@@ -1,18 +1,18 @@
 import React from 'react';
-import AppBar from 'material-ui/AppBar';
+import AppBar from '@mui/material/AppBar';
+import Toolbar from '@mui/material/Toolbar';
+import Typography from '@mui/material/Typography';
 
-const style = {
-  position: 'fixed',
-  top: 0
-};
-
-export default class Header extends React.Component {
-  render() {
-    return (
-      <AppBar
-        className = "header"
-        title={this.props.header}
-        iconClassNameRight="muidocs-icon-navigation-expand-more"/>
-    );
-  }
+function Header({ header }) {
+  return (
+    <AppBar position="static">
+      <Toolbar>
+        <Typography variant="h6" color="inherit">
+          {header}
+        </Typography>
+      </Toolbar>
+    </AppBar>
+  );
 }
+
+export default Header;

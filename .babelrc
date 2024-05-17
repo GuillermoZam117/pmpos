@@ -1,13 +1,21 @@
 {
   "presets": [
-    "es2015",
-    "react",
-    "survivejs-kanban"
+    "@babel/preset-env",
+    "@babel/preset-react"
   ],
   "env": {
-    "start": {
+    "development": {
       "presets": [
-        "react-hmre"
+        "@babel/preset-react"
+      ],
+      "plugins": [
+        "react-hot-loader/babel"
+      ]
+    },
+    "production": {
+      "presets": [
+        "@babel/preset-env",
+        "@babel/preset-react"
       ]
     }
   }

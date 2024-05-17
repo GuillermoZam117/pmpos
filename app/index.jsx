@@ -1,35 +1,34 @@
-import 'babel-polyfill';
-import 'react-toolbox/lib/commons.scss';
+import 'core-js/stable';
+import 'regenerator-runtime/runtime';
 import React from 'react';
 import ReactDOM from 'react-dom';
 import App from './components/App';
 import EntityList from './components/Entities';
 import Login from './components/Login';
-import MuiThemeProvider from 'material-ui/styles/MuiThemeProvider';
-import darkBaseTheme from 'material-ui/styles/baseThemes/darkBaseTheme';
-import getMuiTheme from 'material-ui/styles/getMuiTheme';
-import injectTapEventPlugin from 'react-tap-event-plugin';
-import { Router, Route, hashHistory } from 'react-router';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { store } from './store';
 import { RefreshToken } from './queries';
 
-if (process.env.NODE_ENV !== 'production') {
-  React.Perf = require('react-addons-perf');
-}
-
-injectTapEventPlugin();
+const darkTheme = createTheme({
+  palette: {
+    mode: 'dark',
+  },
+});
 
 const AppHandler = () => (
-  <MuiThemeProvider>
+  <ThemeProvider theme={darkTheme}>
     <Provider store={store}>
-      <Router history={hashHistory}>
-        <Route path="/" component={App}></Route>
-        <Route path="/entities(/:terminalId)(/:screenName)" component={EntityList}></Route>
-        <Route path="/login" component={Login}></Route>
+      <Router>
+        <Routes>
+          <Route path="/" element={<App />} />
+          <Route path="/entities/:terminalId/:screenName" element={<EntityList />} />
+          <Route path="/login" element={<Login />} />
+        </Routes>
       </Router>
     </Provider>
-  </MuiThemeProvider>
+  </ThemeProvider>
 );
 
 if (localStorage['refresh_token']) {
@@ -41,11 +40,6 @@ if (localStorage['refresh_token']) {
 function Render() {
   ReactDOM.render(
     <AppHandler />,
-    document.getElementById('app')
+    document.getElementById('app') // Ensure this element exists in your HTML
   );
 }
-
-
-
-
-

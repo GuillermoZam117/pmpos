@@ -17,3 +17,7 @@ export const TICKETS_REFRESHED = 'TICKETS_REFRESHED'
 export const AUTHENTICATION_REQUEST = 'AUTHENTICATION_REQUEST'
 export const AUTHENTICATION_SUCCESS = 'AUTHENTICATION_SUCCESS'
 export const AUTHENTICATION_FAILURE = 'AUTHENTICATION_FAILURE'
+export const changeTerminalId = (id) => ({
+    type: 'CHANGE_TERMINAL_ID',
+    payload: id
+  });

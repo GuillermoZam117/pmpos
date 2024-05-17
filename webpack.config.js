@@ -1,122 +1,48 @@
 const path = require('path');
-const merge = require('webpack-merge');
-const validate = require('webpack-validator');
-const Joi = require('webpack-validator').Joi
+const HtmlWebpackPlugin = require('html-webpack-plugin');
+const { CleanWebpackPlugin } = require('clean-webpack-plugin');
+const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 
-const parts = require('./libs/parts');
-
-const TARGET = process.env.npm_lifecycle_event;
-const ENABLE_POLLING = process.env.ENABLE_POLLING;
-const PATHS = {
-  app: path.join(__dirname, 'app'),
-  style: [
-    path.join(__dirname, 'app', 'main.css')
-  ],
-  build: path.join(__dirname, 'build'),
-  test: path.join(__dirname, 'tests')
-};
-
-process.env.BABEL_ENV = TARGET;
-
-const common = merge(
-  {
-    // Entry accepts a path or an object of entries.
-    // We'll be using the latter form given it's
-    // convenient with more complex configurations.
-    entry: {
-      app: ['babel-polyfill', PATHS.app]
-    },
+module.exports = {
+    mode: 'development', // Change to 'production' for production build
+    entry: path.resolve(__dirname, 'app', 'index.jsx'),  // ensure the entry point is correct
     output: {
-      path: PATHS.build,
-      filename: '[name].js'
-      // TODO: Set publicPath to match your GitHub project name
-      // E.g., '/kanban-demo/'. Webpack will alter asset paths
-      // based on this. You can even use an absolute path here
-      // or even point to a CDN.
-      //publicPath: ''
+        path: path.resolve(__dirname, 'dist'),
+        filename: 'bundle.js'
     },
+    module: {
+        rules: [
+            {
+                test: /\.(js|jsx)$/,
+                exclude: /node_modules/,
+                use: {
+                    loader: 'babel-loader'
+                }
+            },
+            {
+                test: /\.css$/,
+                use: [MiniCssExtractPlugin.loader, 'css-loader']
+            }
+        ]
+    },
+    plugins: [
+        new CleanWebpackPlugin(),
+        new MiniCssExtractPlugin({
+            filename: '[name].[contenthash].css'
+        }),
+        new HtmlWebpackPlugin({
+            template: path.resolve(__dirname, 'app', 'index.html'),  // ensure this path is correct
+            filename: 'index.html'
+        })
+    ],
     resolve: {
-      extensions: ['', '.js', '.jsx','.json']
+        extensions: ['.js', '.jsx']  // handle .js and .jsx files
+    },
+    devServer: {
+        static: path.resolve(__dirname, 'public'),
+        compress: true,
+        port: 8080,
+        open: true,
+        hot: true
     }
-  },
-  parts.indexTemplate({
-    title: 'PM-POS',
-    appMountId: 'app'
-  }),
-  parts.loadJSON(),
-  parts.loadJSX(PATHS.app),
-  parts.lintJSX(PATHS.app)
-);
-
-var config;
-
-// Detect how npm is run and branch based on that
-switch (TARGET) {
-  case 'build':
-  case 'stats':
-    config = merge(
-      common,
-      {
-        devtool: 'source-map',
-        entry: {
-          style: PATHS.style
-        },
-        output: {
-          path: PATHS.build,
-          filename: '[name].[chunkhash].js',
-          chunkFilename: '[chunkhash].js'
-        }
-      },
-      parts.clean(PATHS.build),
-      parts.setFreeVariable(
-        'process.env.NODE_ENV',
-        'production'
-      ),
-      parts.extractBundle({
-        name: 'vendor',
-        entries: ['react', 'react-dom', 'material-ui']
-      }),
-      parts.minify(),
-      parts.extractCSS(PATHS.style)
-    );
-    break;
-  case 'test':
-  case 'test:tdd':
-    config = merge(
-      common,
-      {
-        devtool: 'inline-source-map'
-      },
-      parts.loadIsparta(PATHS.app),
-      parts.loadJSX(PATHS.test)
-    );
-    break;
-  default:
-    config = merge(
-      common,
-      {
-        devtool: 'eval-source-map',
-        entry: {
-          style: PATHS.style
-        }
-      },
-      parts.loadSass(),
-      parts.setupCSS(PATHS.style),
-      parts.devServer({
-        // Customize host/port here if needed
-        host: process.env.HOST,
-        port: process.env.PORT,
-        poll: ENABLE_POLLING
-      }),
-      parts.enableReactPerformanceTools(),
-      parts.npmInstall()
-    );
-}
-
-const schemaExtension = Joi.object({
-  sassLoader: Joi.any()
-})
-
-module.exports = validate(config, {
-  quiet: true,schemaExtension: schemaExtension
-});
+};

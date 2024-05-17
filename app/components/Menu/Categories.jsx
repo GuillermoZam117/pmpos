@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDom from 'react-dom';
 import {connect} from 'react-redux';
-import { Button } from 'react-toolbox/lib/button';
+import Button from '@mui/material/Button';
 
 class CategoryButton extends React.Component {
     render() {

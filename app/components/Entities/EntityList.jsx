@@ -1,29 +1,23 @@
 import React from 'react';
-import { Button } from 'react-toolbox/lib/button';
+import { Button } from '@mui/material'; // Updated import for MUI
 import { connect } from 'react-redux';
 import ReactMarkdown from 'react-markdown';
 import { changeEntityOfTerminalTicket, getEntityScreenItems } from '../../queries';
 import * as Actions from '../../actions';
-import PureRenderMixin from 'react-addons-pure-render-mixin';
+import PropTypes from 'prop-types'; // Use PropTypes for prop type checking
 
 class EntityListButton extends React.Component {
-
-    constructor(props) {
-        super(props);
-        this.shouldComponentUpdate = PureRenderMixin.shouldComponentUpdate.bind(this);
-    }
-
     render() {
         const style = {
-            'color': this.props.labelColor,
-            'backgroundColor': this.props.color,
-            'margin': '4px',
-            'height': 'auto',
-            'minHeight': '65px',
-            'flex': '1 1 11%',
-            'lineHeight': '1.3',
-            'wordWrap': 'breakWord',
-            'whiteSpace': 'normal'
+            color: this.props.labelColor,
+            backgroundColor: this.props.color,
+            margin: '4px',
+            height: 'auto',
+            minHeight: '65px',
+            flex: '1 1 11%',
+            lineHeight: '1.3',
+            wordWrap: 'break-word',
+            whiteSpace: 'normal'
         };
 
         return (
@@ -31,13 +25,20 @@ class EntityListButton extends React.Component {
                 style={style}
                 className='entityButton'
                 onClick={this.props.onClick}>
-                <ReactMarkdown source={this.props.caption} />
-            </Button>);
+                <ReactMarkdown>{this.props.caption}</ReactMarkdown>
+            </Button>
+        );
     }
 }
 
-class EntityList extends React.Component {
+EntityListButton.propTypes = {
+    labelColor: PropTypes.string,
+    color: PropTypes.string,
+    caption: PropTypes.string,
+    onClick: PropTypes.func
+};
 
+class EntityList extends React.Component {
     loadItems(name) {
         this.props.loadEntityScreenRequest(name);
         getEntityScreenItems(name, (items) => {
@@ -47,6 +48,12 @@ class EntityList extends React.Component {
 
     componentDidMount() {
         this.loadItems(this.props.location.query.screenName);
+    }
+
+    selectEntity = (entityName) => {
+        changeEntityOfTerminalTicket(this.props.location.query.terminalId, 'Tables', entityName, () => {
+            this.context.router.push('/');
+        });
     }
 
     render() {
@@ -62,21 +69,15 @@ class EntityList extends React.Component {
                         caption={x.caption}
                         labelColor={x.labelColor}
                         color={x.color}
-                        onClick={(e) => this.selectEntity(x.name)} />
+                        onClick={() => this.selectEntity(x.name)} />
                 )}
             </div>
         );
     }
-
-    selectEntity = (entityName) => {
-        changeEntityOfTerminalTicket(this.props.location.query.terminalId, 'Tables', entityName, () => {
-            this.context.router.push('/');
-        });
-    }
 }
 
 EntityList.contextTypes = {
-    router: React.PropTypes.object
+    router: PropTypes.object
 }
 
 const mapStateToProps = state => ({
@@ -85,10 +86,10 @@ const mapStateToProps = state => ({
     items: state.entityList.get('items')
 })
 
-const mapDispatchToProps = ({
+const mapDispatchToProps = {
     loadEntityScreenRequest: Actions.loadEntityScreenRequest,
     loadEntityScreenSuccess: Actions.loadEntityScreenSuccess
-})
+}
 
 export default connect(
     mapStateToProps,

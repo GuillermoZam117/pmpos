@@ -1,7 +1,7 @@
 import React from 'react';
-import TextField from 'material-ui/TextField';
-import RaisedButton from 'material-ui/RaisedButton';
+import { TextField, Button, Box, Typography } from '@mui/material'; // Use MUI components
 import { connect } from 'react-redux';
+import PropTypes from 'prop-types';
 import * as Actions from '../../actions';
 import { Authenticate } from '../../queries';
 
@@ -11,32 +11,10 @@ class Login extends React.Component {
         this.state = { userName: '', password: '', message: '' };
     }
 
-    render() {
-        return (
-            <div>
-                <div>
-                    Authentication Required
-                </div>
-                <TextField hintText="User Name"
-                    floatingLabelText="User Name"
-                    value={this.state.userName}
-                    onChange={this.onUserNameChange} />
-                <TextField hintText="Password Field"
-                    floatingLabelText="Password"
-                    type="password"
-                    value={this.state.password}
-                    onChange={this.onPasswordChange} />
-                <br />
-                <br />
-                <div>{this.state.message}</div>
-                <br />
-                <RaisedButton label="OK" onClick={this.onClick} />
-            </div>)
-    }
-
     onUserNameChange = (e) => {
         this.setState({ userName: e.target.value });
     }
+
     onPasswordChange = (e) => {
         this.setState({ password: e.target.value });
     }
@@ -55,26 +33,53 @@ class Login extends React.Component {
                 });
             });
     }
+
+    render() {
+        return (
+            <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height="100vh">
+                <Typography variant="h5" component="div">
+                    Authentication Required
+                </Typography>
+                <TextField 
+                    label="User Name"
+                    value={this.state.userName}
+                    onChange={this.onUserNameChange}
+                    margin="normal"
+                />
+                <TextField 
+                    label="Password"
+                    type="password"
+                    value={this.state.password}
+                    onChange={this.onPasswordChange}
+                    margin="normal"
+                />
+                <Box my={2}>
+                    <Typography color="error">{this.state.message}</Typography>
+                </Box>
+                <Button variant="contained" color="primary" onClick={this.onClick}>
+                    OK
+                </Button>
+            </Box>
+        );
+    }
 }
-
-
 
 Login.contextTypes = {
-    router: React.PropTypes.object
-}
+    router: PropTypes.object
+};
 
 const mapStateToProps = state => ({
     isAuthenticating: state.login.get('isAuthenticating'),
     accessToken: state.login.get('accessToken'),
     refreshToken: state.login.get('refreshToken')
-})
+});
 
-const mapDispatchToProps = ({
+const mapDispatchToProps = {
     authenticationSuccess: Actions.authenticationSuccess,
     authenticationFailure: Actions.authenticationFailure
-})
+};
 
 export default connect(
     mapStateToProps,
     mapDispatchToProps
-)(Login)
+)(Login);

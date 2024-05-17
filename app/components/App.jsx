@@ -1,8 +1,8 @@
-import React, { Component, PropTypes } from 'react';
-import { bindActionCreators } from 'redux';
+import React, { Component } from 'react';
 import { connect } from 'react-redux';
-import { appconfig } from '../config';
-import uuid from 'uuid';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import PropTypes from 'prop-types';
+import { Snackbar, ThemeProvider, createTheme } from '@mui/material';
 import Header from './Header';
 import Menu from './Menu';
 import Orders from './Orders';
@@ -10,176 +10,99 @@ import TicketTotal from './TicketTotal';
 import TicketTags from './TicketTags';
 import Commands from './Commands';
 import MyTickets from './MyTickets';
-import Signalr from '../signalr';
-import Snackbar from 'material-ui/Snackbar';
+import Login from './Login/Login';
+import EntityList from './Entities/EntityList';
+import { changeTerminalId, setTicket, closeMessage, updateMessage } from '../actions';
 import * as Queries from '../queries';
-import * as Actions from '../actions';
+
+// Theme configuration for MUI
+const theme = createTheme({
+  palette: {
+    mode: 'dark', // or 'light'
+  },
+});
 
 class App extends Component {
-
-    componentDidMount() {
-        if (localStorage['terminalId']) {
-            var terminalId = localStorage['terminalId'];
-            Queries.getTerminalExists(terminalId, (result) => {
-                if (result) {
-                    Queries.getTerminalTicket(terminalId, (ticket) => {
-                        this.props.changeTerminalId(terminalId);
-                        this.props.setTicket(ticket);
-                    })
-                } else Queries.registerTerminal((terminalId) => this.updateTerminalId(terminalId));
-            });
+  componentDidMount() {
+    if (localStorage['terminalId']) {
+      const terminalId = localStorage['terminalId'];
+      Queries.getTerminalExists(terminalId, (result) => {
+        if (result) {
+          Queries.getTerminalTicket(terminalId, (ticket) => {
+            this.props.changeTerminalId(terminalId);
+            this.props.setTicket(ticket);
+          });
+        } else {
+          Queries.registerTerminal((newTerminalId) => this.updateTerminalId(newTerminalId));
         }
-        else {
-            Queries.registerTerminal((terminalId) => this.updateTerminalId(terminalId));
-        }
-
-        if (this.props.terminalId) return;
-
-        Signalr.connect((message) => {
-            if (message.indexOf('TICKET_REFRESH') > -1) {
-                console.log('Ticket refreshed');
-                this.props.ticketsNeedsRefresh();
-            }
-        });
+      });
+    } else {
+      Queries.registerTerminal((newTerminalId) => this.updateTerminalId(newTerminalId));
     }
+  }
 
-    updateTerminalId(terminalId) {
-        localStorage['terminalId'] = terminalId;
-        this.props.changeTerminalId(terminalId);
-    }
+  updateTerminalId(terminalId) {
+    localStorage['terminalId'] = terminalId;
+    this.props.changeTerminalId(terminalId);
+  }
 
-    getHeader(ticket = { entities: [] }) {
-        var title = ticket.id === undefined ? 'PM-POS' :
-            ticket.id > 0 ? 'Ticket' : 'New Ticket';
-        var entityList = ticket != null && ticket.entities.length > 0 ? ticket.entities.map(x => x.name).join() : undefined;
-        return title + (entityList ? ` (${entityList})` : '');
-    }
+  closeMessage = () => {
+    this.props.closeMessage();
+  };
 
-    render() {
-        const {menu, menuItems, ticket} = this.props;
-        return (
-            <div className="mainDiv">
-                <Header header={this.getHeader(ticket)} />
-                <div className="mainBody">
-                    <Menu onMenuItemClick={this.onMenuItemClick} />
-                    <Orders ticket={ticket}/>
-                    <MyTickets ticket={ticket} onClick={this.onTicketClick} />
-                </div>
-                <TicketTags ticket={ticket} />
-                <Commands commands={[
-                    { command: this.cleanTicket, caption: 'Clear Orders', color: 'White' },
-                    { command: this.selectTable, caption: 'Tables', color: 'White' },
-                    { command: this.closeTicket, caption: 'Close', color: 'Red', foreground: 'White' }
-                ]} />
-                <TicketTotal />
-                <Snackbar
-                    open={this.props.isMessageOpen}
-                    message={this.props.message}
-                    autoHideDuration={4000}
-                    onRequestClose={this.closeMessage} />
+  render() {
+    return (
+      <ThemeProvider theme={theme}>
+        <Router>
+          <div className="mainDiv">
+            <Header />
+            <div className="mainBody">
+              <Menu />
+              <Orders />
+              <MyTickets />
             </div>
-        );
-    }
-
-    onTicketClick = (ticketId) => {
-        console.log('Ticket Open', ticketId);
-        Queries.loadTerminalTicket(this.props.terminalId, ticketId, (ticket) => {
-            this.props.setTicket(ticket);
-        });
-    }
-
-    onMenuItemClick = (productId, orderTags = '') => {
-        if (!this.props.ticket) {
-            Queries.createTerminalTicket(this.props.terminalId, (ticket) => {
-                this.props.setTicket(ticket);
-                this.onMenuItemClick(productId, orderTags);
-            });
-            return;
-        }
-        Queries.addOrderToTerminalTicket(this.props.terminalId, productId, 1, orderTags, (ticket) => {
-            this.props.setTicket(ticket);
-            this.closeMessage();
-        });
-    }
-
-    cleanTicket = () => {
-        Queries.clearTerminalTicketOrders(this.props.terminalId, (ticket) => {
-            this.props.setTicket(ticket);
-        });
-    }
-
-    selectTable = () => {
-        if (!this.props.ticket) {
-            this.props.updateMessage('Select a ticket');
-            return;
-        }
-        this.context.router.push({
-            pathname: '/entities',
-            query: {
-                terminalId: this.props.terminalId,
-                screenName: appconfig().entityScreenName
-            }
-        });
-    }
-
-    closeTicket = () => {
-        if (this.props.ticket.orders.length == 0) {
-            this.props.updateMessage('Add orders to create a ticket.');
-            return;
-        }
-        Queries.closeTerminalTicket(this.props.terminalId, (errorMessage) => {
-            Queries.postRefresh();
-
-            // notify other Clients that a Food Order Task has been Printed (for GQL Kitchen Display)
-            Queries.broadcastMessage('{"eventName":"TASK_PRINTED","terminal":"Server","userName":"Administrator","productType":"Food"}');
-
-            this.setState({ errorMessage: errorMessage });
-            if (this.props.ticket.id == 0)
-                this.props.updateMessage('Ticket sucsessfully submitted!');
-            this.props.setTicket(undefined);
-        });
-    }
-
-    closeMessage = () => {
-        if (this.props.isMessageOpen)
-            this.props.closeMessage();
-    };
+            <TicketTags />
+            <Commands />
+            <TicketTotal />
+            <Snackbar
+              open={this.props.isMessageOpen}
+              message={this.props.message}
+              autoHideDuration={4000}
+              onClose={this.closeMessage}
+            />
+            <Routes>
+              <Route path="/" element={<div>Home</div>} />
+              <Route path="/entities/:terminalId/:screenName" element={<EntityList />} />
+              <Route path="/login" element={<Login />} />
+            </Routes>
+          </div>
+        </Router>
+      </ThemeProvider>
+    );
+  }
 }
 
-App.contextTypes = {
-    router: React.PropTypes.object
-}
-
-App.defaultProps = {
-    message: '',
-    isMessageOpen: false,
-    menu: { categories: [] },
-    menuItems: []
-}
-
-App.PropTypes = {
-    terminalId: PropTypes.number,
-    message: PropTypes.object,
-    isMessageOpen: PropTypes.boolean,
-    ticket: PropTypes.object
-}
+App.propTypes = {
+  terminalId: PropTypes.number,
+  message: PropTypes.string,
+  isMessageOpen: PropTypes.bool,
+  ticket: PropTypes.object,
+  changeTerminalId: PropTypes.func.isRequired,
+  setTicket: PropTypes.func.isRequired,
+  closeMessage: PropTypes.func.isRequired
+};
 
 const mapStateToProps = state => ({
-    terminalId: state.app.get('terminalId'),
-    message: state.app.getIn(['message', 'text']),
-    isMessageOpen: state.app.getIn(['message', 'isOpen']),
-    ticket: state.app.get('ticket')
-})
+  terminalId: state.app.terminalId,
+  message: state.app.message.text,
+  isMessageOpen: state.app.message.isOpen,
+  ticket: state.app.ticket
+});
 
-const mapDispatchToProps = ({
-    changeTerminalId: Actions.chageTerminalId,
-    updateMessage: Actions.updateMessage,
-    closeMessage: Actions.closeMessage,
-    setTicket: Actions.setTicket,
-    ticketsNeedsRefresh: Actions.ticketsNeedsRefresh
-})
+const mapDispatchToProps = {
+  changeTerminalId,
+  setTicket,
+  closeMessage
+};
 
-export default connect(
-    mapStateToProps,
-    mapDispatchToProps
-)(App)
+export default connect(mapStateToProps, mapDispatchToProps)(App);

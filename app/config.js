@@ -35,12 +35,12 @@ export function appconfig() {
     var SIGNALRhub  = SIGNALRserv + SIGNALRhubs;
 
     // Terminal settings
-    var terminalName = 'Server'
-    var userName = 'Administrator';
-    var departmentName = 'Restaurant';
-    var ticketTypeName = 'Ticket';
-    var menuName = 'Menu';
-    var entityScreenName = 'All Tables';
+    var terminalName = 'SERVIDOR'
+    var userName = 'graphiql';
+    var departmentName = 'MESAS';
+    var ticketTypeName = 'COMEDOR';
+    var menuName = 'MENU';
+    var entityScreenName = 'MESAS';
 
     // assign some stuff to the Object
     // you can override the "auto config" here if you wish
