@@ -3,6 +3,9 @@
     "@babel/preset-env",
     "@babel/preset-react"
   ],
+  "plugins": [
+    "@babel/plugin-transform-runtime"
+  ],
   "env": {
     "development": {
       "presets": [
@@ -16,6 +19,9 @@
       "presets": [
         "@babel/preset-env",
         "@babel/preset-react"
+      ],
+      "plugins": [
+        "@babel/plugin-transform-runtime"
       ]
     }
   }

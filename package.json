@@ -17,6 +17,7 @@
   "license": "MIT",
   "devDependencies": {
     "@babel/core": "^7.24.5",
+    "@babel/plugin-transform-runtime": "^7.24.3",
     "@babel/preset-env": "^7.24.5",
     "@babel/preset-react": "^7.24.1",
     "@types/react": "^18.0.0",
@@ -27,6 +28,7 @@
     "mini-css-extract-plugin": "^2.9.0",
     "react-hot-loader": "^4.13.1",
     "webpack": "^5.91.0",
+    "webpack-bundle-analyzer": "^4.10.2",
     "webpack-cli": "^4.10.0",
     "webpack-dev-server": "^4.15.2"
   },
