@@ -1,8 +1,9 @@
-import React, { Component } from 'react';
+import React, { useEffect } from 'react';
 import { connect } from 'react-redux';
 import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';
 import PropTypes from 'prop-types';
-import { Snackbar, ThemeProvider, createTheme } from '@mui/material';
+import { Snackbar, ThemeProvider } from '@mui/material';
+import { createTheme } from '@mui/material/styles';
 import Header from './Header';
 import Menu from './Menu';
 import Orders from './Orders';
@@ -27,74 +28,80 @@ const theme = createTheme({
   },
 });
 
-class App extends Component {
-  componentDidMount() {
-    if (localStorage['terminalId']) {
-      const terminalId = localStorage['terminalId'];
-      Queries.getTerminalExists(terminalId, (result) => {
-        if (result) {
-          Queries.getTerminalTicket(terminalId, (ticket) => {
-            this.props.setTerminalId(terminalId); // Changed from changeTerminalId
-            this.props.setTicket(ticket);
-          });
-        } else {
-          Queries.registerTerminal((newTerminalId) => this.updateTerminalId(newTerminalId));
-        }
-      });
-    } else {
-      Queries.registerTerminal((newTerminalId) => this.updateTerminalId(newTerminalId));
-    }
-  }
+const App = ({ 
+    terminalId,
+    message,
+    isMessageOpen,
+    setTerminalId,
+    setTicket,
+    closeMessage 
+}) => {
+    useEffect(() => {
+        const initializeTerminal = async () => {
+            const savedTerminalId = localStorage.getItem('terminalId');
+            
+            if (savedTerminalId) {
+                const exists = await Queries.getTerminalExists(savedTerminalId);
+                if (exists) {
+                    const ticket = await Queries.getTerminalTicket(savedTerminalId);
+                    setTerminalId(savedTerminalId);
+                    setTicket(ticket);
+                } else {
+                    const newTerminalId = await Queries.registerTerminal();
+                    updateTerminalId(newTerminalId);
+                }
+            } else {
+                const newTerminalId = await Queries.registerTerminal();
+                updateTerminalId(newTerminalId);
+            }
+        };
 
-  updateTerminalId(terminalId) {
-    localStorage['terminalId'] = terminalId;
-    this.props.setTerminalId(terminalId); // Changed from changeTerminalId
-  }
+        initializeTerminal();
+    }, []); // Empty dependency array for componentDidMount behavior
 
-  closeMessage = () => {
-    this.props.closeMessage();
-  };
+    const updateTerminalId = (id) => {
+        localStorage.setItem('terminalId', id);
+        setTerminalId(id);
+    };
 
-  render() {
     return (
-      <ThemeProvider theme={theme}>
-        <Router>
-          <div className="mainDiv">
-            <Header />
-            <div className="mainBody">
-              <Menu />
-              <Orders />
-              <MyTickets />
-            </div>
-            <TicketTags />
-            <Commands />
-            <TicketTotal />
-            <Snackbar
-              open={this.props.isMessageOpen}
-              message={this.props.message}
-              autoHideDuration={4000}
-              onClose={this.closeMessage}
-            />
-            <Switch>
-              <Route path="/" exact component={() => <div>Home</div>} />
-              <Route path="/entities/:terminalId/:screenName" component={EntityList} />
-              <Route path="/login" component={Login} />
-            </Switch>
-          </div>
-        </Router>
-      </ThemeProvider>
+        <ThemeProvider theme={theme}>
+            <Router>
+                <div className="mainDiv">
+                    <Header />
+                    <div className="mainBody">
+                        <Menu />
+                        <Orders />
+                        <MyTickets />
+                    </div>
+                    <TicketTags />
+                    <Commands />
+                    <TicketTotal />
+                    <Snackbar
+                        open={isMessageOpen}
+                        message={message}
+                        autoHideDuration={4000}
+                        onClose={closeMessage}
+                    />
+                    <Switch>
+                        <Route path="/" exact component={() => <div>Home</div>} />
+                        <Route path="/entities/:terminalId/:screenName" component={EntityList} />
+                        <Route path="/login" component={Login} />
+                    </Switch>
+                </div>
+            </Router>
+        </ThemeProvider>
     );
-  }
-}
+};
 
 App.propTypes = {
-  terminalId: PropTypes.string,
-  message: PropTypes.string,
-  isMessageOpen: PropTypes.bool,
-  ticket: PropTypes.object,
-  setTerminalId: PropTypes.func.isRequired, // Changed from changeTerminalId
-  setTicket: PropTypes.func.isRequired,
-  closeMessage: PropTypes.func.isRequired
+    terminalId: PropTypes.string,
+    message: PropTypes.string,
+    isMessageOpen: PropTypes.bool,
+    ticket: PropTypes.object,
+    setTerminalId: PropTypes.func.isRequired,
+    setTicket: PropTypes.func.isRequired,
+    closeMessage: PropTypes.func.isRequired
 };
 
 const mapStateToProps = (state) => ({

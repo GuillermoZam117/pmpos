@@ -1,87 +1,140 @@
-import React from 'react';
-import AppBar from '@mui/material/AppBar'; // Updated import for MUI
-import Paper from '@mui/material/Paper'; // Updated import for MUI
-import List from '@mui/material/List'; // Updated import for MUI
-import ListItem from '@mui/material/ListItem'; // Updated import for MUI
-import ListSubheader from '@mui/material/ListSubheader'; // Updated import for MUI
-import ListItemText from '@mui/material/ListItemText'; // Updated import for MUI
+import React, { useEffect, useState, useCallback, memo } from 'react';
+import PropTypes from 'prop-types';
+import { 
+    AppBar, 
+    Paper, 
+    List, 
+    ListItem, 
+    ListSubheader, 
+    ListItemText 
+} from '@mui/material';
 import { connect } from 'react-redux';
 import { getTerminalTickets } from '../queries';
 import * as Actions from '../actions';
-import { shouldComponentUpdate } from 'react-addons-pure-render-mixin';
 
-const Total = (p) => {
-    return <b>{p.total}</b>
-}
+const Total = memo(({ total }) => {
+    return <b>{total}</b>;
+});
 
-class MyTicketLine extends React.Component {
+Total.propTypes = {
+    total: PropTypes.number.isRequired
+};
 
-    constructor(props) {
-        super(props);
-        this.shouldComponentUpdate = shouldComponentUpdate.bind(this);
-    }
+const MyTicketLine = memo(({ ticket, onClick = () => {} }) => {
+    const handleClick = useCallback(() => {
+        onClick(ticket.id);
+    }, [ticket.id, onClick]);
 
-    render() {
-        const { ticket, onClick = () => {} } = this.props;
-        return (
-            <ListItem button onClick={onClick.bind(null, ticket.id)}>
-                <ListItemText>
-                    <div style={{ 'display': 'flex', 'margin': '4px' }}>
-                        <span className="myListTicketNumber">{ticket.number}</span>
-                        <span className="myListEntity">{ticket.entities.map(x => x.name).join()}</span>
-                        <span className="myListRemaining">{ticket.remaining.toFixed(2)}</span>
-                    </div>
-                </ListItemText>
-            </ListItem>
-        )
-    }
-}
+    return (
+        <ListItem button onClick={handleClick}>
+            <ListItemText>
+                <div style={{ display: 'flex', margin: '4px' }}>
+                    <span className="myListTicketNumber">{ticket.number}</span>
+                    <span className="myListEntity">
+                        {ticket.entities.map(x => x.name).join()}
+                    </span>
+                    <span className="myListRemaining">
+                        {ticket.remaining.toFixed(2)}
+                    </span>
+                </div>
+            </ListItemText>
+        </ListItem>
+    );
+});
 
-class MyTickets extends React.Component {
+MyTicketLine.propTypes = {
+    ticket: PropTypes.shape({
+        id: PropTypes.string.isRequired,
+        number: PropTypes.string.isRequired,
+        entities: PropTypes.arrayOf(
+            PropTypes.shape({
+                name: PropTypes.string.isRequired
+            })
+        ).isRequired,
+        remaining: PropTypes.number.isRequired
+    }).isRequired,
+    onClick: PropTypes.func
+};
 
-    loadItems(terminalId = this.props.terminalId) {
-        this.props.loadMyTicketsRequest();
-        getTerminalTickets(terminalId, (items) => {
-            this.props.ticketsRefreshed();
-            if (items) this.props.loadMyTicketsSuccess(items);
-            else this.props.loadMyTicketsFailure();
+const MyTickets = ({ 
+    terminalId,
+    ticket,
+    items,
+    ticketsNeedsRefresh,
+    isFetching,
+    loadMyTicketsRequest,
+    loadMyTicketsSuccess,
+    loadMyTicketsFailure,
+    ticketsRefreshed,
+    onClick
+}) => {
+    const loadItems = useCallback((currentTerminalId = terminalId) => {
+        loadMyTicketsRequest();
+        getTerminalTickets(currentTerminalId, (items) => {
+            ticketsRefreshed();
+            if (items) {
+                loadMyTicketsSuccess(items);
+            } else {
+                loadMyTicketsFailure();
+            }
         });
-    }
+    }, [terminalId, loadMyTicketsRequest, loadMyTicketsSuccess, loadMyTicketsFailure, ticketsRefreshed]);
 
-    componentWillReceiveProps(nextProps) {
-        if (nextProps.ticketsNeedsRefresh && !nextProps.isFetching) {
-            if (this.props.ticket) {
-                this.props.ticketsRefreshed();
+    useEffect(() => {
+        if (terminalId) {
+            loadItems();
+        }
+    }, [terminalId, loadItems]);
+
+    useEffect(() => {
+        if (ticketsNeedsRefresh && !isFetching) {
+            if (ticket) {
+                ticketsRefreshed();
                 return;
             }
-            console.log('Reload 3', nextProps);
-            this.loadItems(nextProps.terminalId);
-        } else if (nextProps.terminalId && this.props.ticket && nextProps.ticket == undefined) {
-            console.log('Reload 1', nextProps.ticket, this.props.ticket);
-            this.loadItems(nextProps.terminalId);
-        } else if (nextProps.terminalId && nextProps.terminalId !== this.props.terminalId) {
-            console.log('Reload 2', nextProps.terminalId, this.props.terminalId);
-            this.loadItems(nextProps.terminalId);
+            loadItems(terminalId);
         }
-    }
+    }, [ticketsNeedsRefresh, isFetching, ticket, terminalId, loadItems, ticketsRefreshed]);
 
-    render() {
-        if (this.props.ticket && !this.props.ticketsNeedsRefresh) return null;
-        if (!this.props.items) return (<div>Loading...</div>);
-        return (
-            <Paper className="myTickets" style={{ 'borderRadius': '0' }}>
-                <List subheader={<ListSubheader>My Tickets</ListSubheader>}>
-                    {this.props.items.sort((x, y) => new Date(y.lastOrderDate) - new Date(x.lastOrderDate))
-                        .map((x) => <MyTicketLine key={x.id} ticket={x} onClick={this.props.onClick} />)}
-                </List>
-            </Paper>
-        );
-    }
-}
+    if (ticket && !ticketsNeedsRefresh) return null;
+    if (!items) return <div>Loading...</div>;
+
+    return (
+        <Paper className="myTickets" sx={{ borderRadius: 0 }}>
+            <List subheader={<ListSubheader>My Tickets</ListSubheader>}>
+                {items
+                    .sort((x, y) => new Date(y.lastOrderDate) - new Date(x.lastOrderDate))
+                    .map((x) => (
+                        <MyTicketLine 
+                            key={x.id} 
+                            ticket={x} 
+                            onClick={onClick} 
+                        />
+                    ))}
+            </List>
+        </Paper>
+    );
+};
+
+MyTickets.propTypes = {
+    terminalId: PropTypes.string,
+    ticket: PropTypes.object,
+    items: PropTypes.array,
+    ticketsNeedsRefresh: PropTypes.bool,
+    isFetching: PropTypes.bool,
+    loadMyTicketsRequest: PropTypes.func.isRequired,
+    loadMyTicketsSuccess: PropTypes.func.isRequired,
+    loadMyTicketsFailure: PropTypes.func.isRequired,
+    ticketsRefreshed: PropTypes.func.isRequired,
+    onClick: PropTypes.func
+};
 
 const mapStateToProps = (state) => ({
     terminalId: state.app?.get('terminalId') || '',
-    ticket: state.app?.get('ticket') || null
+    ticket: state.app?.get('ticket') || null,
+    items: state.app?.get('items') || [],
+    ticketsNeedsRefresh: state.app?.get('ticketsNeedsRefresh') || false,
+    isFetching: state.app?.get('isFetching') || false
 });
 
 const mapDispatchToProps = {
@@ -91,4 +144,4 @@ const mapDispatchToProps = {
     ticketsRefreshed: Actions.ticketsRefreshed
 };
 
-export default connect(mapStateToProps, mapDispatchToProps)(MyTickets);
+export default connect(mapStateToProps, mapDispatchToProps)(memo(MyTickets));
