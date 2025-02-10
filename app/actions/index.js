@@ -5,8 +5,8 @@ export const changeSelectedCategory = (category) => ({
     category,
 });
 
-export const changeTerminalId = (terminalId) => ({
-    type: types.CHANGE_TERMINALID,
+export const setTerminalId = (terminalId) => ({
+    type: types.SET_TERMINAL_ID,
     terminalId,
 });
 

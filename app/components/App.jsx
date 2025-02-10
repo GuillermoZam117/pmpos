@@ -12,7 +12,12 @@ import Commands from './Commands';
 import MyTickets from './MyTickets';
 import Login from './Login/Login';
 import EntityList from './Entities/EntityList';
-import { changeTerminalId, setTicket, closeMessage, updateMessage } from '../actions';
+import { 
+    setTerminalId,
+    setTicket, 
+    closeMessage, 
+    updateMessage 
+} from '../actions';
 import * as Queries from '../queries';
 
 // Theme configuration for MUI
@@ -29,7 +34,7 @@ class App extends Component {
       Queries.getTerminalExists(terminalId, (result) => {
         if (result) {
           Queries.getTerminalTicket(terminalId, (ticket) => {
-            this.props.changeTerminalId(terminalId);
+            this.props.setTerminalId(terminalId); // Changed from changeTerminalId
             this.props.setTicket(ticket);
           });
         } else {
@@ -43,7 +48,7 @@ class App extends Component {
 
   updateTerminalId(terminalId) {
     localStorage['terminalId'] = terminalId;
-    this.props.changeTerminalId(terminalId);
+    this.props.setTerminalId(terminalId); // Changed from changeTerminalId
   }
 
   closeMessage = () => {
@@ -83,26 +88,26 @@ class App extends Component {
 }
 
 App.propTypes = {
-  terminalId: PropTypes.number,
+  terminalId: PropTypes.string,
   message: PropTypes.string,
   isMessageOpen: PropTypes.bool,
   ticket: PropTypes.object,
-  changeTerminalId: PropTypes.func.isRequired,
+  setTerminalId: PropTypes.func.isRequired, // Changed from changeTerminalId
   setTicket: PropTypes.func.isRequired,
   closeMessage: PropTypes.func.isRequired
 };
 
 const mapStateToProps = (state) => ({
-  message: state.app?.message || '',  // Add null check
-  terminalId: state.app.terminalId,
-  isMessageOpen: state.app.message.isOpen,
-  ticket: state.app.ticket
+  message: state.app.getIn(['message', 'text']),
+  terminalId: state.app.get('terminalId'),
+  isMessageOpen: state.app.getIn(['message', 'isOpen']),
+  ticket: state.app.get('ticket')
 });
 
 const mapDispatchToProps = {
-  changeTerminalId,
-  setTicket,
-  closeMessage
+    setTerminalId, // Changed from changeTerminalId
+    setTicket,
+    closeMessage
 };
 
 export default connect(mapStateToProps, mapDispatchToProps)(App);
