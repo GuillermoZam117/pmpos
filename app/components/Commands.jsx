@@ -1,23 +1,45 @@
 import React from 'react';
-import Button from '@mui/material/Button';
+import PropTypes from 'prop-types';
+import { Box } from '@mui/material';
+import CommandButtonComponent from './CommandButton';
 
-export default class Commands extends React.Component {
-  render() {
-    const { commands } = this.props;
+const Commands = ({ commands = [] }) => {
+    if (!commands || commands.length === 0) {
+        return null;
+    }
+
     return (
-      <div className="commands">
-        {commands.map(({ command, caption, color, foreground }) => (
-          <Button
-            variant="contained"
-            className="commandButton"
-            key={caption}
-            style={{ backgroundColor: color, color: foreground }}
-            onClick={command}
-          >
-            {caption}
-          </Button>
-        ))}
-      </div>
+        <Box 
+            sx={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 1,
+                p: 1
+            }}
+        >
+            {commands.map((command, index) => (
+                <CommandButtonComponent 
+                    key={`cmd-${command.id || index}`} 
+                    command={command} 
+                />
+            ))}
+        </Box>
     );
-  }
-}
+};
+
+Commands.propTypes = {
+    commands: PropTypes.arrayOf(
+        PropTypes.shape({
+            id: PropTypes.string,
+            caption: PropTypes.string,
+            icon: PropTypes.string,
+            onClick: PropTypes.func
+        })
+    )
+};
+
+Commands.defaultProps = {
+    commands: []
+};
+
+export default Commands;

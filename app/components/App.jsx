@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import { Snackbar, ThemeProvider, createTheme } from '@mui/material';
 import Header from './Header';
@@ -70,11 +70,11 @@ class App extends Component {
               autoHideDuration={4000}
               onClose={this.closeMessage}
             />
-            <Routes>
-              <Route path="/" element={<div>Home</div>} />
-              <Route path="/entities/:terminalId/:screenName" element={<EntityList />} />
-              <Route path="/login" element={<Login />} />
-            </Routes>
+            <Switch>
+              <Route path="/" exact component={() => <div>Home</div>} />
+              <Route path="/entities/:terminalId/:screenName" component={EntityList} />
+              <Route path="/login" component={Login} />
+            </Switch>
           </div>
         </Router>
       </ThemeProvider>
@@ -92,9 +92,9 @@ App.propTypes = {
   closeMessage: PropTypes.func.isRequired
 };
 
-const mapStateToProps = state => ({
+const mapStateToProps = (state) => ({
+  message: state.app?.message || '',  // Add null check
   terminalId: state.app.terminalId,
-  message: state.app.message.text,
   isMessageOpen: state.app.message.isOpen,
   ticket: state.app.ticket
 });

@@ -1,7 +1,15 @@
-import {Map} from 'immutable';
+import { Map } from 'immutable';
 import * as types from '../constants/ActionTypes';
 
-function setTerminaId(state, terminalId) {
+const initialState = Map({
+    message: Map({ text: '', isOpen: false }),
+    terminalId: '',
+    ticket: null,
+    isLoading: false,
+    error: null
+});
+
+function setTerminalId(state, terminalId) {
     return state.set('terminalId', terminalId);
 }
 
@@ -17,16 +25,22 @@ function setTicket(state, ticket) {
     return state.set('ticket', ticket)
 }
 
-export default function app(state = Map(), action) {
+export default function app(state = initialState, action) {
     switch (action.type) {
+        case 'SET_MESSAGE':
+            return {
+                ...state,
+                message: action.payload
+            };
         case types.CHANGE_TERMINALID:
-            return setTerminaId(state, action.terminalId);
+            return setTerminalId(state, action.terminalId);
         case types.UPDATE_MESSAGE:
             return setMessage(state, action.message);
         case types.CLOSE_MESSAGE:
             return closeMessage(state);
         case types.SET_TICKET:
             return setTicket(state, action.ticket);
+        default:
+            return state;
     }
-    return state;
 }

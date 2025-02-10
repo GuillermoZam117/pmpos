@@ -79,11 +79,9 @@ class MyTickets extends React.Component {
     }
 }
 
-const mapStateToProps = state => ({
-    isFetching: state.myTickets.get('isFetching'),
-    items: state.myTickets.get('items'),
-    ticketsNeedsRefresh: state.myTickets.get('ticketsNeedsRefresh'),
-    terminalId: state.app.get('terminalId')
+const mapStateToProps = (state) => ({
+    terminalId: state.app?.get('terminalId') || '',
+    ticket: state.app?.get('ticket') || null
 });
 
 const mapDispatchToProps = {

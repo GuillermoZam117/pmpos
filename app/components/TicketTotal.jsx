@@ -14,8 +14,8 @@ const TicketTotal = ({ticket}) => {
     );
 }
 
-const mapStateToProps = state => ({
-    ticket: state.app.get('ticket')
+const mapStateToProps = (state) => ({
+    ticket: state.app?.get('ticket') || null
 })
 
 export default connect(

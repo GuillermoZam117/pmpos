@@ -1,45 +1,69 @@
 import 'core-js/stable';
 import 'regenerator-runtime/runtime';
-import React from 'react';
+import React, { StrictMode } from 'react';
 import ReactDOM from 'react-dom';
-import App from './components/App';
-import EntityList from './components/Entities';
-import Login from './components/Login';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Switch, Route } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { store } from './store';
 import { RefreshToken } from './queries';
 
+// Components
+import App from './components/App';
+import EntityList from './components/Entities';
+import Login from './components/Login';
+import ErrorBoundary from './components/ErrorBoundary';
+
+// Theme configuration
 const darkTheme = createTheme({
-  palette: {
-    mode: 'dark',
-  },
+    palette: {
+        mode: 'dark',
+        primary: {
+            main: '#90caf9',
+        },
+        secondary: {
+            main: '#f48fb1',
+        },
+    },
 });
 
-const AppHandler = () => (
-  <ThemeProvider theme={darkTheme}>
-    <Provider store={store}>
-      <Router>
-        <Routes>
-          <Route path="/" element={<App />} />
-          <Route path="/entities/:terminalId/:screenName" element={<EntityList />} />
-          <Route path="/login" element={<Login />} />
-        </Routes>
-      </Router>
-    </Provider>
-  </ThemeProvider>
-);
-
-if (localStorage['refresh_token']) {
-  RefreshToken(localStorage['refresh_token'], () => {
-    Render();
-  });
-} else Render();
+function RootApp() {
+    return (
+        <StrictMode>
+            <ErrorBoundary>
+                <ThemeProvider theme={darkTheme}>
+                    <Provider store={store}>
+                        <BrowserRouter>
+                            <Switch>
+                                <Route exact path="/" component={App} />
+                                <Route path="/entities/:terminalId/:screenName" component={EntityList} />
+                                <Route path="/login" component={Login} />
+                            </Switch>
+                        </BrowserRouter>
+                    </Provider>
+                </ThemeProvider>
+            </ErrorBoundary>
+        </StrictMode>
+    );
+}
 
 function Render() {
-  ReactDOM.render(
-    <AppHandler />,
-    document.getElementById('app') // Ensure this element exists in your HTML
-  );
+    ReactDOM.render(<RootApp />, document.getElementById('app'));
+}
+
+// Authentication check with error handling
+if (localStorage['refresh_token']) {
+    RefreshToken(localStorage['refresh_token'], Render)
+        .catch(error => {
+            console.error('Auth refresh failed:', error);
+            localStorage.removeItem('refresh_token');
+            Render();
+        });
+} else {
+    Render();
+}
+
+// Hot module replacement support
+if (module.hot) {
+    module.hot.accept();
 }
