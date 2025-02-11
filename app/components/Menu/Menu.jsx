@@ -34,24 +34,31 @@ class Menu extends React.Component {
 
   refreshMenu() {
     console.log('🔄 Getting menu from server...');
+    const token = localStorage.getItem('access_token');
+    
+    if (!token) {
+        console.error('No authentication token found');
+        return;
+    }
+
     Queries.getMenu((menu) => {
         console.log('📦 Received menu:', menu);
         
-        Queries.getOrderTagColors((colors) => {
-            console.log('🎨 Received colors:', colors);
-            const result = colors.reduce((map, obj) => {
-                map[obj.name] = obj.value;
-                return map;
-            }, {});
-            this.props.setOrderTagColors(result);
-        });
+        if (menu) {
+            Queries.getOrderTagColors((colors) => {
+                if (colors) {
+                    this.props.setOrderTagColors(colors);
+                }
+            }, token);
 
-        this.props.setMenu(menu);
-        if (menu.categories[0]) {
-            console.log('🔍 Setting initial category:', menu.categories[0].name);
-            this.onCategoryClick(menu.categories[0].name);
+            this.props.setMenu(menu);
+            if (menu.categories && menu.categories.length > 0) {
+                this.props.changeSelectedCategory(menu.categories[0].name);
+            }
+        } else {
+            console.error('Failed to load menu');
         }
-    });
+    }, token);
   }
 
   onCategoryClick = (category) => {
@@ -64,15 +71,18 @@ class Menu extends React.Component {
   refreshMenuItems(categoryName) {
     const { menu } = this.props;
     if (!menu || !menu.categories) {
-      console.warn('Menu o menu.categories no están definidos');
+      // Se muestra una notificación o se llama a una acción para reportar el error
+      this.props.showMessage('El menú o las categorías no están cargados');
       return;
     }
     const selectedCategory = menu.categories.find(c => c.name === categoryName);
     if (!selectedCategory) {
-      console.warn(`No se encontró la categoría: ${categoryName}`);
+      this.props.showMessage(`No se encontró la categoría: ${categoryName}`);
       return;
     }
-    // Continuar la lógica con selectedCategory...
+   // Aquí continúa la lógica de actualización de los items basados en la categoría
+    // Por ejemplo, se puede despachar una acción para refrescar el estado del menú
+    this.props.updateMenuItems(selectedCategory.items);
   }
 }
 

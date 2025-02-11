@@ -3,6 +3,7 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const Dotenv = require('dotenv-webpack');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
 // const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');
 
 module.exports = {
@@ -11,7 +12,6 @@ module.exports = {
     output: {
         path: path.resolve(__dirname, 'dist'),
         filename: '[name].[contenthash].js',
-        chunkFilename: '[name].[contenthash].js',
         publicPath: '/'
     },
     devtool: 'source-map', // Added source maps for debugging
@@ -22,22 +22,13 @@ module.exports = {
         hot: true,
         port: 8080,
         historyApiFallback: true,
-        open: true, // Opens browser automatically
         proxy: {
-            '/api': {
-                target: 'http://localhost:9000',
-                changeOrigin: true
-            },
+            '/api': 'http://localhost:9000',
             '/Token': {
                 target: 'http://localhost:9000',
-                changeOrigin: true,
-                secure: false,
-                pathRewrite: { '^/Token': '/token' }  // Added lowercase rewrite
+                pathRewrite: { '^/Token': '/token' }
             },
-            '/signalr': {
-                target: 'http://localhost:9000',
-                changeOrigin: true
-            }
+            '/signalr': 'http://localhost:9000'
         }
     },
     module: {
@@ -68,10 +59,8 @@ module.exports = {
             filename: '[name].[contenthash].css',
         }),
         new HtmlWebpackPlugin({
-            template: path.resolve(__dirname, 'app', 'index.html'),
-            filename: 'index.html',
-            title: 'PMPOS',
-            inject: true
+            template: './app/index.html',
+            favicon: './public/favicon.ico'
         }),
         new Dotenv({
             path: './.env',
@@ -79,6 +68,14 @@ module.exports = {
             systemvars: true,
             silent: true,
             defaults: false
+        }),
+        new CopyWebpackPlugin({
+            patterns: [
+                { 
+                    from: 'app/assets/favicon.ico', 
+                    to: 'favicon.ico' 
+                }
+            ],
         }),
         // Commented out Bundle Analyzer
         // new BundleAnalyzerPlugin(),

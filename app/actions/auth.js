@@ -53,7 +53,7 @@ export const refreshToken = () => async (dispatch, getState) => {
             body: new URLSearchParams({
                 grant_type: 'refresh_token',
                 refresh_token: currentRefreshToken,
-                client_id: 'pmpos',
+                client_id: 'graphiql',
                 client_secret: 'test'
             })
         });

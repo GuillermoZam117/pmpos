@@ -46,7 +46,7 @@ export function RefreshToken(refreshToken, callback) {
     store.dispatch(Actions.authenticationRequest());
     jQuery.ajax({
         'type': 'POST',
-        'url': config.GQLserv + '/Token',
+        'url': config.authUrl,
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         data: $.param({ grant_type: 'refresh_token', refresh_token: refreshToken, client_id: 'pmpos', client_secret: 'test' })
     }).done(response => {
@@ -61,7 +61,7 @@ export function RefreshToken(refreshToken, callback) {
 export function Authenticate(userName, password, callback, failCallback) {
     jQuery.ajax({
         'type': 'POST',
-        'url': config.GQLserv + '/Token',
+        'url': config.authUrl,
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         data: $.param({ grant_type: 'password', username: userName, password: password, client_id: 'pmpos', client_secret: 'test' })
     }).done(response => {
@@ -126,60 +126,93 @@ export const ensureAuthenticated = async () => {
     return token;
 };
 
-export const getMenu = async (callback) => {
-    console.log('📡 Fetching menu...');
+// Función para cargar el menú (ya existente, se validan datos)
+export const getMenu = async (callback, token) => {
+    if (!token) {
+        console.error('No token provided');
+        return callback(null);
+    }
+
     try {
-        const token = await ensureAuthenticated();
-        const query = `
-            query {
-                menu: getMenu(name: "${appconfig().menuName}") {
-                    categories {
-                        id
-                        name
-                        color
-                        foreground
-                        menuItems {
-                            id
-                            name
-                            color
-                            caption
-                            foreground
-                            productId
-                            defaultOrderTags
-                        }
-                    }
-                }
-            }
-        `;
-        const response = await fetch(appconfig().GQLurl, {
+        const response = await fetch(config.GQLurl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify({ query })
+            body: JSON.stringify({
+                query: `
+                    query {
+                        menu: getMenu(name: "${config.menuName}") {
+                            id
+                            name
+                            categories {
+                                id
+                                name
+                                menuItems {
+                                    id
+                                    name
+                                    price
+                                }
+                            }
+                        }
+                    }
+                `
+            })
         });
-        const data = await response.json();
-        if (data.errors) {
-            console.error('❌ GraphQL errors:', data.errors);
-            return;
+
+        const result = await response.json();
+        console.log('Menu response:', result);
+
+        if (result.errors) {
+            console.error('GraphQL errors:', result.errors);
+            return callback(null);
         }
-        if (callback) callback(data.data.menu);
+
+        callback(result.data?.menu);
     } catch (error) {
-        console.error('❌ Menu fetch error:', error);
+        console.error('Menu fetch error:', error);
+        callback(null);
     }
 };
 
-export function getProductPortions(productId, callback) {
-    var query = getProductPortionsScript(productId);
-    $.postJSON(query, function (response) {
-        if (response.errors) {
-            //handle
-        } else {
-            if (callback) callback(response.data.portions);
+export const getProductPortions = async (productId) => {
+    try {
+        const response = await fetch(config.GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${await getToken()}`
+            },
+            body: JSON.stringify({
+                query: `
+                    query GetProductPortions($productId: ID!) {
+                        portions: getProductPortions(productId: $productId) {
+                            id
+                            name
+                            price
+                        }
+                    }
+                `,
+                variables: {
+                    productId
+                }
+            })
+        });
+
+        const result = await response.json();
+        
+        if (result.errors) {
+            console.error('GraphQL errors:', result.errors);
+            throw new Error(result.errors[0].message);
         }
-    });
-}
+
+        return result.data.portions;
+    } catch (error) {
+        console.error('Failed to fetch product portions:', error);
+        throw error;
+    }
+};
 
 export function getProductOrderTags(productId, portion, callback) {
     var query = getProductOrderTagsScript(productId, portion);
@@ -379,14 +412,27 @@ export function getOrderTagsForTerminal(terminalId, orderUid, callback) {
     });
 }
 
-export function getOrderTagColors(callback) {
-    var query = getGetOrderTagColorsScript();
-    $.postJSON(query, function (response) {
-        if (response.errors) {
-            // handle errors
-        } else {
-            if (callback) callback(response.data.colors);
-        }
+export function getOrderTagColors(callback, token) {
+    fetch(config.GQLurl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+            query: `{
+                colors:getOrderTagColors{
+                    name,
+                    value
+                }
+            }`
+        })
+    })
+    .then(response => response.json())
+    .then(result => callback(result.data?.colors))
+    .catch(error => {
+        console.error('Error fetching order tag colors:', error);
+        callback(null);
     });
 }
 
@@ -594,10 +640,121 @@ function getPostBroadcastMessageScript(msg) {
     return 'mutation m {postBroadcastMessage(message:"' + msg + '"){message}}';
 }
 
+// Función para autenticación de usuarios
+export async function authenticateUser(username, password, callback) {
+  // Se construye el body en formato URL encoded con los parámetros requeridos
+  const params = new URLSearchParams();
+  params.append('grant_type', 'password');
+  params.append('username', username);      // usuario proporcionado
+  params.append('password', password);       // contraseña proporcionada
+  params.append('client_id', 'graphiql');      // valor fijo según lo indicado
+
+  try {
+    const response = await fetch(appconfig().authUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: params.toString()
+    });
+    
+    const result = await response.json();
+    
+    if (result.error || result.errors) {
+      console.error('❌ Authentication errors:', result.error || result.errors);
+      return;
+    }
+    
+    if (!result.token && !result.data) {
+      console.error('❌ Respuesta inválida en autenticación:', result);
+      return;
+    }
+    
+    // Dependiendo de la respuesta del backend, obtenemos el token:
+    const authData = result.token ? result : result.data.authenticate;
+    
+    if (callback) callback(authData);
+  } catch (error) {
+    console.error('❌ Authentication fetch error:', error);
+  }
+};
+
+// Función para cargar las mesas
+export const getTables = async (callback, token) => {
+    if (!token) {
+        console.error('No token provided for getTables');
+        return callback(null);
+    }
+
+    fetch(config.GQLurl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+            query: `
+                query {
+                    tables: getTables {
+                        id
+                        number
+                        status
+                        isOpen
+                        totalAmount
+                    }
+                }
+            `
+        })
+    })
+    .then(response => response.json())
+    .then(result => {
+        console.log('Tables response:', result);
+        if (result.errors) {
+            console.error('GraphQL errors:', result.errors);
+            return callback(null);
+        }
+        callback(result.data?.tables);
+    })
+    .catch(error => {
+        console.error('Tables fetch error:', error);
+        callback(null);
+    });
+};
+
+// Función para crear un ticket
+export const createTicket = async (ticketData, callback) => {
+    const query = `
+      mutation {
+          createTicket(ticketData: ${JSON.stringify(ticketData)}) {
+              id
+              status
+              createdAt
+          }
+      }
+    `;
+    try {
+        const response = await fetch(appconfig().GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ query })
+        });
+        const data = await response.json();
+        if (data.errors) {
+            console.error('❌ Create Ticket errors:', data.errors);
+            return;
+        }
+        if (callback) callback(data.data.createTicket);
+    } catch (error) {
+        console.error('❌ Create Ticket fetch error:', error);
+    }
+};
+
 export const authenticate = async () => {
     try {
-        // Realizar la petición POST al endpoint correcto
-        const response = await fetch('http://localhost:9000/Token', {
+        const response = await fetch(config.authUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
@@ -607,30 +764,277 @@ export const authenticate = async () => {
                 username: 'graphiql',
                 password: 'graphiql',
                 client_id: 'graphiql'
-            }),
+            })
         });
         
         const result = await response.json();
-
-        // En caso de error, lanza la excepción con el mensaje
         if (!response.ok) {
-            const errorMsg = result.error_description || 'Unknown error';
-            throw new Error(`Authentication failed: ${errorMsg}`);
+            throw new Error(`Authentication failed: ${result.error_description || 'Unknown error'}`);
         }
         
-        const token = result.access_token;
+        // Guardar token en localStorage y store
+        localStorage.setItem('access_token', result.access_token);
         store.dispatch({
             type: 'AUTHENTICATION_SUCCESS',
             payload: {
-                accessToken: token,
-                // Asegúrate de que el refreshToken esté presente en la respuesta,
-                // de lo contrario, este campo podría no ser necesario.
-                refreshToken: result.refresh_token,
-            },
+                accessToken: result.access_token,
+                refreshToken: result.refresh_token
+            }
         });
-        return token;
+        
+        return result.access_token;
     } catch (error) {
-        store.dispatch({ type: 'AUTHENTICATION_FAILURE', error: error.message });
+        console.error('Authentication error:', error);
         throw error;
     }
 };
+
+export const validateUserPin = async (pin) => {
+    const query = `
+        query ValidatePin($pin: String!) {
+            validateUserPin(pin: $pin) {
+                isValid
+                user {
+                    id
+                    name
+                    permissions
+                }
+            }
+        }
+    `;
+
+    // Implementar la llamada a GraphQL usando el token
+    // ...
+};
+
+export const getToken = async (username, password) => {
+    try {
+        const response = await fetch(config.authUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: `grant_type=password&username=${username}&password=${password}`
+        });
+
+        if (!response.ok) {
+            throw new Error('Auth failed');
+        }
+
+        const data = await response.json();
+        return data.access_token;
+    } catch (error) {
+        console.error('Error getting token:', error);
+        throw error;
+    }
+};
+
+export const validatePin = async (pin, callback) => {
+    try {
+        const response = await fetch(config.GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                query: `
+                    query {
+                        getUser(pin: "${pin}") {
+                            pin
+                            name
+                        }
+                    }
+                `
+            })
+        });
+
+        const result = await response.json();
+        console.log('GraphQL Response:', result);
+
+        if (result.errors) {
+            console.error('GraphQL errors:', result.errors);
+            return callback(null);
+        }
+
+        callback(result.data?.getUser);
+    } catch (error) {
+        console.error('PIN validation error:', error);
+        callback(null);
+    }
+};
+
+// 1. Obtener y guardar token inicial
+export const authenticate = async () => {
+    try {
+        const response = await fetch(config.authUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: new URLSearchParams({
+                grant_type: 'password',
+                username: 'graphiql',
+                password: 'graphiql',
+                client_id: 'graphiql'
+            })
+        });
+        
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(`Authentication failed: ${result.error_description || 'Unknown error'}`);
+        }
+        
+        // Guardar token en localStorage y store
+        localStorage.setItem('access_token', result.access_token);
+        store.dispatch({
+            type: 'AUTHENTICATION_SUCCESS',
+            payload: {
+                accessToken: result.access_token,
+                refreshToken: result.refresh_token
+            }
+        });
+        
+        return result.access_token;
+    } catch (error) {
+        console.error('Authentication error:', error);
+        throw error;
+    }
+};
+
+// 2. Validar PIN
+export const validatePin = async (pin, callback) => {
+    try {
+        const response = await fetch(config.GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                query: `
+                    query {
+                        getUser(pin: "${pin}") {
+                            pin
+                            name
+                        }
+                    }
+                `
+            })
+        });
+
+        const result = await response.json();
+        console.log('PIN validation response:', result);
+
+        if (result.errors) {
+            console.error('PIN validation errors:', result.errors);
+            return callback(null);
+        }
+
+        callback(result.data?.getUser);
+    } catch (error) {
+        console.error('PIN validation error:', error);
+        callback(null);
+    }
+};
+
+// 3. Cargar mesas
+export const getTables = async (callback, token) => {
+    if (!token) {
+        console.error('No token provided for getTables');
+        return callback(null);
+    }
+
+    try {
+        const response = await fetch(config.GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                query: `
+                    query {
+                        tables: getTables {
+                            id
+                            number
+                            status
+                            isOpen
+                            totalAmount
+                        }
+                    }
+                `
+            })
+        });
+
+        const result = await response.json();
+        console.log('Tables response:', result);
+        
+        if (result.errors) {
+            console.error('Tables query errors:', result.errors);
+            return callback(null);
+        }
+
+        callback(result.data?.tables);
+    } catch (error) {
+        console.error('Tables fetch error:', error);
+        callback(null);
+    }
+};
+
+// 4. Crear ticket para una mesa
+export const createTerminalTicket = async (terminalId, callback) => {
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+
+    try {
+        const response = await fetch(config.GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                query: `
+                    mutation {
+                        ticket: createTerminalTicket(terminalId: "${terminalId}") {
+                            id
+                            uid
+                            type
+                            number
+                            date
+                            totalAmount
+                            remainingAmount
+                            entities {
+                                name
+                                type
+                            }
+                            states {
+                                stateName
+                                state
+                            }
+                            orders {
+                                id
+                                uid
+                                name
+                                quantity
+                                price
+                            }
+                        }
+                    }
+                `
+            })
+        });
+
+        const result = await response.json();
+        if (result.errors) {
+            console.error('Create ticket errors:', result.errors);
+            return callback(null);
+        }
+
+        callback(result.data?.ticket);
+    } catch (error) {
+        console.error('Create ticket error:', error);
+        callback(null);
+    }
+};
+
+// ... Las demás funciones existentes se mantienen igual ...

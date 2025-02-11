@@ -10,8 +10,8 @@ async function debugSambaPOS() {
     
     const config = {
         GQLurl: process.env.SAMBAPOS_GRAPHQL_URL || 'http://localhost:9000/api/graphql',
-        userName: process.env.USER_NAME || 'admin',
-        password: process.env.PASSWORD || '1234'
+        userName: process.env.USERNAME || 'grahipql',
+        password: process.env.PASSWORD || 'grahipql'
     };
 
     try {
