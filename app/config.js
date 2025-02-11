@@ -1,3 +1,12 @@
+export default {
+    authUrl: '/Token',
+    clientId: 'graphiql',
+    defaultCredentials: {
+        username: 'graphiql',
+        password: 'graphiql'
+    }
+};
+
 export function appconfig() {
     return {
         // SambaPOS API Configuration

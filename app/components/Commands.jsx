@@ -3,11 +3,8 @@ import PropTypes from 'prop-types';
 import { Box } from '@mui/material';
 import CommandButtonComponent from './CommandButton';
 
+// Botones de acción
 const Commands = ({ commands = [] }) => {
-    if (!commands || commands.length === 0) {
-        return null;
-    }
-
     return (
         <Box 
             sx={{
@@ -17,9 +14,9 @@ const Commands = ({ commands = [] }) => {
                 p: 1
             }}
         >
-            {commands.map((command, index) => (
+            {commands.map(command => (
                 <CommandButtonComponent 
-                    key={`cmd-${command.id || index}`} 
+                    key={command.id} 
                     command={command} 
                 />
             ))}

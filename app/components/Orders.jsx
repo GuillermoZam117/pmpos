@@ -7,6 +7,7 @@ import ReactDOM from 'react-dom'; // Ensure this is the correct casing for your 
 import { postRefresh } from '../queries';
 import PropTypes from 'prop-types';
 
+// Vista de órdenes actuales
 export default class Orders extends React.Component {
     render() {
         const { ticket, onClick = () => {}, onOrderTagSelected = () => {} } = this.props;
@@ -14,20 +15,11 @@ export default class Orders extends React.Component {
         return (
             <Paper className="orders" style={{ 'borderRadius': '0' }}>
                 <List subheader={<ListSubheader>Orders</ListSubheader>}>
-                    {ticket.orders.map(({ uid, name, quantity, price, priceTag, portion, productId, tags, states, locked }) => (
-                        <ListItem key={uid}>
+                    {ticket.orders.map(order => (
+                        <ListItem key={order.uid}>
                             <Order
-                                name={name}
-                                quantity={quantity}
-                                price={price.toFixed(2)}
-                                priceTag={priceTag}
-                                portion={portion}
-                                productId={productId}
-                                orderTags={tags}
-                                orderStates={states}
+                                {...order}
                                 onClick={onClick}
-                                orderUid={uid}
-                                locked={locked}
                             />
                         </ListItem>
                     ))}

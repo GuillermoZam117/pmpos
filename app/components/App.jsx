@@ -1,184 +1,141 @@
-import React, { Component } from 'react';
-import { authenticateUser, getMenu, getTables, createTicket } from '../queries';
-import Login from './Login';
-import Menu from './Menu/Menu';
-import MyTickets from './MyTickets';
-import { Snackbar, ThemeProvider, Button } from '@mui/material';
+import React, { useEffect } from 'react';
+import { connect } from 'react-redux';
+import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';
+import PropTypes from 'prop-types';
+import { Snackbar, ThemeProvider } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
 import Header from './Header';
+import Menu from './Menu';
+import Orders from './Orders';
 import TicketTotal from './TicketTotal';
 import TicketTags from './TicketTags';
 import Commands from './Commands';
-import { authService } from '../services/authService';
-import { userService } from '../services/userService';
-import PinPad from './PinPad';
-import { appconfig } from '../config';
+import MyTickets from './MyTickets';
+import Login from './Login/Login';
+import EntityList from './Entities/EntityList';
+import { 
+    setTerminalId,
+    setTicket, 
+    closeMessage, 
+    updateMessage 
+} from '../actions';
+import * as Queries from '../queries';
 
-// Theme configuration for MUI
 const theme = createTheme({
   palette: {
-    mode: 'dark', // or 'light'
+    mode: 'dark',
   },
 });
 
-class App extends Component {
-    state = {
-        token: null,
-        authenticated: false,
-        loading: true,
-        error: null,
-        menu: null,
-        tables: [],
-        user: null
-    };
-
-    componentDidMount() {
-        this.initializeApp();
-    }
-
-    initializeApp = async () => {
-        try {
-            const authResult = await authService.login('graphiql', 'graphiql');
-            console.log('Token obtenido:', authResult);
-
-            if (authResult && authResult.token) {
-                this.setState({
-                    token: authResult.token,  // Make sure this is being set
-                    authenticated: true,
-                    loading: false
-                });
+const App = ({ 
+    terminalId,
+    message,
+    isMessageOpen,
+    isAuthenticated,
+    setTerminalId,
+    setTicket,
+    closeMessage 
+}) => {
+    useEffect(() => {
+        const initializeTerminal = async () => {
+            if (!isAuthenticated) {
+                return;
             }
-        } catch (error) {
-            console.error('Error en autenticación inicial:', error);
-            this.setState({
-                error: 'No se pudo inicializar la aplicación',
-                loading: false
-            });
-        }
-    };
 
-    loadMenu = async () => {
-        this.setState({ loading: true });
-        await getMenu((menu) => {
-            if (menu) {
-                this.setState({ menu, loading: false });
-            } else {
-                this.setState({ error: 'Error al cargar el menú', loading: false });
-            }
-        }, this.state.token);  // Pass token here
-    };
-
-    loadTables = async () => {
-        await getTables((tables) => {
-            if (tables) {
-                this.setState({ tables });
-            } else {
-                console.warn('No se pudieron cargar las mesas');
-            }
-        }, this.state.token);  // Pass token here
-    };
-
-    handlePinSubmit = async (pin) => {
-        try {
-            console.log('Validando PIN:', pin);
-            const user = await userService.validatePin(pin);
-            console.log('Respuesta validación:', user);
+            const savedTerminalId = localStorage.getItem('terminalId');
             
-            if (user) {
-                // Store token in localStorage and state
-                const token = localStorage.getItem('access_token');
-                
-                this.setState({ 
-                    user,
-                    token,
-                    error: null
-                }, () => {
-                    // Pass token to load functions
-                    this.loadMenu();
-                    this.loadTables();
-                });
+            if (savedTerminalId) {
+                const exists = await Queries.getTerminalExists(savedTerminalId);
+                if (exists) {
+                    Queries.getTerminalTicket(savedTerminalId, (ticket) => {
+                        setTerminalId(savedTerminalId);
+                        setTicket(ticket);
+                    });
+                } else {
+                    Queries.registerTerminal((newTerminalId) => {
+                        updateTerminalId(newTerminalId);
+                    });
+                }
             } else {
-                this.setState({ 
-                    error: 'Usuario no encontrado',
-                    user: null 
+                Queries.registerTerminal((newTerminalId) => {
+                    updateTerminalId(newTerminalId);
                 });
             }
-        } catch (error) {
-            console.error('Error en validación:', error);
-            this.setState({ 
-                error: error.message || 'PIN inválido',
-                user: null 
-            });
-        }
+        };
+
+        initializeTerminal();
+    }, [isAuthenticated]); // Dependency on authentication state
+
+    const updateTerminalId = (id) => {
+        localStorage.setItem('terminalId', id);
+        setTerminalId(id);
     };
 
-    handleCreateTicket = async (ticketData) => {
-        await createTicket(ticketData, (ticket) => {
-            if (ticket) {
-                console.log('Ticket creado:', ticket);
-            } else {
-                console.error('Fallo al crear ticket');
-            }
-        });
-    };
-
-    handleLogout = () => {
-        authService.logout();
-        window.location.reload();
-    };
-
-    render() {
-        const { loading, error, authenticated, menu, tables, user } = this.state;
-
-        if (loading) {
-            return <div>Iniciando aplicación...</div>;
-        }
-
-        if (error) {
-            return <div>Error: {error}</div>;
-        }
-
-        if (!authenticated) {
-            return <div>No se pudo autenticar la aplicación</div>;
-        }
-
-        if (!user) {
-            return (
-                <PinPad 
-                    onPinSubmit={this.handlePinSubmit}
-                    error={error}
-                />
-            );
-        }
-
+    // Si no está autenticado, muestra la pantalla de login
+    if (!isAuthenticated) {
         return (
             <ThemeProvider theme={theme}>
+                <Router>
+                    <Switch>
+                        <Route path="/" component={Login} />
+                    </Switch>
+                </Router>
+            </ThemeProvider>
+        );
+    }
+
+    return (
+        <ThemeProvider theme={theme}>
+            <Router>
                 <div className="mainDiv">
                     <Header />
-                    <Button 
-                        onClick={this.handleLogout}
-                        sx={{ position: 'absolute', top: 10, right: 10 }}
-                    >
-                        Logout
-                    </Button>
                     <div className="mainBody">
-                        <Menu menu={menu} />
+                        <Menu />
+                        <Orders />
                         <MyTickets />
                     </div>
                     <TicketTags />
                     <Commands />
                     <TicketTotal />
-                    {error && <div className="error">{error}</div>}
                     <Snackbar
-                        open={!!error}
-                        message={error}
+                        open={isMessageOpen}
+                        message={message}
                         autoHideDuration={4000}
-                        onClose={() => this.setState({ error: null })}
+                        onClose={closeMessage}
                     />
+                    <Switch>
+                        <Route path="/" exact component={() => <div>Home</div>} />
+                        <Route path="/entities/:terminalId/:screenName" component={EntityList} />
+                    </Switch>
                 </div>
-            </ThemeProvider>
-        );
-    }
-}
+            </Router>
+        </ThemeProvider>
+    );
+};
 
-export default App;
+App.propTypes = {
+    terminalId: PropTypes.string,
+    message: PropTypes.string,
+    isMessageOpen: PropTypes.bool,
+    isAuthenticated: PropTypes.bool,
+    ticket: PropTypes.object,
+    setTerminalId: PropTypes.func.isRequired,
+    setTicket: PropTypes.func.isRequired,
+    closeMessage: PropTypes.func.isRequired
+};
+
+const mapStateToProps = (state) => ({
+    message: state.app.getIn(['message', 'text']),
+    terminalId: state.app.get('terminalId'),
+    isMessageOpen: state.app.getIn(['message', 'isOpen']),
+    isAuthenticated: state.app.get('isAuthenticated'),
+    ticket: state.app.get('ticket')
+});
+
+const mapDispatchToProps = {
+    setTerminalId,
+    setTicket,
+    closeMessage
+};
+
+export default connect(mapStateToProps, mapDispatchToProps)(App);

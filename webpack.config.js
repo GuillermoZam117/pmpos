@@ -39,9 +39,20 @@ module.exports = {
                 use: {
                     loader: 'babel-loader',
                     options: {
-                        presets: ['@babel/preset-env', '@babel/preset-react'],
+                        presets: [
+                            ['@babel/preset-env', {
+                                targets: {
+                                    node: '14'
+                                },
+                                useBuiltIns: 'usage',
+                                corejs: 3
+                            }],
+                            '@babel/preset-react'
+                        ],
                         plugins: [
-                            '@babel/plugin-transform-runtime',
+                            ['@babel/plugin-transform-runtime', {
+                                regenerator: true
+                            }],
                             'react-hot-loader/babel' // Added for hot reload
                         ],
                     },

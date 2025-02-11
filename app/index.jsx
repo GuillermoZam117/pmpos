@@ -1,7 +1,7 @@
 import 'core-js/stable';
 import 'regenerator-runtime/runtime';
 import React, { StrictMode } from 'react';
-import ReactDOM from 'react-dom';  // Changed import
+import { createRoot } from 'react-dom/client';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { BrowserRouter, Switch, Route } from 'react-router-dom';
 import { Provider } from 'react-redux';
@@ -68,22 +68,25 @@ function RootApp() {
     );
 }
 
-const rootElement = document.getElementById('app');
+// Wait for DOM to be ready
+document.addEventListener('DOMContentLoaded', () => {
+    const container = document.getElementById('root');
+    const root = createRoot(container);
 
-const RootComponent = () => {
-    if (!authService.isAuthenticated()) {
-        return <Login />;
+    const render = (Component) => {
+        root.render(
+            <Provider store={store}>
+                <Component />
+            </Provider>
+        );
+    };
+
+    render(App);
+
+    if (module.hot) {
+        module.hot.accept('./components/App', () => {
+            const NextApp = require('./components/App').default;
+            render(NextApp);
+        });
     }
-    return <RootApp />;
-};
-
-// Use ReactDOM.render instead of createRoot
-ReactDOM.render(
-    <RootComponent />,
-    rootElement
-);
-
-// Hot module replacement support
-if (module.hot) {
-    module.hot.accept();
-}
+});

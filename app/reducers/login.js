@@ -1,35 +1,34 @@
 import { Map } from 'immutable';
-import * as types from '../constants/ActionTypes';
 
 const initialState = Map({
-    isAuthenticating: false,
-    accessToken: '',
-    refreshToken: '',
+    accessToken: null,
+    refreshToken: null,
+    isLoading: false,
     error: null
 });
 
 export default function login(state = initialState, action) {
     switch (action.type) {
-        case types.AUTHENTICATION_REQUEST:
+        case 'LOGIN_REQUEST':
             return state.merge({
-                isAuthenticating: true,
+                isLoading: true,
                 error: null
             });
 
-        case types.AUTHENTICATION_SUCCESS:
+        case 'LOGIN_SUCCESS':
             return state.merge({
-                isAuthenticating: false,
-                accessToken: action.accessToken,
-                refreshToken: action.refreshToken,
+                isLoading: false,
+                accessToken: action.payload.accessToken,
+                refreshToken: action.payload.refreshToken,
                 error: null
             });
 
-        case types.AUTHENTICATION_FAILURE:
+        case 'LOGIN_FAILURE':
             return state.merge({
-                isAuthenticating: false,
-                accessToken: '',
-                refreshToken: '',
-                error: action.error
+                isLoading: false,
+                accessToken: null,
+                refreshToken: null,
+                error: action.payload
             });
 
         default:

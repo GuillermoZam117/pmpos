@@ -1,51 +1,73 @@
-import { createStore, applyMiddleware, compose } from 'redux';
-import { thunk } from 'redux-thunk';  // Updated import
-import rootReducer from './reducers';
-import { createLogger } from 'redux-logger';
+import { createStore, applyMiddleware, combineReducers } from 'redux';
+import { thunk } from 'redux-thunk';
+import { Map } from 'immutable';
 
-// Redux DevTools configuration
-const composeEnhancers = 
-    typeof window === 'object' && 
-    window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ ? 
-    window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__({
-        trace: true,
-        traceLimit: 25
-    }) : compose;
-
-// Configure logger
-const logger = createLogger({
-    collapsed: true,
-    diff: true,
-    colors: {
-        title: () => '#08f',
-        prevState: () => '#999',
-        action: () => '#03A9F4',
-        nextState: () => '#4CAF50',
-        error: () => '#F20404',
-    }
+// Initial states
+const initialAppState = Map({
+    message: Map({
+        text: '',
+        isOpen: false
+    }),
+    terminalId: '',
+    ticket: null,
+    isLoading: false,
+    error: null,
+    items: [],
+    ticketsNeedsRefresh: false,
+    isFetching: false,
+    isAuthenticated: false
 });
 
-// Create store with middleware
-export const store = createStore(
-    rootReducer,
-    composeEnhancers(
-        applyMiddleware(
-            thunk,
-            logger
-        )
-    )
-);
+const initialLoginState = Map({
+    accessToken: null,
+    refreshToken: null,
+    isLoading: false,
+    error: null
+});
 
-// Development helpers
-if (process.env.NODE_ENV !== 'production') {
-    window.store = store;
-    window.getState = store.getState;
-}
+// Reducers
+const app = (state = initialAppState, action) => {
+    switch (action.type) {
+        case 'SET_TERMINAL_ID':
+            return state.set('terminalId', action.payload);
+        case 'SET_TICKET':
+            return state.set('ticket', action.payload);
+        default:
+            return state;
+    }
+};
 
-// HMR support
-if (module.hot) {
-    module.hot.accept('./reducers', () => {
-        const nextRootReducer = require('./reducers').default;
-        store.replaceReducer(nextRootReducer);
-    });
-}
+const login = (state = initialLoginState, action) => {
+    switch (action.type) {
+        case 'AUTHENTICATION_SUCCESS':
+            return state.merge({
+                accessToken: action.payload.accessToken,
+                refreshToken: action.payload.refreshToken,
+                isLoading: false
+            });
+        default:
+            return state;
+    }
+};
+
+const rootReducer = combineReducers({
+    app,
+    login
+});
+
+export const configureStore = () => {
+    const store = createStore(
+        rootReducer,
+        applyMiddleware(thunk)
+    );
+
+    if (module.hot) {
+        module.hot.accept('./reducers', () => {
+            store.replaceReducer(rootReducer);
+        });
+    }
+
+    return store;
+};
+
+export const store = configureStore();

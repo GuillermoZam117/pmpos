@@ -1,85 +1,75 @@
-import React from 'react';
-import { TextField, Button, Box, Typography } from '@mui/material'; // Use MUI components
-import { connect } from 'react-redux';
-import PropTypes from 'prop-types';
-import * as Actions from '../../actions';
-import { Authenticate } from '../../queries';
+import React, { useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { loginWithPin } from '../../actions/auth';
 
-class Login extends React.Component {
-    constructor(props) {
-        super(props);
-        this.state = { userName: '', password: '', message: '' };
-    }
+const Login = () => {
+    const [pin, setPin] = useState('');
+    const dispatch = useDispatch();
+    const error = useSelector(state => state.login.get('error'));
+    const isLoading = useSelector(state => state.login.get('isLoading'));
 
-    onUserNameChange = (e) => {
-        this.setState({ userName: e.target.value });
-    }
+    const handlePinChange = (value) => {
+        if (pin.length < 4) {
+            setPin(prev => prev + value);
+        }
+    };
 
-    onPasswordChange = (e) => {
-        this.setState({ password: e.target.value });
-    }
+    const handleSubmit = async () => {
+        if (pin.length === 4) {
+            const success = await dispatch(loginWithPin(pin));
+            if (success) {
+                setPin('');
+            }
+        }
+    };
 
-    onClick = () => {
-        Authenticate(this.state.userName, this.state.password,
-            (accessToken, refreshToken) => {
-                this.props.authenticationSuccess(accessToken, refreshToken);
-                this.context.router.push('/');
-            },
-            (errorCode, errorMessage) => {
-                this.setState({
-                    userName: '',
-                    password: '',
-                    message: errorMessage
-                });
-            });
-    }
+    const handleClear = () => {
+        setPin('');
+    };
 
-    render() {
-        return (
-            <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height="100vh">
-                <Typography variant="h5" component="div">
-                    Authentication Required
-                </Typography>
-                <TextField 
-                    label="User Name"
-                    value={this.state.userName}
-                    onChange={this.onUserNameChange}
-                    margin="normal"
-                />
-                <TextField 
-                    label="Password"
-                    type="password"
-                    value={this.state.password}
-                    onChange={this.onPasswordChange}
-                    margin="normal"
-                />
-                <Box my={2}>
-                    <Typography color="error">{this.state.message}</Typography>
-                </Box>
-                <Button variant="contained" color="primary" onClick={this.onClick}>
-                    OK
-                </Button>
-            </Box>
-        );
-    }
-}
-
-Login.contextTypes = {
-    router: PropTypes.object
+    return (
+        <div className="login-container">
+            <div className="pin-display">
+                {[...Array(4)].map((_, i) => (
+                    <div key={i} className={`pin-dot ${pin[i] ? 'filled' : ''}`}>
+                        {pin[i] ? '•' : ''}
+                    </div>
+                ))}
+            </div>
+            
+            <div className="numpad-grid">
+                {[1,2,3,4,5,6,7,8,9].map(num => (
+                    <button 
+                        key={num}
+                        onClick={() => handlePinChange(num)}
+                        disabled={isLoading}
+                        className="numpad-button">
+                        {num}
+                    </button>
+                ))}
+                <button 
+                    onClick={handleClear}
+                    disabled={isLoading}
+                    className="numpad-button clear">
+                    Clear
+                </button>
+                <button 
+                    onClick={() => handlePinChange(0)}
+                    disabled={isLoading}
+                    className="numpad-button">
+                    0
+                </button>
+                <button 
+                    onClick={handleSubmit}
+                    disabled={pin.length !== 4 || isLoading}
+                    className="numpad-button enter">
+                    Enter
+                </button>
+            </div>
+            
+            {error && <div className="error-message">{error}</div>}
+        </div>
+    );
 };
 
-const mapStateToProps = state => ({
-    isAuthenticating: state.login.get('isAuthenticating'),
-    accessToken: state.login.get('accessToken'),
-    refreshToken: state.login.get('refreshToken')
-});
-
-const mapDispatchToProps = {
-    authenticationSuccess: Actions.authenticationSuccess,
-    authenticationFailure: Actions.authenticationFailure
-};
-
-export default connect(
-    mapStateToProps,
-    mapDispatchToProps
-)(Login);
+export default Login;

@@ -5,6 +5,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Flujo de autenticación usando el servicio authService
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -12,8 +13,8 @@ const Login = () => {
 
     try {
       const result = await authService.login();
-      if (result && result.token) {
-        window.location.reload(); // O usar navigate si usas react-router
+      if (result?.token) {
+        window.location.reload();
       }
     } catch (err) {
       setError(err.message);
