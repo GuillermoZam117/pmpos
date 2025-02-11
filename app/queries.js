@@ -114,16 +114,61 @@ export function postRefresh() {
     $.postJSON(query);
 }
 
-export function getMenu(callback) {
-    var query = getMenuScript();
-    $.postJSON(query, function (response) {
-        if (response.errors) {
-            //handle
-        } else {
-            if (callback) callback(response.data.menu);
+export const ensureAuthenticated = async () => {
+    // Verifica si ya hay un token en el state
+    const state = store.getState();
+    const currentToken = state.login?.get('accessToken');
+    if (currentToken) {
+        return currentToken;
+    }
+    // Si no hay token, usa el método "authenticate" (que usa /Token y x-www-form-urlencoded)
+    const token = await authenticate();
+    return token;
+};
+
+export const getMenu = async (callback) => {
+    console.log('📡 Fetching menu...');
+    try {
+        const token = await ensureAuthenticated();
+        const query = `
+            query {
+                menu: getMenu(name: "${appconfig().menuName}") {
+                    categories {
+                        id
+                        name
+                        color
+                        foreground
+                        menuItems {
+                            id
+                            name
+                            color
+                            caption
+                            foreground
+                            productId
+                            defaultOrderTags
+                        }
+                    }
+                }
+            }
+        `;
+        const response = await fetch(appconfig().GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ query })
+        });
+        const data = await response.json();
+        if (data.errors) {
+            console.error('❌ GraphQL errors:', data.errors);
+            return;
         }
-    });
-}
+        if (callback) callback(data.data.menu);
+    } catch (error) {
+        console.error('❌ Menu fetch error:', error);
+    }
+};
 
 export function getProductPortions(productId, callback) {
     var query = getProductPortionsScript(productId);
@@ -191,24 +236,33 @@ export function closeTerminalTicket(terminalId, callback) {
     });
 }
 
-export const getTerminalExists = async (terminalId) => {
+export const getTerminalExists = async (terminalName, callback) => {
     try {
-        const state = store.getState();
-        const token = state.login.get('accessToken');
-        
-        if (!token) {
-            await store.dispatch(login());
-        }
-
-        const client = createClient(token || store.getState().login.get('accessToken'));
-        const { terminal } = await client.request(queries.getTerminal, {
-            terminalName: terminalId
+        const token = await ensureAuthenticated();
+        const query = `
+            query TerminalExists($terminalName: String!) {
+                terminalExists(name: $terminalName)
+            }
+        `;
+        const response = await fetch(appconfig().GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                query,
+                variables: { terminalName }
+            })
         });
-
-        return !!terminal;
+        const data = await response.json();
+        if (data.errors) {
+            console.error('❌ GraphQL errors:', data.errors);
+            return;
+        }
+        if (callback) callback(data.data.terminalExists);
     } catch (error) {
-        console.error('Terminal check failed:', error);
-        return false;
+        console.error('❌ Network error:', error);
     }
 };
 
@@ -245,16 +299,41 @@ export function changeEntityOfTerminalTicket(terminalId, type, name, callback) {
     });
 }
 
-export function getEntityScreenItems(name, callback) {
-    var query = getGetEntityScreenItemsScript(name);
-    $.postJSON(query, function (response) {
-        if (response.errors) {
-            // handle errors
-        } else {
-            if (callback) callback(response.data.items);
+export const getEntityScreenItems = async (screenName, callback) => {
+    // Se asegura de obtener un token válido
+    const token = await ensureAuthenticated();
+    // Se construye la consulta GraphQL
+    const query = `
+        query {
+            getEntityScreenItems(screen: "${screenName}") {
+                id
+                name
+                caption
+                type
+                color
+                
+            }
         }
-    });
-}
+    `;
+    try {
+        const response = await fetch(appconfig().GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ query })
+        });
+        const data = await response.json();
+        if (data.errors) {
+            console.error('❌ GraphQL errors:', data.errors);
+            return;
+        }
+        if (callback) callback(data.data.getEntityScreenItems);
+    } catch (error) {
+        console.error('❌ getEntityScreenItems fetch error:', error);
+    }
+};
 
 export function updateOrderPortionOfTerminalTicket(terminalId, orderUid, portion, callback) {
     var query = getUpdateOrderPortionOfTerminalTicketScript(terminalId, orderUid, portion);
@@ -514,3 +593,44 @@ function getPostBroadcastMessageScript(msg) {
     msg = msg.replace(/"/g, '\\"');
     return 'mutation m {postBroadcastMessage(message:"' + msg + '"){message}}';
 }
+
+export const authenticate = async () => {
+    try {
+        // Realizar la petición POST al endpoint correcto
+        const response = await fetch('http://localhost:9000/Token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: new URLSearchParams({
+                grant_type: 'password',
+                username: 'graphiql',
+                password: 'graphiql',
+                client_id: 'graphiql'
+            }),
+        });
+        
+        const result = await response.json();
+
+        // En caso de error, lanza la excepción con el mensaje
+        if (!response.ok) {
+            const errorMsg = result.error_description || 'Unknown error';
+            throw new Error(`Authentication failed: ${errorMsg}`);
+        }
+        
+        const token = result.access_token;
+        store.dispatch({
+            type: 'AUTHENTICATION_SUCCESS',
+            payload: {
+                accessToken: token,
+                // Asegúrate de que el refreshToken esté presente en la respuesta,
+                // de lo contrario, este campo podría no ser necesario.
+                refreshToken: result.refresh_token,
+            },
+        });
+        return token;
+    } catch (error) {
+        store.dispatch({ type: 'AUTHENTICATION_FAILURE', error: error.message });
+        throw error;
+    }
+};

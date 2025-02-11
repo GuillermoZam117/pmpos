@@ -1,0 +1,9 @@
+{
+    "name": "PMPOS",
+    "short_name": "PMPOS",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#121212",
+    "theme_color": "#90caf9",
+    "icons": []
+}

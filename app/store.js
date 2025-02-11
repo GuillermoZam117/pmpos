@@ -1,55 +1,48 @@
 import { createStore, applyMiddleware, compose } from 'redux';
-import { Map } from 'immutable';
-import { thunk } from 'redux-thunk';
+import { thunk } from 'redux-thunk';  // Updated import
 import rootReducer from './reducers';
+import { createLogger } from 'redux-logger';
 
-const composeEnhancers = window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ || compose;
+// Redux DevTools configuration
+const composeEnhancers = 
+    typeof window === 'object' && 
+    window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ ? 
+    window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__({
+        trace: true,
+        traceLimit: 25
+    }) : compose;
 
-// Create plain object initial state
-const initialState = {
-    app: Map({
-        message: Map({
-            text: '',
-            isOpen: false
-        }),
-        terminalId: '',
-        ticket: null,
-        isLoading: false,
-        error: null,
-        items: [],
-        ticketsNeedsRefresh: false,
-        isFetching: false
-    }),
-    login: Map({
-        isAuthenticating: false,
-        accessToken: '',
-        refreshToken: '',
-        error: null
-    }),
-    menu: Map({
-        selectedCategory: '',
-        orderTagColors: Map({}),
-        menu: null,
-        menuItems: []
-    }),
-    entityList: Map({
-        items: [],
-        isFetching: false
-    })
-};
+// Configure logger
+const logger = createLogger({
+    collapsed: true,
+    diff: true,
+    colors: {
+        title: () => '#08f',
+        prevState: () => '#999',
+        action: () => '#03A9F4',
+        nextState: () => '#4CAF50',
+        error: () => '#F20404',
+    }
+});
 
+// Create store with middleware
 export const store = createStore(
     rootReducer,
-    initialState,
-    composeEnhancers(applyMiddleware(thunk))
+    composeEnhancers(
+        applyMiddleware(
+            thunk,
+            logger
+        )
+    )
 );
 
-// Add store to window for debugging
+// Development helpers
 if (process.env.NODE_ENV !== 'production') {
     window.store = store;
+    window.getState = store.getState;
 }
 
-// Enable HMR for reducers
+// HMR support
 if (module.hot) {
     module.hot.accept('./reducers', () => {
         const nextRootReducer = require('./reducers').default;

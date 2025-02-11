@@ -93,3 +93,18 @@ export const authenticationFailure = (error) => ({
     type: types.AUTHENTICATION_FAILURE,
     error
 });
+
+// Add these exports to existing actions
+export const loadDepartmentRequest = () => ({
+    type: 'LOAD_DEPARTMENT_REQUEST'
+});
+
+export const loadDepartmentSuccess = (department) => ({
+    type: 'LOAD_DEPARTMENT_SUCCESS',
+    department
+});
+
+export const loadDepartmentFailure = (error) => ({
+    type: 'LOAD_DEPARTMENT_FAILURE',
+    error
+});

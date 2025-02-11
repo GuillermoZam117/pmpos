@@ -19,7 +19,9 @@ import {
     closeMessage, 
     updateMessage,
     loadDepartment,
-    loadEntities
+    loadEntities,
+    loadEntityScreenRequest, 
+    loadEntityScreenSuccess
 } from '../actions';
 import * as Queries from '../queries';
 import { authService } from '../services/authService';
@@ -44,18 +46,25 @@ const App = ({
     const config = appconfig();
 
     useEffect(() => {
+        console.log('🔍 App initialization started');
         const initializeApp = async () => {
             try {
-                // Load department
-                await dispatch(loadDepartment(config.departmentName));
+                console.log('📝 Config:', config);
                 
-                // Load tables/entities
-                await dispatch(loadEntities({
-                    type: config.entityScreenName,
-                    terminalId: config.terminalName
-                }));
+                // Set terminal ID
+                dispatch(setTerminalId(config.terminalName));
+                console.log('✅ Terminal ID set:', config.terminalName);
+
+                // Load entities/tables
+                console.log('🔄 Loading entities...');
+                dispatch(loadEntityScreenRequest(config.entityScreenName));
+                
+                await getEntityScreenItems(config.entityScreenName, (items) => {
+                    console.log('📊 Entities loaded:', items);
+                    dispatch(loadEntityScreenSuccess(config.entityScreenName, items));
+                });
             } catch (error) {
-                console.error('Failed to load initial data:', error);
+                console.error('❌ Initialization error:', error);
             }
         };
 

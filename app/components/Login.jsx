@@ -38,7 +38,7 @@ const Login = () => {
             bgcolor: 'background.default'
         }}>
             <form onSubmit={handleLogin}>
-                <Typography variant="h5" sx={{ mb: 3 }}>Login to PMPOS</Typography>
+                <Typography variant="h5" sx={{ mb: 3 }}>INCIO DE SESION SAMBAPOS_COMANDAS</Typography>
                 <Box sx={{ mb: 2 }}>
                     <TextField
                         fullWidth

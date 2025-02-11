@@ -21,29 +21,32 @@ class CategoryButton extends React.Component {
     }
 }
 
-class Categories extends React.Component {
-    render() {
-        const { categories = [], selectedCategory, onClick = () => { } } = this.props;
-        return (
-            <div className="categories" id="categories">
-                {categories.map(({id, name, color, foreground}) =>
-                    <CategoryButton
-                        selectedCategory={selectedCategory}
-                        name = {name}
-                        foreground = {foreground}
-                        key={id}
-                        color={color}
-                        onClick={onClick}/>
-                ) }
-            </div>
-        );
-    }
+const Categories = ({ menu, selectedCategory, categories = [], onCategoryClick }) => {
+  return (
+    <div>
+      {categories.map(category => (
+        <Button
+          key={category.name}
+          variant={selectedCategory === category.name ? 'contained' : 'outlined'}
+          onClick={() => onCategoryClick(category.name)}
+        >
+          {category.name}
+        </Button>
+      ))}
+    </div>
+  );
+};
 
-}
-
-const mapStateToProps = state => ({
-    selectedCategory: state.menu.get('selectedCategory')
-})
+const mapStateToProps = (state) => {
+    // Add debug logging
+    console.log('Categories state:', state?.app?.toJS());
+    
+    return {
+        menu: state.app?.get('menu'),
+        selectedCategory: state.app?.get('selectedCategory'),
+        categories: state.app?.getIn(['menu', 'categories'])?.toJS() || []
+    };
+};
 
 export default connect(
     mapStateToProps

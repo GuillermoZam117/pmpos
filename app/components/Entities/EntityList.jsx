@@ -57,8 +57,16 @@ class EntityList extends React.Component {
     }
 
     render() {
-        if (!this.props.items) {
-            return <p>Loading...</p>
+        if (this.props.isFetching) {
+            return <p>Loading...</p>;
+        }
+
+        if (!this.props.items || this.props.items.length === 0) {
+            return (
+                <div className="entityList">
+                    <p>No tables available</p>
+                </div>
+            );
         }
 
         return (
@@ -66,9 +74,9 @@ class EntityList extends React.Component {
                 {this.props.items.map(x =>
                     <EntityListButton
                         key={x.name}
-                        caption={x.caption}
-                        labelColor={x.labelColor}
-                        color={x.color}
+                        caption={x.caption || x.name}
+                        labelColor={x.labelColor || '#ffffff'}
+                        color={x.color || '#2196f3'}
                         onClick={() => this.selectEntity(x.name)} />
                 )}
             </div>

@@ -8,7 +8,11 @@ import * as Actions from '../../actions';
 
 class Menu extends React.Component {
   componentDidMount() {
-    if (!this.props.menu) this.refreshMenu();
+    console.log('🔍 Menu mounting, current menu:', this.props.menu);
+    if (!this.props.menu) {
+        console.log('📋 Refreshing menu...');
+        this.refreshMenu();
+    }
   }
 
   render() {
@@ -21,7 +25,7 @@ class Menu extends React.Component {
       <Paper className="menu">
         <Categories
           categories={menu ? menu.categories : undefined}
-          onClick={this.onCategoryClick}
+          onCategoryClick={this.onCategoryClick} // Usa el nombre correcto de la prop
         />
         <MenuItems menuItems={menuItems} onClick={onMenuItemClick} />
       </Paper>
@@ -29,35 +33,53 @@ class Menu extends React.Component {
   }
 
   refreshMenu() {
+    console.log('🔄 Getting menu from server...');
     Queries.getMenu((menu) => {
-      Queries.getOrderTagColors((colors) => {
-        const result = colors.reduce((map, obj) => {
-          map[obj.name] = obj.value;
-          return map;
-        }, {});
-        this.props.setOrderTagColors(result);
-      });
-      this.props.setMenu(menu);
-      if (menu.categories[0]) this.onCategoryClick(menu.categories[0].name);
+        console.log('📦 Received menu:', menu);
+        
+        Queries.getOrderTagColors((colors) => {
+            console.log('🎨 Received colors:', colors);
+            const result = colors.reduce((map, obj) => {
+                map[obj.name] = obj.value;
+                return map;
+            }, {});
+            this.props.setOrderTagColors(result);
+        });
+
+        this.props.setMenu(menu);
+        if (menu.categories[0]) {
+            console.log('🔍 Setting initial category:', menu.categories[0].name);
+            this.onCategoryClick(menu.categories[0].name);
+        }
     });
   }
 
   onCategoryClick = (category) => {
+    console.log('👆 Category clicked:', category);
     this.props.changeSelectedCategory(category);
     this.props.closeMessage();
     this.refreshMenuItems(category);
   };
 
-  refreshMenuItems(category) {
-    const categories = this.props.menu.categories;
-    const c = categories.find((x) => x.name === category);
-    this.props.setMenuItems(c.menuItems);
+  refreshMenuItems(categoryName) {
+    const { menu } = this.props;
+    if (!menu || !menu.categories) {
+      console.warn('Menu o menu.categories no están definidos');
+      return;
+    }
+    const selectedCategory = menu.categories.find(c => c.name === categoryName);
+    if (!selectedCategory) {
+      console.warn(`No se encontró la categoría: ${categoryName}`);
+      return;
+    }
+    // Continuar la lógica con selectedCategory...
   }
 }
 
 const mapStateToProps = (state) => ({
-  menu: state.menu.get('menu'),
-  menuItems: state.menu.get('menuItems'),
+    selectedCategory: state.app.get('selectedCategory'),
+    menu: state.app.get('menu'),
+    terminalId: state.app.get('terminalId')
 });
 
 const mapDispatchToProps = {

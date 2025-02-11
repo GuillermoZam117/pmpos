@@ -19,7 +19,7 @@ export function appconfig() {
         
         // Application Settings
         autoConnectPrinter: true,
-        defaultPrinter: 'POS58',
+        defaultPrinter: 'CAJA',
         tableView: true,
         showOrderTags: true,
         allowSplitBill: true,
