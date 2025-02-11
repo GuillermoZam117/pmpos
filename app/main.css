@@ -3,6 +3,10 @@ body {
   font-family: sans-serif;
   margin: 0px;
   overflow-y: hidden;
+  /* Agregar scroll suave */
+  scroll-behavior: smooth;
+  /* Mejorar height en móviles */
+  height: -webkit-fill-available;
 }
 
 #app{
@@ -12,6 +16,8 @@ body {
   -ms-user-select:none; 
   user-select:none;
   -o-user-select:none;
+  /* Agregar soporte para notch */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
 .mainBody{

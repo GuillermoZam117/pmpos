@@ -3,6 +3,8 @@ import jQuery from 'jquery';
 import { appconfig } from './config';
 import { store } from './store';
 import * as Actions from './actions';
+import createClient, { queries } from './utils/graphqlClient';
+import { login } from './actions/auth';
 
 var config = appconfig();
 
@@ -189,16 +191,26 @@ export function closeTerminalTicket(terminalId, callback) {
     });
 }
 
-export function getTerminalExists(terminalId, callback) {
-    var query = getGetTerminalExistsScript(terminalId);
-    $.postJSON(query, function (response) {
-        if (response.errors) {
-            //handle
-        } else {
-            if (callback) callback(response.data.result);
+export const getTerminalExists = async (terminalId) => {
+    try {
+        const state = store.getState();
+        const token = state.login.get('accessToken');
+        
+        if (!token) {
+            await store.dispatch(login());
         }
-    });
-}
+
+        const client = createClient(token || store.getState().login.get('accessToken'));
+        const { terminal } = await client.request(queries.getTerminal, {
+            terminalName: terminalId
+        });
+
+        return !!terminal;
+    } catch (error) {
+        console.error('Terminal check failed:', error);
+        return false;
+    }
+};
 
 export function addOrderToTicket(ticket, productId, quantity = 1, callback) {
     var query = getAddOrderToTicketQuery(ticket, productId, quantity);

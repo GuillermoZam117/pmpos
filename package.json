@@ -10,7 +10,9 @@
     "build": "webpack --mode production",
     "test": "karma start",
     "test:tdd": "npm run test -- --auto-watch --no-single-run",
-    "test:lint": "eslint ./app ./tests --ext .js --ext .jsx --ignore-path .gitignore --ignore-pattern dist --cache"
+    "test:lint": "eslint ./app ./tests --ext .js --ext .jsx --ignore-path .gitignore --ignore-pattern dist --cache",
+    "debug": "cross-env NODE_ENV=development webpack serve --mode development --env debug=true",
+    "debug:api": "node --experimental-json-modules --no-warnings scripts/debug-sambapos.mjs"
   },
   "devDependencies": {
     "@babel/core": "^7.24.5",
@@ -21,10 +23,17 @@
     "@types/react": "^17.0.0",
     "babel-loader": "^9.1.3",
     "clean-webpack-plugin": "^4.0.0",
+    "cross-env": "^7.0.3",
     "css-loader": "^7.1.1",
+    "dotenv": "^16.4.7",
+    "dotenv-webpack": "^8.1.0",
+    "eslint": "^8.0.0",
+    "eslint-plugin-react": "^7.37.4",
     "html-webpack-plugin": "^5.6.0",
     "mini-css-extract-plugin": "^2.9.0",
+    "node-fetch": "^2.7.0",
     "react-hot-loader": "^4.13.1",
+    "redux": "^5.0.0",
     "style-loader": "^3.3.4",
     "webpack": "^5.97.1",
     "webpack-cli": "^4.10.0",
@@ -39,6 +48,8 @@
     "@redux-devtools/extension": "^3.3.0",
     "classnames": "^2.2.6",
     "core-js": "^3.37.1",
+    "graphql": "^16.10.0",
+    "graphql-request": "^7.1.2",
     "immutability-helper": "^3.1.1",
     "immutable": "^4.3.7",
     "jquery": "^3.5.0",
@@ -51,7 +62,7 @@
     "react-redux": "^7.2.9",
     "react-router": "^5.2.0",
     "react-router-dom": "^5.2.0",
-    "redux": "^4.1.1",
+    "redux-thunk": "^3.1.0",
     "regenerator-runtime": "^0.14.1",
     "uuid": "^8.3.2"
   }

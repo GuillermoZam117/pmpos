@@ -9,7 +9,10 @@ const initialState = Map({
   terminalId: '',
   ticket: null,
   isLoading: false,
-  error: null
+  error: null,
+  items: [],
+  ticketsNeedsRefresh: false,
+  isFetching: false
 });
 
 export default function app(state = initialState, action) {

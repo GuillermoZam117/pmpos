@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
-import { connect } from 'react-redux';
+import { connect, useDispatch } from 'react-redux';
 import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';
 import PropTypes from 'prop-types';
-import { Snackbar, ThemeProvider } from '@mui/material';
+import { Snackbar, ThemeProvider, Button } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
 import Header from './Header';
 import Menu from './Menu';
@@ -17,9 +17,13 @@ import {
     setTerminalId,
     setTicket, 
     closeMessage, 
-    updateMessage 
+    updateMessage,
+    loadDepartment,
+    loadEntities
 } from '../actions';
 import * as Queries from '../queries';
+import { authService } from '../services/authService';
+import { appconfig } from '../config';
 
 // Theme configuration for MUI
 const theme = createTheme({
@@ -36,6 +40,28 @@ const App = ({
     setTicket,
     closeMessage 
 }) => {
+    const dispatch = useDispatch();
+    const config = appconfig();
+
+    useEffect(() => {
+        const initializeApp = async () => {
+            try {
+                // Load department
+                await dispatch(loadDepartment(config.departmentName));
+                
+                // Load tables/entities
+                await dispatch(loadEntities({
+                    type: config.entityScreenName,
+                    terminalId: config.terminalName
+                }));
+            } catch (error) {
+                console.error('Failed to load initial data:', error);
+            }
+        };
+
+        initializeApp();
+    }, [dispatch]);
+
     useEffect(() => {
         const initializeTerminal = async () => {
             const savedTerminalId = localStorage.getItem('terminalId');
@@ -64,11 +90,22 @@ const App = ({
         setTerminalId(id);
     };
 
+    const handleLogout = () => {
+        authService.logout();
+        window.location.reload();
+    };
+
     return (
         <ThemeProvider theme={theme}>
             <Router>
                 <div className="mainDiv">
                     <Header />
+                    <Button 
+                        onClick={handleLogout}
+                        sx={{ position: 'absolute', top: 10, right: 10 }}
+                    >
+                        Logout
+                    </Button>
                     <div className="mainBody">
                         <Menu />
                         <Orders />

@@ -1,34 +1,38 @@
 import { Map } from 'immutable';
 import * as types from '../constants/ActionTypes';
 
-function authenticationRequest(state) {
-    state = state.set('accessToken', '');
-    state = state.set('refreshToken', '');
-    return state.set('isAuthenticating', true);
-}
+const initialState = Map({
+    isAuthenticating: false,
+    accessToken: '',
+    refreshToken: '',
+    error: null
+});
 
-function authenticationSuccess(state, accessToken, refreshToken) {
-    localStorage['refresh_token'] = refreshToken;
-    localStorage['access_token'] = accessToken;
-    state = state.set('accessToken', accessToken);
-    state = state.set('refreshToken', refreshToken);
-    return state.set('isAuthenticating', false);
-}
-
-function authenticationFailure(state) {
-    state = state.set('accessToken', '');
-    state = state.set('refreshToken', '');
-    return state.set('isAuthenticating', false);
-}
-
-export default function app(state = Map(), action) {
+export default function login(state = initialState, action) {
     switch (action.type) {
         case types.AUTHENTICATION_REQUEST:
-            return authenticationRequest(state);
+            return state.merge({
+                isAuthenticating: true,
+                error: null
+            });
+
         case types.AUTHENTICATION_SUCCESS:
-            return authenticationSuccess(state, action.accessToken, action.refreshToken);
+            return state.merge({
+                isAuthenticating: false,
+                accessToken: action.accessToken,
+                refreshToken: action.refreshToken,
+                error: null
+            });
+
         case types.AUTHENTICATION_FAILURE:
-            return authenticationFailure(state);
+            return state.merge({
+                isAuthenticating: false,
+                accessToken: '',
+                refreshToken: '',
+                error: action.error
+            });
+
+        default:
+            return state;
     }
-    return state;
 }

@@ -1,12 +1,13 @@
 import 'core-js/stable';
 import 'regenerator-runtime/runtime';
 import React, { StrictMode } from 'react';
-import ReactDOM from 'react-dom';
+import ReactDOM from 'react-dom';  // Changed import
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { BrowserRouter, Switch, Route } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { store } from './store';
 import { RefreshToken } from './queries';
+import { authService } from './services/authService';
 
 // Components
 import App from './components/App';
@@ -20,11 +21,31 @@ const darkTheme = createTheme({
         mode: 'dark',
         primary: {
             main: '#90caf9',
+            // Agregar colores complementarios
+            light: '#b3e5fc',
+            dark: '#5d99c6'
         },
         secondary: {
             main: '#f48fb1',
+            light: '#f6a5c0',
+            dark: '#bf5f82'
         },
+        background: {
+            default: '#121212',
+            paper: '#1e1e1e'
+        }
     },
+    typography: {
+        fontFamily: [
+            '-apple-system',
+            'BlinkMacSystemFont',
+            '"Segoe UI"',
+            'Roboto',
+            '"Helvetica Neue"',
+            'Arial',
+            'sans-serif'
+        ].join(',')
+    }
 });
 
 function RootApp() {
@@ -47,21 +68,20 @@ function RootApp() {
     );
 }
 
-function Render() {
-    ReactDOM.render(<RootApp />, document.getElementById('app'));
-}
+const rootElement = document.getElementById('app');
 
-// Authentication check with error handling
-if (localStorage['refresh_token']) {
-    RefreshToken(localStorage['refresh_token'], Render)
-        .catch(error => {
-            console.error('Auth refresh failed:', error);
-            localStorage.removeItem('refresh_token');
-            Render();
-        });
-} else {
-    Render();
-}
+const RootComponent = () => {
+    if (!authService.isAuthenticated()) {
+        return <Login />;
+    }
+    return <RootApp />;
+};
+
+// Use ReactDOM.render instead of createRoot
+ReactDOM.render(
+    <RootComponent />,
+    rootElement
+);
 
 // Hot module replacement support
 if (module.hot) {

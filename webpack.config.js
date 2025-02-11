@@ -2,6 +2,7 @@ const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const Dotenv = require('dotenv-webpack');
 // const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');
 
 module.exports = {
@@ -23,8 +24,20 @@ module.exports = {
         historyApiFallback: true,
         open: true, // Opens browser automatically
         proxy: {
-            '/api': 'http://localhost:9000',    // GraphQL endpoint
-            '/signalr': 'http://localhost:9000' // SignalR for real-time updates
+            '/api': {
+                target: 'http://localhost:9000',
+                changeOrigin: true
+            },
+            '/Token': {
+                target: 'http://localhost:9000',
+                changeOrigin: true,
+                secure: false,
+                pathRewrite: { '^/Token': '/token' }  // Added lowercase rewrite
+            },
+            '/signalr': {
+                target: 'http://localhost:9000',
+                changeOrigin: true
+            }
         }
     },
     module: {
@@ -60,14 +73,21 @@ module.exports = {
             title: 'PMPOS',
             inject: true
         }),
+        new Dotenv({
+            path: './.env',
+            safe: true,
+            systemvars: true,
+            silent: true,
+            defaults: false
+        }),
         // Commented out Bundle Analyzer
         // new BundleAnalyzerPlugin(),
     ],
     resolve: {
-        extensions: ['.js', '.jsx'],
         alias: {
             'react-dom': '@hot-loader/react-dom' // Added for hot reload
-        }
+        },
+        extensions: ['.js', '.jsx']
     },
     optimization: {
         splitChunks: {

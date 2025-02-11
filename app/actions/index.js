@@ -78,16 +78,18 @@ export const loadMyTicketsFailure = (error) => ({
     error,
 });
 
-export const authenticationRequest = () => ({
+// Authentication Actions
+export const authenticationRequest = (credentials) => ({
     type: types.AUTHENTICATION_REQUEST,
+    credentials
 });
 
-export const authenticationSuccess = (accessToken, refreshToken) => ({
+export const authenticationSuccess = (tokens) => ({
     type: types.AUTHENTICATION_SUCCESS,
-    accessToken,
-    refreshToken,
+    ...tokens
 });
 
-export const authenticationFailure = () => ({
+export const authenticationFailure = (error) => ({
     type: types.AUTHENTICATION_FAILURE,
+    error
 });

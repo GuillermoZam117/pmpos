@@ -3,12 +3,12 @@ import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 
-function Header({ header }) {
+function Header() {
   return (
     <AppBar position="static">
       <Toolbar>
         <Typography variant="h6" color="inherit">
-          {header}
+          PMPOS
         </Typography>
       </Toolbar>
     </AppBar>
