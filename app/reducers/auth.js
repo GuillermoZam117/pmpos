@@ -1,58 +1,39 @@
-import { Map } from 'immutable';
+import { AUTH_TYPES } from '../actions/auth';
 
-const initialState = Map({
+const initialState = {
     isAuthenticated: false,
-    accessToken: null,
-    refreshToken: null,
-    roles: [],
-    username: null,
-    expiresAt: null,
-    isLoading: false,
+    user: null,
+    token: null,
+    loading: false,
     error: null
-});
+};
 
-export default function auth(state = initialState, action) {
+export default function authReducer(state = initialState, action) {
     switch (action.type) {
-        case 'AUTHENTICATION_REQUEST':
-            return state.merge({
-                isLoading: true,
+        case AUTH_TYPES.LOGIN_REQUEST:
+            return {
+                ...state,
+                loading: true,
                 error: null
-            });
-
-        case 'AUTHENTICATION_SUCCESS':
-            return state.merge({
+            };
+        case AUTH_TYPES.LOGIN_SUCCESS:
+            return {
+                ...state,
                 isAuthenticated: true,
-                accessToken: action.payload.accessToken,
-                refreshToken: action.payload.refreshToken,
-                roles: action.payload.roles,
-                username: action.payload.username,
-                expiresAt: action.payload.expiresAt,
-                isLoading: false,
+                user: action.payload.user,
+                token: action.payload.token,
+                loading: false,
                 error: null
-            });
-
-        case 'AUTHENTICATION_FAILURE':
-            return state.merge({
+            };
+        case AUTH_TYPES.LOGIN_FAILURE:
+            return {
+                ...state,
                 isAuthenticated: false,
-                accessToken: null,
-                refreshToken: null,
-                roles: [],
-                username: null,
-                expiresAt: null,
-                isLoading: false,
-                error: action.error
-            });
-
-        case 'AUTHENTICATION_REQUIRED':
-            return state.merge({
-                isAuthenticated: false,
-                accessToken: null,
-                refreshToken: null
-            });
-
-        case 'LOGOUT':
-            return initialState;
-
+                user: null,
+                token: null,
+                loading: false,
+                error: action.payload
+            };
         default:
             return state;
     }

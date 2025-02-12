@@ -1,25 +1,31 @@
-import React, { useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import React from 'react';
+import { useDispatch } from 'react-redux';
+import { Grid, Button, Paper, Typography } from '@mui/material';
+import { styled } from '@mui/material/styles';
 import { loginWithPin } from '../../actions/auth';
 
+const PinPad = styled(Paper)(({ theme }) => ({
+    padding: theme.spacing(2),
+    margin: theme.spacing(2),
+    maxWidth: 300,
+    backgroundColor: theme.palette.background.default
+}));
+
+const PinButton = styled(Button)(({ theme }) => ({
+    margin: theme.spacing(0.5),
+    minWidth: '60px',
+    minHeight: '60px',
+    fontSize: '1.5rem'
+}));
+
 const Login = () => {
-    const [pin, setPin] = useState('');
+    const [pin, setPin] = React.useState('');
+    const [error, setError] = React.useState('');
     const dispatch = useDispatch();
-    const error = useSelector(state => state.login.get('error'));
-    const isLoading = useSelector(state => state.login.get('isLoading'));
 
-    const handlePinChange = (value) => {
-        if (pin.length < 4) {
-            setPin(prev => prev + value);
-        }
-    };
-
-    const handleSubmit = async () => {
-        if (pin.length === 4) {
-            const success = await dispatch(loginWithPin(pin));
-            if (success) {
-                setPin('');
-            }
+    const handleNumber = (num) => {
+        if (pin.length < 6) {
+            setPin(prev => prev + num);
         }
     };
 
@@ -27,48 +33,90 @@ const Login = () => {
         setPin('');
     };
 
+    const handleEnter = async () => {
+        if (pin.length > 0) {
+            try {
+                setError('');
+                await dispatch(loginWithPin(pin));
+            } catch (err) {
+                setError(err.message);
+                setPin('');
+            }
+        }
+    };
+
     return (
-        <div className="login-container">
-            <div className="pin-display">
-                {[...Array(4)].map((_, i) => (
-                    <div key={i} className={`pin-dot ${pin[i] ? 'filled' : ''}`}>
-                        {pin[i] ? '•' : ''}
-                    </div>
-                ))}
-            </div>
-            
-            <div className="numpad-grid">
-                {[1,2,3,4,5,6,7,8,9].map(num => (
-                    <button 
-                        key={num}
-                        onClick={() => handlePinChange(num)}
-                        disabled={isLoading}
-                        className="numpad-button">
-                        {num}
-                    </button>
-                ))}
-                <button 
-                    onClick={handleClear}
-                    disabled={isLoading}
-                    className="numpad-button clear">
-                    Clear
-                </button>
-                <button 
-                    onClick={() => handlePinChange(0)}
-                    disabled={isLoading}
-                    className="numpad-button">
-                    0
-                </button>
-                <button 
-                    onClick={handleSubmit}
-                    disabled={pin.length !== 4 || isLoading}
-                    className="numpad-button enter">
-                    Enter
-                </button>
-            </div>
-            
-            {error && <div className="error-message">{error}</div>}
-        </div>
+        <Grid 
+            container 
+            justifyContent="center" 
+            alignItems="center" 
+            style={{ minHeight: '100vh' }}
+        >
+            <PinPad elevation={3}>
+                <Typography variant="h5" align="center" gutterBottom>
+                    Enter PIN
+                </Typography>
+                
+                {error && (
+                    <Typography color="error" align="center" gutterBottom>
+                        {error}
+                    </Typography>
+                )}
+                
+                <Typography 
+                    variant="h4" 
+                    align="center" 
+                    style={{ margin: '20px 0' }}
+                >
+                    {pin.replace(/./g, '•')}
+                </Typography>
+
+                <Grid container spacing={1} justifyContent="center">
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
+                        <Grid item xs={4} key={num}>
+                            <PinButton
+                                variant="contained"
+                                color="primary"
+                                onClick={() => handleNumber(num)}
+                                fullWidth
+                            >
+                                {num}
+                            </PinButton>
+                        </Grid>
+                    ))}
+                    <Grid item xs={4}>
+                        <PinButton
+                            variant="contained"
+                            color="secondary"
+                            onClick={handleClear}
+                            fullWidth
+                        >
+                            Clear
+                        </PinButton>
+                    </Grid>
+                    <Grid item xs={4}>
+                        <PinButton
+                            variant="contained"
+                            color="primary"
+                            onClick={() => handleNumber(0)}
+                            fullWidth
+                        >
+                            0
+                        </PinButton>
+                    </Grid>
+                    <Grid item xs={4}>
+                        <PinButton
+                            variant="contained"
+                            color="primary"
+                            onClick={handleEnter}
+                            fullWidth
+                        >
+                            Enter
+                        </PinButton>
+                    </Grid>
+                </Grid>
+            </PinPad>
+        </Grid>
     );
 };
 

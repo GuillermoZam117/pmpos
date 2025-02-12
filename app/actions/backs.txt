@@ -1,0 +1,72 @@
+
+export const loginSuccess = (token, user) => ({
+    type: 'LOGIN_SUCCESS',
+    payload: { token, user }
+});
+
+export const loginFailure = (error) => ({
+    type: 'LOGIN_FAILURE',
+    payload: error
+});
+
+export const authenticationRequest = () => ({
+    type: 'AUTHENTICATION_REQUEST'
+});
+
+export const authenticationSuccess = (sessionData) => ({
+    type: 'AUTHENTICATION_SUCCESS',
+    payload: sessionData
+});
+
+export const authenticationFailure = (error) => ({
+    type: 'AUTHENTICATION_FAILURE',
+    error
+});
+
+export const authenticationRequired = () => ({
+    type: 'AUTHENTICATION_REQUIRED'
+});
+
+export const logout = () => ({
+    type: 'LOGOUT'
+});
+
+
+// Actions object to prevent duplicate declarations
+const actions = {
+    // Action creators
+    loginRequest: () => ({
+        type: AUTH_TYPES.LOGIN_REQUEST
+    }),
+
+    loginSuccess: (data) => ({
+        type: AUTH_TYPES.LOGIN_SUCCESS,
+        payload: data
+    }),
+
+    loginFailure: (error) => ({
+        type: AUTH_TYPES.LOGIN_FAILURE,
+        payload: error
+    }),
+
+    authRequest: () => ({
+        type: AUTH_TYPES.AUTHENTICATION_REQUEST
+    }),
+
+    authSuccess: (data) => ({
+        type: AUTH_TYPES.AUTHENTICATION_SUCCESS,
+        payload: data
+    }),
+
+    authFailure: (error) => ({
+        type: AUTH_TYPES.AUTHENTICATION_FAILURE,
+        error
+    })
+};
+
+// Export other necessary actions
+export const { 
+    authSuccess,
+    authFailure,
+    authRequest 
+} = actions;

@@ -8,7 +8,7 @@ function Header() {
     <AppBar position="static">
       <Toolbar>
         <Typography variant="h6" color="inherit">
-          PMPOS
+          SAMBASOFTMX
         </Typography>
       </Toolbar>
     </AppBar>

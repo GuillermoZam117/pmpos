@@ -5,30 +5,51 @@ import { store } from './store';
 import * as Actions from './actions';
 import createClient, { queries } from './utils/graphqlClient';
 import { login } from './actions/auth';
-import { jwtDecode } from 'jwt-decode';
-import config from './config';
+import { tokenService } from './services/tokenService';
 
-const config = appconfig();
-
-const SESSION_DURATION = 1000 * 60 * 60; // 1 hour
-const TOKEN_REFRESH_THRESHOLD = 1000 * 60 * 5; // 5 minutes
-
-function isTokenExpired(token) {
-    if (!token) return true;
-    try {
-        const decoded = jwtDecode(token);
-        return decoded.exp * 1000 < Date.now();
-    } catch (error) {
-        console.error('Token decode error:', error);
-        return true;
+const getStoredToken = () => {
+    const token = localStorage.getItem('access_token');
+    const expiry = localStorage.getItem('token_expiry');
+    
+    if (token && expiry && new Date(expiry) > new Date()) {
+        return token;
     }
+    return null;
+};
+
+var config = appconfig();
+
+export function postJSON(query, callback) {
+    const token = getStoredToken();
+    
+    return fetch(appconfig().GQLurl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ query })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.errors) {
+            console.error('GraphQL errors:', data.errors);
+            throw new Error(data.errors[0].message);
+        }
+        if (callback) callback(data);
+        return data;
+    })
+    .catch(error => {
+        console.error('Query error:', error);
+        throw error;
+    });
 }
 
 $.postJSON = function (query, callback) {
-    const accessToken = store.getState().login.get('accessToken');
-    const refreshToken = store.getState().login.get('refreshToken');
+    var accessToken = store.getState().login.get('accessToken');
+    var refreshToken = store.getState().login.get('refreshToken');
 
-    const data = JSON.stringify({ query: query });
+    var data = JSON.stringify({ query: query });
     return jQuery.ajax({
         'type': 'POST',
         'url': config.GQLurl,
@@ -62,7 +83,7 @@ export function RefreshToken(refreshToken, callback) {
     store.dispatch(Actions.authenticationRequest());
     jQuery.ajax({
         'type': 'POST',
-        'url': config.authUrl,
+        'url': config.GQLserv + '/Token',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         data: $.param({ grant_type: 'refresh_token', refresh_token: refreshToken, client_id: 'pmpos', client_secret: 'test' })
     }).done(response => {
@@ -74,184 +95,106 @@ export function RefreshToken(refreshToken, callback) {
     });
 }
 
-const appSettings = appconfig(); // Changed name to avoid conflict
-
-export const authenticate = async () => {
-    try {
-        const response = await fetch(appSettings.authUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: new URLSearchParams({
-                grant_type: 'password',
-                username: appSettings.userName,
-                password: appSettings.password,
-                client_id: appSettings.clientId
-            })
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error_description || 'Authentication failed');
+export function Authenticate(userName, password, callback, failCallback) {
+    jQuery.ajax({
+        'type': 'POST',
+        'url': config.GQLserv + '/Token',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        data: $.param({ grant_type: 'password', username: userName, password: password, client_id: 'pmpos', client_secret: 'test' })
+    }).done(response => {
+        callback(response.access_token, response.refresh_token);
+    }).fail(response => {
+        var error = response.responseText ? JSON.parse(response.responseText).error_description : undefined;
+        if (!error) {
+            error = response.statusText;
         }
+        console.log('error', error);
+        failCallback(response.status, error)
+    });
+}
 
-        const data = await response.json();
-        return {
-            accessToken: data.access_token,
-            refreshToken: data.refresh_token
-        };
+export function getTerminalTicket(terminalId, callback) {
+    var query = getGetTerminalTicketScript(terminalId);
+    $.postJSON(query, function (response) {
+        if (response.errors) {
+            if (callback) callback(undefined);
+        } else {
+            if (callback) callback(response.data.ticket);
+        }
+    });
+}
+
+export function loadTerminalTicket(terminalId, ticketId, callback) {
+    var query = getLoadTerminalTicketScript(terminalId, ticketId);
+    $.postJSON(query, function (response) {
+        if (response.errors) {
+            if (callback) callback(undefined);
+        } else {
+            if (callback) callback(response.data.ticket);
+        }
+    });
+}
+
+export function getTerminalTickets(terminalId, callback) {
+    var query = getGetTerminalTicketsScript(terminalId);
+    $.postJSON(query, function (response) {
+        if (response.errors) {
+            if (callback) callback(undefined);
+        } else {
+            if (callback) callback(response.data.tickets);
+        }
+    });
+}
+
+export function postRefresh() {
+    var query = 'mutation m{postTicketRefreshMessage(id:0){id}}';
+    $.postJSON(query);
+}
+
+export const ensureAuthenticated = async () => {
+    try {
+        return await tokenService.getToken();
     } catch (error) {
-        console.error('Authentication error:', error);
+        console.error('Authentication failed:', error);
         throw error;
     }
 };
 
-export const ensureAuthenticated = async () => {
-    const token = localStorage.getItem('access_token');
-    if (!token) {
-        // Try to get new token
-        const authResult = await authenticate();
-        localStorage.setItem('access_token', authResult.accessToken);
-        return authResult.accessToken;
-    }
-    return token;
-};
-
-// Add new function for session management
-function setupSessionRefresh(sessionData) {
-    const timeUntilRefresh = sessionData.expiresAt - Date.now() - TOKEN_REFRESH_THRESHOLD;
-    
-    setTimeout(async () => {
-        try {
-            await RefreshToken(sessionData.refreshToken, (response) => {
-                if (response.status === 200) {
-                    const newSessionData = {
-                        ...sessionData,
-                        accessToken: response.access_token,
-                        refreshToken: response.refresh_token,
-                        expiresAt: Date.now() + SESSION_DURATION
-                    };
-                    localStorage.setItem('session', JSON.stringify(newSessionData));
-                    setupSessionRefresh(newSessionData);
-                } else {
-                    store.dispatch({ type: 'AUTHENTICATION_REQUIRED' });
-                    window.location = '#/login';
-                }
-            });
-        } catch (error) {
-            console.error('Session refresh failed:', error);
-            store.dispatch({ type: 'AUTHENTICATION_REQUIRED' });
-            window.location = '#/login';
-        }
-    }, timeUntilRefresh);
-}
-
-// Add permission check helper
-export const hasPermission = (requiredPermission) => {
+// Función para cargar el menú (ya existente, se validan datos)
+export const getMenu = async (callback) => {
     try {
-        const session = JSON.parse(localStorage.getItem('session'));
-        if (!session || !session.roles) return false;
-        
-        // Check if user has required role/permission
-        return session.roles.some(role => 
-            role === 'admin' || role === requiredPermission
-        );
-    } catch (error) {
-        console.error('Permission check error:', error);
-        return false;
-    }
-};
-
-export const getMenu = async (callback, token) => {
-    if (!token) {
-        console.error('No token provided');
-        return callback(null);
-    }
-
-    try {
-        const response = await fetch(config.GQLurl, {
+        const response = await fetch(appconfig().GQLurl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify({
-                query: `
-                    query {
-                        menu: getMenu(name: "${config.menuName}") {
-                            id
-                            name
-                            categories {
-                                id
-                                name
-                                menuItems {
-                                    id
-                                    name
-                                    price
-                                }
-                            }
-                        }
-                    }
-                `
-            })
+            body: JSON.stringify({ query: '{ menu { categories { name items { id name price } } } }' })
         });
-
-        const result = await response.json();
-        console.log('Menu response:', result);
-
-        if (result.errors) {
-            console.error('GraphQL errors:', result.errors);
-            return callback(null);
+        const data = await response.json();
+        if (data.errors) {
+            console.error('❌ GraphQL errors:', data.errors);
+            return;
         }
-
-        callback(result.data?.menu);
+        if (callback) callback(data.data.menu);
     } catch (error) {
-        console.error('Menu fetch error:', error);
-        callback(null);
+        console.error('❌ Menu fetch error:', error);
     }
 };
 
-export const getProductPortions = async (productId) => {
-    try {
-        const response = await fetch(config.GQLurl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${await getToken()}`
-            },
-            body: JSON.stringify({
-                query: `
-                    query GetProductPortions($productId: ID!) {
-                        portions: getProductPortions(productId: $productId) {
-                            id
-                            name
-                            price
-                        }
-                    }
-                `,
-                variables: {
-                    productId
-                }
-            })
-        });
-
-        const result = await response.json();
-        
-        if (result.errors) {
-            console.error('GraphQL errors:', result.errors);
-            throw new Error(result.errors[0].message);
+export function getProductPortions(productId, callback) {
+    var query = getProductPortionsScript(productId);
+    $.postJSON(query, function (response) {
+        if (response.errors) {
+            //handle
+        } else {
+            if (callback) callback(response.data.portions);
         }
-
-        return result.data.portions;
-    } catch (error) {
-        console.error('Failed to fetch product portions:', error);
-        throw error;
-    }
-};
+    });
+}
 
 export function getProductOrderTags(productId, portion, callback) {
-    const query = getProductOrderTagsScript(productId, portion);
+    var query = getProductOrderTagsScript(productId, portion);
     $.postJSON(query, function (response) {
         if (response.errors) {
             //handle
@@ -262,7 +205,7 @@ export function getProductOrderTags(productId, portion, callback) {
 }
 
 export function registerTerminal(callback) {
-    const query = getRegisterTerminalScript();
+    var query = getRegisterTerminalScript();
     $.postJSON(query, function (response) {
         if (response.errors) {
             //handle
@@ -273,7 +216,7 @@ export function registerTerminal(callback) {
 }
 
 export function createTerminalTicket(terminalId, callback) {
-    const query = getCreateTerminalTicketScript(terminalId);
+    var query = getCreateTerminalTicketScript(terminalId);
     $.postJSON(query, function (response) {
         if (response.errors) {
             //handle
@@ -284,7 +227,7 @@ export function createTerminalTicket(terminalId, callback) {
 }
 
 export function clearTerminalTicketOrders(terminalId, callback) {
-    const query = getClearTerminalTicketScript(terminalId);
+    var query = getClearTerminalTicketScript(terminalId);
     $.postJSON(query, function (response) {
         if (response.errors) {
             //handle
@@ -295,7 +238,7 @@ export function clearTerminalTicketOrders(terminalId, callback) {
 }
 
 export function closeTerminalTicket(terminalId, callback) {
-    const query = getCloseTerminalTicketScript(terminalId);
+    var query = getCloseTerminalTicketScript(terminalId);
     $.postJSON(query, function (response) {
         if (response.errors) {
             //handle
@@ -313,7 +256,7 @@ export const getTerminalExists = async (terminalName, callback) => {
                 terminalExists(name: $terminalName)
             }
         `;
-        const response = await fetch(config.GQLurl, {
+        const response = await fetch(appconfig().GQLurl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -326,17 +269,17 @@ export const getTerminalExists = async (terminalName, callback) => {
         });
         const data = await response.json();
         if (data.errors) {
-            console.error('GraphQL errors:', data.errors);
+            console.error('❌ GraphQL errors:', data.errors);
             return;
         }
         if (callback) callback(data.data.terminalExists);
     } catch (error) {
-        console.error('Network error:', error);
+        console.error('❌ Network error:', error);
     }
 };
 
 export function addOrderToTicket(ticket, productId, quantity = 1, callback) {
-    const query = getAddOrderToTicketQuery(ticket, productId, quantity);
+    var query = getAddOrderToTicketQuery(ticket, productId, quantity);
     $.postJSON(query, function (response) {
         if (response.errors) {
             // handle errors
@@ -347,7 +290,7 @@ export function addOrderToTicket(ticket, productId, quantity = 1, callback) {
 }
 
 export function addOrderToTerminalTicket(terminalId, productId, quantity = 1, orderTags = '', callback) {
-    const query = getAddOrderToTerminalTicketScript(terminalId, productId, orderTags);
+    var query = getAddOrderToTerminalTicketScript(terminalId, productId, orderTags);
     $.postJSON(query, function (response) {
         if (response.errors) {
             // handle errors
@@ -358,7 +301,7 @@ export function addOrderToTerminalTicket(terminalId, productId, quantity = 1, or
 }
 
 export function changeEntityOfTerminalTicket(terminalId, type, name, callback) {
-    const query = getChangeEntityOfTerminalTicketScript(terminalId, type, name);
+    var query = getChangeEntityOfTerminalTicketScript(terminalId, type, name);
     $.postJSON(query, function (response) {
         if (response.errors) {
             // handle errors
@@ -369,7 +312,9 @@ export function changeEntityOfTerminalTicket(terminalId, type, name, callback) {
 }
 
 export const getEntityScreenItems = async (screenName, callback) => {
+    // Se asegura de obtener un token válido
     const token = await ensureAuthenticated();
+    // Se construye la consulta GraphQL
     const query = `
         query {
             getEntityScreenItems(screen: "${screenName}") {
@@ -378,11 +323,12 @@ export const getEntityScreenItems = async (screenName, callback) => {
                 caption
                 type
                 color
+                
             }
         }
     `;
     try {
-        const response = await fetch(config.GQLurl, {
+        const response = await fetch(appconfig().GQLurl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -392,17 +338,17 @@ export const getEntityScreenItems = async (screenName, callback) => {
         });
         const data = await response.json();
         if (data.errors) {
-            console.error('GraphQL errors:', data.errors);
+            console.error('❌ GraphQL errors:', data.errors);
             return;
         }
         if (callback) callback(data.data.getEntityScreenItems);
     } catch (error) {
-        console.error('getEntityScreenItems fetch error:', error);
+        console.error('❌ getEntityScreenItems fetch error:', error);
     }
 };
 
 export function updateOrderPortionOfTerminalTicket(terminalId, orderUid, portion, callback) {
-    const query = getUpdateOrderPortionOfTerminalTicketScript(terminalId, orderUid, portion);
+    var query = getUpdateOrderPortionOfTerminalTicketScript(terminalId, orderUid, portion);
     $.postJSON(query, function (response) {
         if (response.errors) {
             // handle errors
@@ -413,7 +359,7 @@ export function updateOrderPortionOfTerminalTicket(terminalId, orderUid, portion
 }
 
 export function executeAutomationCommandForTerminalTicket(terminalId, orderUid, name, value, callback) {
-    const query = getExecuteAutomationCommandForTerminalTicketScript(terminalId, orderUid, name, value);
+    var query = getExecuteAutomationCommandForTerminalTicketScript(terminalId, orderUid, name, value);
     $.postJSON(query, function (response) {
         if (response.errors) {
             // handle errors
@@ -424,7 +370,7 @@ export function executeAutomationCommandForTerminalTicket(terminalId, orderUid, 
 }
 
 export function updateOrderTagOfTerminalTicket(terminalId, orderUid, name, tag, callback) {
-    const query = getUpdateOrderTagOfTerminalTicketScript(terminalId, orderUid, name, tag);
+    var query = getUpdateOrderTagOfTerminalTicketScript(terminalId, orderUid, name, tag);
     $.postJSON(query, function (response) {
         if (response.errors) {
             // handle errors
@@ -435,7 +381,7 @@ export function updateOrderTagOfTerminalTicket(terminalId, orderUid, name, tag, 
 }
 
 export function getOrderTagsForTerminal(terminalId, orderUid, callback) {
-    const query = getGetOrderTagsForTerminalScript(terminalId, orderUid);
+    var query = getGetOrderTagsForTerminalScript(terminalId, orderUid);
     $.postJSON(query, function (response) {
         if (response.errors) {
             callback([]);
@@ -445,32 +391,19 @@ export function getOrderTagsForTerminal(terminalId, orderUid, callback) {
     });
 }
 
-export function getOrderTagColors(callback, token) {
-    fetch(config.GQLurl, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-            query: `{
-                colors:getOrderTagColors{
-                    name,
-                    value
-                }
-            }`
-        })
-    })
-    .then(response => response.json())
-    .then(result => callback(result.data?.colors))
-    .catch(error => {
-        console.error('Error fetching order tag colors:', error);
-        callback(null);
+export function getOrderTagColors(callback) {
+    var query = getGetOrderTagColorsScript();
+    $.postJSON(query, function (response) {
+        if (response.errors) {
+            // handle errors
+        } else {
+            if (callback) callback(response.data.colors);
+        }
     });
 }
 
 export function cancelOrderOnTerminalTicket(terminalId, orderUid, callback) {
-    const query = getCancelOrderOnTerminalTicketScript(terminalId, orderUid);
+    var query = getCancelOrderOnTerminalTicketScript(terminalId, orderUid);
     $.postJSON(query, function (response) {
         if (response.errors) {
             // handle errors
@@ -481,108 +414,12 @@ export function cancelOrderOnTerminalTicket(terminalId, orderUid, callback) {
 }
 
 export function broadcastMessage(msg, callback) {
-    const query = getPostBroadcastMessageScript(msg);
+    var query = getPostBroadcastMessageScript(msg);
     $.postJSON(query, function (response) {
         if (response.errors) {
             // handle errors
         } else {
             if (callback) callback(response.data.postBroadcastMessage);
-        }
-    });
-}
-
-export function getTerminalTickets(terminalId, callback) {
-    const query = getGetTerminalTicketsScript(terminalId);
-    $.postJSON(query, function (response) {
-        if (response.errors) {
-            if (callback) callback(undefined);
-        } else {
-            if (callback) callback(response.data.tickets);
-        }
-    });
-}
-
-export const getTables = async (callback, token) => {
-    if (!token) {
-        console.error('No token provided for getTables');
-        return callback(null);
-    }
-
-    fetch(config.GQLurl, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-            query: `
-                query {
-                    tables: getTables {
-                        id
-                        number
-                        status
-                        isOpen
-                        totalAmount
-                    }
-                }
-            `
-        })
-    })
-    .then(response => response.json())
-    .then(result => {
-        console.log('Tables response:', result);
-        if (result.errors) {
-            console.error('GraphQL errors:', result.errors);
-            return callback(null);
-        }
-        callback(result.data?.tables);
-    })
-    .catch(error => {
-        console.error('Tables fetch error:', error);
-        callback(null);
-    });
-};
-
-export const createTicket = async (ticketData, callback) => {
-    try {
-        const token = await ensureAuthenticated();
-        const response = await fetch(config.GQLurl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-                query: `
-                    mutation {
-                        createTicket(ticketData: ${JSON.stringify(ticketData)}) {
-                            id
-                            status
-                            createdAt
-                        }
-                    }
-                `
-            })
-        });
-        const data = await response.json();
-        if (data.errors) {
-            console.error('Create Ticket errors:', data.errors);
-            return callback(null);
-        }
-        callback(data.data?.createTicket);
-    } catch (error) {
-        console.error('Create Ticket error:', error);
-        callback(null);
-    }
-};
-
-export function getTerminalTicket(terminalId, callback) {
-    const query = getGetTerminalTicketScript(terminalId);
-    $.postJSON(query, function (response) {
-        if (response.errors) {
-            if (callback) callback(undefined);
-        } else {
-            if (callback) callback(response.data.ticket);
         }
     });
 }
@@ -603,7 +440,7 @@ function getGetOrderTagsForTerminalScript(terminalId, orderUid) {
     return `
     mutation tags{orderTags:getOrderTagsForTerminalTicketOrder(
         terminalId:"${terminalId}"
-        orderUid:"${orderUid}")
+	    orderUid:"${orderUid}")
     {name,tags{caption,color,labelColor,name}}}`;
 }
 
@@ -613,6 +450,12 @@ function getRegisterTerminalScript() {
         department:"${config.departmentName}",
         user:"${config.userName}",
         ticketType:"${config.ticketTypeName}")}`;
+}
+
+function getCreateTerminalTicketScript(terminalId) {
+    return `mutation m{
+            ticket:createTerminalTicket(terminalId:"${terminalId}")
+        ${getTicketResult()}}`;
 }
 
 function getGetTerminalTicketScript(terminalId) {
@@ -626,6 +469,7 @@ function getLoadTerminalTicketScript(terminalId, ticketId) {
             ticket:loadTerminalTicket(terminalId:"${terminalId}", ticketId:"${ticketId}")
         ${getTicketResult()}}`;
 }
+
 
 function getGetTerminalTicketsScript(terminalId) {
     return `query q{
@@ -649,7 +493,7 @@ function getUpdateOrderTagOfTerminalTicketScript(terminalId, orderUid, name, tag
     return `mutation m{ticket:updateOrderOfTerminalTicket(
         terminalId:"${terminalId}",
         orderUid:"${orderUid}",
-        orderTags:[{tagName:"${name}",tag:"${tag}"}])
+	    orderTags:[{tagName:"${name}",tag:"${tag}"}])
     ${getTicketResult()}}`;
 }
 
@@ -657,7 +501,7 @@ function getExecuteAutomationCommandForTerminalTicketScript(terminalId, orderUid
     return `mutation m{ticket:executeAutomationCommandForTerminalTicket(
         terminalId:"${terminalId}",
         orderUid:"${orderUid}",
-        name:"${name}",
+	    name:"${name}",
         value:"${value}")
     ${getTicketResult()}}`;
 }
@@ -706,7 +550,7 @@ function getTicketResult() {
   entities{name,type},      
   states{stateName,state},
   tags{tagName,tag},
-    orders{
+	orders{
     id,
     uid,
     productId,
@@ -738,7 +582,7 @@ mutation m{ticket:addOrderToTicket(
   ticket:${ticketStr},menuItem:"${menuItem}",quantity:${quantity}
 ){id,uid,type,number,date,totalAmount,remainingAmount,
   states{stateName,state},
-    orders{
+	orders{
     id,
     uid,
     name,
@@ -761,3 +605,145 @@ function getPostBroadcastMessageScript(msg) {
     msg = msg.replace(/"/g, '\\"');
     return 'mutation m {postBroadcastMessage(message:"' + msg + '"){message}}';
 }
+
+// Función para autenticación de usuarios
+export async function authenticateUser(username, password, callback) {
+  // Se construye el body en formato URL encoded con los parámetros requeridos
+  const params = new URLSearchParams();
+  params.append('grant_type', 'password');
+  params.append('user_name', username);      // usuario proporcionado
+  params.append('password', password);       // contraseña proporcionada
+  params.append('client_id', 'graphiql');      // valor fijo según lo indicado
+
+  try {
+    const response = await fetch(appconfig().authUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: params.toString()
+    });
+    
+    const result = await response.json();
+    
+    if (result.error || result.errors) {
+      console.error('❌ Authentication errors:', result.error || result.errors);
+      return;
+    }
+    
+    if (!result.token && !result.data) {
+      console.error('❌ Respuesta inválida en autenticación:', result);
+      return;
+    }
+    
+    // Dependiendo de la respuesta del backend, obtenemos el token:
+    const authData = result.token ? result : result.data.authenticate;
+    
+    if (callback) callback(authData);
+  } catch (error) {
+    console.error('❌ Authentication fetch error:', error);
+  }
+}
+
+// Función para cargar las mesas
+export const getTables = async (callback) => {
+    const query = `
+      query {
+          tables {
+              id
+              number
+              status
+          }
+      }
+    `;
+    try {
+        const response = await fetch(appconfig().GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ query })
+        });
+        const data = await response.json();
+        if (data.errors) {
+            console.error('❌ Tables errors:', data.errors);
+            return;
+        }
+        if (callback) callback(data.data.tables);
+    } catch (error) {
+        console.error('❌ Tables fetch error:', error);
+    }
+};
+
+// Función para crear un ticket
+export const createTicket = async (ticketData, callback) => {
+    const query = `
+      mutation {
+          createTicket(ticketData: ${JSON.stringify(ticketData)}) {
+              id
+              status
+              createdAt
+          }
+      }
+    `;
+    try {
+        const response = await fetch(appconfig().GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ query })
+        });
+        const data = await response.json();
+        if (data.errors) {
+            console.error('❌ Create Ticket errors:', data.errors);
+            return;
+        }
+        if (callback) callback(data.data.createTicket);
+    } catch (error) {
+        console.error('❌ Create Ticket fetch error:', error);
+    }
+};
+
+export const authenticate = async () => {
+    try {
+        // Realizar la petición POST al endpoint correcto
+        const response = await fetch('http://localhost:9000/Token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: new URLSearchParams({
+                grant_type: 'password',
+                username: 'graphiql',
+                password: 'graphiql',
+                client_id: 'graphiql'
+            }),
+        });
+        
+        const result = await response.json();
+
+        // En caso de error, lanza la excepción con el mensaje
+        if (!response.ok) {
+            const errorMsg = result.error_description || 'Unknown error';
+            throw new Error(`Authentication failed: ${errorMsg}`);
+        }
+        
+        const token = result.access_token;
+        store.dispatch({
+            type: 'AUTHENTICATION_SUCCESS',
+            payload: {
+                accessToken: token,
+                // Asegúrate de que el refreshToken esté presente en la respuesta,
+                // de lo contrario, este campo podría no ser necesario.
+                refreshToken: result.refresh_token,
+            },
+        });
+        return token;
+    } catch (error) {
+        store.dispatch({ type: 'AUTHENTICATION_FAILURE', error: error.message });
+        throw error;
+    }
+};

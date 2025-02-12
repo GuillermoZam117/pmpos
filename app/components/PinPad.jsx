@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Button, TextField, Typography } from '@mui/material';
 import { styled } from '@mui/material/styles';
+import { useDispatch } from 'react-redux';
+import { login } from '../actions/auth';
 
 const PinButton = styled(Button)(({ theme }) => ({
   width: '80px',
@@ -13,6 +15,16 @@ const PinButton = styled(Button)(({ theme }) => ({
 
 const PinPad = ({ onAuthenticate }) => {
   const [pin, setPin] = useState('');
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    console.group('🔐 PIN Pad Component');
+    console.log('PIN pad mounted');
+    return () => {
+      console.log('PIN pad unmounted');
+      console.groupEnd();
+    };
+  }, []);
 
   const handlePinClick = (value) => {
     if (pin.length < 4) {
@@ -21,13 +33,19 @@ const PinPad = ({ onAuthenticate }) => {
   };
 
   const handleSubmit = async () => {
+    console.group('🔑 PIN Submit');
+    console.time('PIN Authentication');
+    
     try {
-      const result = await authenticateUser(pin);
-      if (result.success) {
-        onAuthenticate(result);
-      }
+      console.log('Attempting login with PIN');
+      await dispatch(login(pin));
+      console.log('✅ Login successful');
     } catch (error) {
-      console.error('PIN authentication failed:', error);
+      console.error('❌ Login failed:', error);
+      setPin('');
+    } finally {
+      console.timeEnd('PIN Authentication');
+      console.groupEnd();
     }
   };
 

@@ -1,9 +1,10 @@
-import React, { useEffect } from 'react';
-import { connect } from 'react-redux';
-import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { HashRouter as Router, Route, Switch } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import { Snackbar, ThemeProvider } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
 import Header from './Header';
 import Menu from './Menu';
 import Orders from './Orders';
@@ -13,17 +14,32 @@ import Commands from './Commands';
 import MyTickets from './MyTickets';
 import Login from './Login/Login';
 import EntityList from './Entities/EntityList';
+import PinPad from './PinPad';
 import { 
     setTerminalId,
     setTicket, 
     closeMessage, 
     updateMessage 
 } from '../actions';
+import { 
+    setAuthenticated, 
+    initiateAuthentication,
+    initializeAuth
+} from '../actions/auth';
 import * as Queries from '../queries';
+import Debug from 'debug';
+
+const debug = Debug('pmpos:app');
 
 const theme = createTheme({
   palette: {
     mode: 'dark',
+    primary: {
+        main: '#1976d2'
+    },
+    secondary: {
+        main: '#dc004e'
+    }
   },
 });
 
@@ -36,56 +52,41 @@ const App = ({
     setTicket,
     closeMessage 
 }) => {
-    useEffect(() => {
-        const initializeTerminal = async () => {
-            if (!isAuthenticated) {
-                return;
-            }
+    const dispatch = useDispatch();
+    const auth = useSelector(state => state.auth);
+    const [isLoading, setIsLoading] = useState(true);
 
-            const savedTerminalId = localStorage.getItem('terminalId');
+    useEffect(() => {
+        const initApp = async () => {
+            debug('Initializing application...');
+            setIsLoading(true);
             
-            if (savedTerminalId) {
-                const exists = await Queries.getTerminalExists(savedTerminalId);
-                if (exists) {
-                    Queries.getTerminalTicket(savedTerminalId, (ticket) => {
-                        setTerminalId(savedTerminalId);
-                        setTicket(ticket);
-                    });
-                } else {
-                    Queries.registerTerminal((newTerminalId) => {
-                        updateTerminalId(newTerminalId);
-                    });
-                }
-            } else {
-                Queries.registerTerminal((newTerminalId) => {
-                    updateTerminalId(newTerminalId);
-                });
+            try {
+                await dispatch(initializeAuth());
+                debug('Authentication initialized');
+            } catch (error) {
+                debug('Authentication failed:', error);
+            } finally {
+                setIsLoading(false);
             }
         };
 
-        initializeTerminal();
-    }, [isAuthenticated]); // Dependency on authentication state
+        initApp();
+    }, [dispatch]);
 
-    const updateTerminalId = (id) => {
-        localStorage.setItem('terminalId', id);
-        setTerminalId(id);
-    };
-
-    // Si no está autenticado, muestra la pantalla de login
-    if (!isAuthenticated) {
-        return (
-            <ThemeProvider theme={theme}>
-                <Router>
-                    <Switch>
-                        <Route path="/" component={Login} />
-                    </Switch>
-                </Router>
-            </ThemeProvider>
-        );
+    if (isLoading) {
+        return <div>Loading...</div>;
     }
 
+    if (!auth.isAuthenticated) {
+        debug('User not authenticated, showing PinPad');
+        return <PinPad />;
+    }
+
+    debug('User authenticated, rendering main app');
     return (
         <ThemeProvider theme={theme}>
+            <CssBaseline />
             <Router>
                 <div className="mainDiv">
                     <Header />
