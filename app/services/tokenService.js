@@ -221,17 +221,10 @@ class TokenService {
 
     async authenticate(pin) {
         try {
-            console.log('🔑 Starting PIN authentication...');
             const token = await this.getToken();
-            
-            if (!token) {
-                throw new Error('No token available');
-            }
+            console.log('📡 Sending PIN validation...');
 
-            const settings = appconfig();
-            console.log(`📡 Authenticating user...`);
-
-            const response = await fetch(settings.graphqlUrl, {
+            const response = await fetch(appconfig().graphqlUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -239,69 +232,46 @@ class TokenService {
                 },
                 body: JSON.stringify({
                     query: `
-                        query AuthenticateUser($pin: String!) {
-                            authenticateUser(pin: $pin) {
-                                id
-                                name
-                                permissions
-                                departments {
-                                    id
-                                    name
-                                }
+                        mutation ValidatePin($pin: String!) {
+                            validatePin(pin: $pin) {
+                                success
+                                message
                             }
                         }
                     `,
-                    variables: { 
-                        pin: pin.toString() 
-                    }
+                    variables: { pin: pin.toString() }
                 })
             });
 
-            // Log response details for debugging
-            console.log('Response status:', response.status);
-            const responseText = await response.text();
-            console.log('Response body:', responseText);
-
             if (!response.ok) {
-                throw new Error('Authentication failed');
+                const errorText = await response.text();
+                console.error('Server Error:', errorText);
+                throw new Error(`Authentication failed: ${response.status} - ${errorText}`);
             }
 
-            let result;
-            try {
-                result = JSON.parse(responseText);
-            } catch (e) {
-                console.error('Failed to parse response:', e);
-                throw new Error('Invalid server response');
-            }
+            const result = await response.json();
+            console.log('✅ PIN validation response:', result);
 
             if (result.errors) {
-                const errorMessage = result.errors[0]?.message || 'Unknown error';
-                throw new Error(errorMessage);
+                console.error('GraphQL Errors:', result.errors);
+                throw new Error(result.errors[0].message || 'Authentication failed');
             }
 
-            if (!result.data?.authenticateUser) {
+            if (!result.data?.validatePin?.success) {
                 throw new Error('Invalid PIN');
             }
 
-            const user = result.data.authenticateUser;
-            console.log('✅ User authenticated:', user.name);
-
-            // Store user data
-            this.setUserData(user);
-
             return {
                 success: true,
-                message: `Welcome ${user.name}`,
-                user
+                message: result.data.validatePin.message
             };
-
         } catch (error) {
-            console.error('❌ Authentication failed:', error);
-            throw new Error(
-                error.message === 'Authentication failed' ? 
-                'Invalid PIN' : 
-                'Service temporarily unavailable'
-            );
+            console.error('❌ PIN validation failed:', error);
+            let errorMessage = 'Authentication service unavailable. Please try again later.';
+            if (error.message === 'Invalid PIN') {
+                errorMessage = 'Invalid PIN';
+            }
+            throw new Error(errorMessage);
         }
     }
 

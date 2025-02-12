@@ -747,3 +747,13 @@ export const authenticate = async () => {
         throw error;
     }
 };
+
+// Adding PIN validation query
+const PIN_VALIDATION = `
+    mutation ValidatePin($pin: String!) {
+        validatePin(pin: $pin) {
+            success
+            message
+        }
+    }
+`;

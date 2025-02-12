@@ -31,18 +31,22 @@ export const authActions = {
 };
 
 // Thunk Actions
-export const login = (credentials) => async (dispatch) => {
-    dispatch(authActions.loginRequest());
-    
+export const login = (pin) => async (dispatch) => {
     try {
-        console.log('🔑 Attempting login...');
-        const token = await tokenService.authenticate(credentials);
-        dispatch(authActions.loginSuccess(token));
-        return token;
+        dispatch({ type: 'LOGIN_REQUEST' });
+        const tokenService = new TokenService();
+        const result = await tokenService.authenticate(pin);
+
+        if (result.success) {
+            dispatch({ type: 'LOGIN_SUCCESS', payload: result });
+            return true;
+        }
+
+        dispatch({ type: 'LOGIN_FAILURE', error: 'Invalid PIN' });
+        return false;
     } catch (error) {
-        console.error('❌ Login failed:', error);
-        dispatch(authActions.loginFailure(error.message));
-        throw error;
+        dispatch({ type: 'LOGIN_FAILURE', error: error.message });
+        return false;
     }
 };
 
