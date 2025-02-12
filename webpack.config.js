@@ -4,10 +4,7 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
-const Dotenv = require('dotenv');
-
-// Load environment variables
-const env = Dotenv.config().parsed || {};
+require('dotenv').config();
 
 module.exports = (env, argv) => {
     const isProduction = argv.mode === 'production';
@@ -15,11 +12,11 @@ module.exports = (env, argv) => {
     // Define environment variables for DefinePlugin
     const envKeys = {
         'process.env': JSON.stringify({
-            NODE_ENV: isProduction ? 'production' : 'development',
+            NODE_ENV: process.env.NODE_ENV,
             API_URL: env.API_URL || 'http://localhost:9000',
             SAMBAPOS_API_URL: env.SAMBAPOS_API_URL,
-            SAMBAPOS_GRAPHQL_URL: env.SAMBAPOS_GRAPHQL_URL,
-            SAMBAPOS_TOKEN_URL: env.SAMBAPOS_TOKEN_URL,
+            SAMBAPOS_GRAPHQL_URL: process.env.SAMBAPOS_GRAPHQL_URL || 'http://localhost:9000/api/graphql',
+            SAMBAPOS_TOKEN_URL: process.env.SAMBAPOS_TOKEN_URL || 'http://localhost:9000/Token',
             USER_NAME: env.USER_NAME,
             CLIENT_ID: env.CLIENT_ID
         })

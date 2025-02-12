@@ -16,11 +16,19 @@ const debug = (message) => {
     }
 };
 
-const TOKEN_CONFIG = {
-    STORAGE_KEY: 'sambapos_token',
-    EXPIRY_KEY: 'sambapos_token_expiry',
-    REQUEST_TIMEOUT: 20000,
-    REFRESH_THRESHOLD: 7 * 24 * 60 * 60 * 1000 // 7 days
+const AUTH_CONSTANTS = {
+    STORAGE_KEYS: {
+        TOKEN: 'sambapos_token_encrypted',
+        EXPIRY: 'sambapos_token_expiry'
+    },
+    REQUEST_TIMEOUT: 30000,
+    TOKEN_VALIDITY: 365 * 24 * 60 * 60 * 1000,
+    DEFAULTS: {
+        GRANT_TYPE: 'password',
+        CLIENT_ID: 'graphiql',
+        USERNAME: 'graphiql',
+        PASSWORD: 'graphiql'
+    }
 };
 
 class TokenService {
@@ -33,11 +41,11 @@ class TokenService {
 
     initializeFromStorage() {
         try {
-            const token = localStorage.getItem(TOKEN_CONFIG.STORAGE_KEY);
-            const expiry = localStorage.getItem(TOKEN_CONFIG.EXPIRY_KEY);
+            const token = localStorage.getItem(AUTH_CONSTANTS.STORAGE_KEYS.TOKEN);
+            const expiry = localStorage.getItem(AUTH_CONSTANTS.STORAGE_KEYS.EXPIRY);
             
             if (token && expiry && this.isTokenValid(expiry)) {
-                this.currentToken = token;
+                this.currentToken = this.decryptToken(token);
                 console.log('Token loaded from storage');
             }
         } catch (error) {
@@ -48,12 +56,18 @@ class TokenService {
 
     async getToken() {
         try {
-            if (this.currentToken && this.isTokenValid()) {
-                return this.currentToken;
+            const storedToken = this.currentToken || localStorage.getItem(AUTH_CONSTANTS.STORAGE_KEYS.TOKEN);
+            const expiryDate = localStorage.getItem(AUTH_CONSTANTS.STORAGE_KEYS.EXPIRY);
+
+            if (storedToken && expiryDate && new Date(expiryDate) > new Date()) {
+                console.log('✅ Using cached token');
+                return storedToken;
             }
+
+            console.log('🔄 Token invalid or expired, refreshing...');
             return await this.refreshToken();
         } catch (error) {
-            console.error('Token retrieval failed:', error);
+            console.error('❌ Token retrieval failed:', error);
             throw error;
         }
     }
@@ -64,39 +78,47 @@ class TokenService {
         }
 
         this.pendingRefresh = (async () => {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
-
             try {
-                console.time('tokenRefresh');
+                console.log('🔄 Starting token refresh...');
                 const settings = appconfig();
-                const response = await fetch(settings.authUrl, {
+                
+                const credentials = {
+                    grant_type: AUTH_CONSTANTS.DEFAULTS.GRANT_TYPE,
+                    client_id: AUTH_CONSTANTS.DEFAULTS.CLIENT_ID,
+                    username: AUTH_CONSTANTS.DEFAULTS.USERNAME,
+                    password: AUTH_CONSTANTS.DEFAULTS.PASSWORD
+                };
+
+                console.log('📤 Refreshing token with:', credentials);
+
+                const response = await fetch('http://localhost:9000/Token', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded'
                     },
-                    body: new URLSearchParams({
-                        grant_type: 'password',
-                        username: settings.userName,
-                        password: settings.password,
-                        client_id: 'graphiql'
-                    }),
-                    signal: controller.signal
+                    body: new URLSearchParams(credentials)
                 });
 
                 if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Token refresh failed:', {
+                        status: response.status,
+                        error: errorText
+                    });
                     throw new Error(`Token refresh failed: ${response.status}`);
                 }
 
                 const data = await response.json();
-                const expiryDate = new Date(Date.now() + TOKEN_VALIDITY);
+                console.log('✅ Token received successfully');
                 
+                const expiryDate = new Date(Date.now() + AUTH_CONSTANTS.TOKEN_VALIDITY);
                 this.setToken(data.access_token, expiryDate);
-                console.timeEnd('tokenRefresh');
                 
                 return data.access_token;
+            } catch (error) {
+                console.error('❌ Token refresh error:', error);
+                throw error;
             } finally {
-                clearTimeout(timeoutId);
                 this.pendingRefresh = null;
             }
         })();
@@ -125,7 +147,7 @@ class TokenService {
             const expiryTime = new Date(expiry).getTime();
             const now = Date.now();
             const timeLeft = expiryTime - now;
-            
+               
             console.debug(`Token expires in ${Math.floor(timeLeft / (1000 * 60 * 60))} hours`);
             return timeLeft > REFRESH_THRESHOLD;
         } catch (error) {
@@ -160,6 +182,145 @@ class TokenService {
         } catch (error) {
             console.error('Error decrypting token:', error);
             throw error;
+        }
+    }
+
+    async validatePin(pin) {
+        const token = await this.getToken();
+        if (!token) {
+            throw new Error('No token available for PIN validation');
+        }
+
+        const settings = appconfig();
+        const response = await fetch(settings.graphqlUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                query: `
+                    mutation ValidatePin($pin: String!) {
+                        validatePin(pin: $pin) {
+                            success
+                            message
+                        }
+                    }
+                `,
+                variables: { pin }
+            })
+        });
+
+        const result = await response.json();
+        if (result.errors) {
+            throw new Error(result.errors[0].message);
+        }
+
+        return result.data.validatePin;
+    }
+
+    async authenticate(pin) {
+        try {
+            console.log('🔑 Starting PIN authentication...');
+            const token = await this.getToken();
+            
+            if (!token) {
+                throw new Error('No token available');
+            }
+
+            const settings = appconfig();
+            console.log(`📡 Authenticating user...`);
+
+            const response = await fetch(settings.graphqlUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    query: `
+                        query AuthenticateUser($pin: String!) {
+                            authenticateUser(pin: $pin) {
+                                id
+                                name
+                                permissions
+                                departments {
+                                    id
+                                    name
+                                }
+                            }
+                        }
+                    `,
+                    variables: { 
+                        pin: pin.toString() 
+                    }
+                })
+            });
+
+            // Log response details for debugging
+            console.log('Response status:', response.status);
+            const responseText = await response.text();
+            console.log('Response body:', responseText);
+
+            if (!response.ok) {
+                throw new Error('Authentication failed');
+            }
+
+            let result;
+            try {
+                result = JSON.parse(responseText);
+            } catch (e) {
+                console.error('Failed to parse response:', e);
+                throw new Error('Invalid server response');
+            }
+
+            if (result.errors) {
+                const errorMessage = result.errors[0]?.message || 'Unknown error';
+                throw new Error(errorMessage);
+            }
+
+            if (!result.data?.authenticateUser) {
+                throw new Error('Invalid PIN');
+            }
+
+            const user = result.data.authenticateUser;
+            console.log('✅ User authenticated:', user.name);
+
+            // Store user data
+            this.setUserData(user);
+
+            return {
+                success: true,
+                message: `Welcome ${user.name}`,
+                user
+            };
+
+        } catch (error) {
+            console.error('❌ Authentication failed:', error);
+            throw new Error(
+                error.message === 'Authentication failed' ? 
+                'Invalid PIN' : 
+                'Service temporarily unavailable'
+            );
+        }
+    }
+
+    setUserData(user) {
+        try {
+            localStorage.setItem('user', JSON.stringify(user));
+        } catch (error) {
+            console.error('Failed to store user data:', error);
+        }
+    }
+
+    // Add method to get stored user
+    getCurrentUser() {
+        try {
+            const userData = localStorage.getItem('user');
+            return userData ? JSON.parse(userData) : null;
+        } catch (error) {
+            console.error('Error getting user data:', error);
+            return null;
         }
     }
 }
