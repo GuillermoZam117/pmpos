@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch, useSelector, connect } from 'react-redux';
 import { HashRouter as Router, Route, Switch } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import { Snackbar, ThemeProvider } from '@mui/material';
@@ -24,10 +24,14 @@ import {
 import { 
     setAuthenticated, 
     initiateAuthentication,
-    initializeAuth
+    initializeAuth,
+    login, 
+    logout, 
+    refreshToken 
 } from '../actions/auth';
 import * as Queries from '../queries';
 import Debug from 'debug';
+import { darkTheme } from '../theme';
 
 const debug = Debug('pmpos:app');
 
@@ -55,6 +59,7 @@ const App = ({
     const dispatch = useDispatch();
     const auth = useSelector(state => state.auth);
     const [isLoading, setIsLoading] = useState(true);
+    const user = useSelector(state => state.auth.user);
 
     useEffect(() => {
         const initApp = async () => {
@@ -74,6 +79,18 @@ const App = ({
         initApp();
     }, [dispatch]);
 
+    useEffect(() => {
+        const initAuth = async () => {
+            try {
+                await dispatch(refreshToken());
+            } catch (error) {
+                console.error('Auth initialization failed:', error);
+            }
+        };
+
+        initAuth();
+    }, [dispatch]);
+
     if (isLoading) {
         return <div>Loading...</div>;
     }
@@ -85,11 +102,11 @@ const App = ({
 
     debug('User authenticated, rendering main app');
     return (
-        <ThemeProvider theme={theme}>
+        <ThemeProvider theme={darkTheme}>
             <CssBaseline />
             <Router>
                 <div className="mainDiv">
-                    <Header />
+                    {isAuthenticated && <Header />}
                     <div className="mainBody">
                         <Menu />
                         <Orders />
@@ -107,6 +124,7 @@ const App = ({
                     <Switch>
                         <Route path="/" exact component={() => <div>Home</div>} />
                         <Route path="/entities/:terminalId/:screenName" component={EntityList} />
+                        <Route exact path="/login" component={Login} />
                     </Switch>
                 </div>
             </Router>

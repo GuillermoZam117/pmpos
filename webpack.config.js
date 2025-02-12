@@ -3,15 +3,31 @@ const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
-const Dotenv = require('dotenv-webpack');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
+const Dotenv = require('dotenv');
+
+// Load environment variables
+const env = Dotenv.config().parsed || {};
 
 module.exports = (env, argv) => {
     const isProduction = argv.mode === 'production';
     
+    // Define environment variables for DefinePlugin
+    const envKeys = {
+        'process.env': JSON.stringify({
+            NODE_ENV: isProduction ? 'production' : 'development',
+            API_URL: env.API_URL || 'http://localhost:9000',
+            SAMBAPOS_API_URL: env.SAMBAPOS_API_URL,
+            SAMBAPOS_GRAPHQL_URL: env.SAMBAPOS_GRAPHQL_URL,
+            SAMBAPOS_TOKEN_URL: env.SAMBAPOS_TOKEN_URL,
+            USER_NAME: env.USER_NAME,
+            CLIENT_ID: env.CLIENT_ID
+        })
+    };
+
     return {
         mode: isProduction ? 'production' : 'development',
-        entry: path.resolve(__dirname, 'app', 'index.jsx'),
+        entry: './app/index.jsx',
         output: {
             path: path.resolve(__dirname, 'dist'),
             filename: '[name].[contenthash].js',
@@ -76,13 +92,6 @@ module.exports = (env, argv) => {
                 template: './app/index.html',
                 favicon: './public/favicon.ico'
             }),
-            new Dotenv({
-                path: './.env',
-                safe: true,
-                systemvars: true,
-                silent: true,
-                defaults: false
-            }),
             new CopyWebpackPlugin({
                 patterns: [
                     { 
@@ -91,13 +100,7 @@ module.exports = (env, argv) => {
                     }
                 ],
             }),
-            new webpack.DefinePlugin({
-                'process.env': JSON.stringify({
-                    NODE_ENV: isProduction ? 'production' : 'development',
-                    DEBUG: isProduction ? false : 'pmpos:*',
-                    API_URL: process.env.API_URL || 'http://localhost:9000'
-                })
-            }),
+            new webpack.DefinePlugin(envKeys),
             new webpack.ProvidePlugin({
                 process: 'process/browser',
                 Buffer: ['buffer', 'Buffer']
@@ -111,15 +114,14 @@ module.exports = (env, argv) => {
             fallback: {
                 "path": require.resolve("path-browserify"),
                 "fs": false,
-                "process": require.resolve("process/browser"),
-                "buffer": require.resolve("buffer/")
+                "process": require.resolve("process/browser")
             }
         },
         optimization: {
             splitChunks: {
                 chunks: 'all',
                 maxInitialRequests: Infinity,
-                minSize: 0,
+                minSize: 20000,
                 cacheGroups: {
                     vendor: {
                         test: /[\\/]node_modules[\\/]/,
@@ -133,7 +135,7 @@ module.exports = (env, argv) => {
             runtimeChunk: 'single'
         },
         performance: {
-            hints: process.env.NODE_ENV === 'production' ? 'warning' : false,
+            hints: isProduction ? 'warning' : false,
             maxEntrypointSize: 512000,
             maxAssetSize: 512000
         },

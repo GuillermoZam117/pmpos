@@ -7,12 +7,14 @@
     "stats": "webpack --profile --json > stats.json",
     "start": "cross-env NODE_ENV=development webpack serve --mode development --open",
     "deploy": "gh-pages -d build",
-    "build": "cross-env NODE_ENV=production webpack --mode production",
+    "build": "cross-env NODE_ENV=production webpack --mode production --no-devtool",
     "test": "karma start",
     "test:tdd": "npm run test -- --auto-watch --no-single-run",
     "test:lint": "eslint ./app ./tests --ext .js --ext .jsx --ignore-path .gitignore --ignore-pattern dist --cache",
     "debug": "cross-env NODE_ENV=development webpack serve --mode development --env debug=true",
-    "debug:api": "node --experimental-json-modules --no-warnings scripts/debug-sambapos.mjs"
+    "debug:api": "node --experimental-json-modules --no-warnings scripts/debug-sambapos.mjs",
+    "clean": "rimraf dist",
+    "analyze": "cross-env NODE_ENV=production webpack --mode production --analyze"
   },
   "devDependencies": {
     "@babel/core": "^7.24.5",
@@ -39,6 +41,7 @@
     "process": "^0.11.10",
     "react-hot-loader": "^4.13.0",
     "redux": "^5.0.0",
+    "rimraf": "^6.0.1",
     "stream-browserify": "^3.0.0",
     "style-loader": "^3.3.4",
     "webpack": "^5.97.1",
@@ -69,11 +72,12 @@
     "react-addons-pure-render-mixin": "^15.6.3",
     "react-dom": "^17.0.2",
     "react-markdown": "^6.0.3",
-    "react-redux": "^7.2.6",
+    "react-redux": "^7.2.9",
     "react-router": "^5.2.0",
     "react-router-dom": "^5.3.0",
+    "redux-actions": "^3.0.3",
     "redux-logger": "^3.0.6",
-    "redux-thunk": "^3.1.0",
+    "redux-thunk": "^2.4.1",
     "regenerator-runtime": "^0.14.1",
     "uuid": "^8.3.2"
   }

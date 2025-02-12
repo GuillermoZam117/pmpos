@@ -18,6 +18,16 @@ export const TICKETS_REFRESHED = 'TICKETS_REFRESHED'
 export const AUTHENTICATION_REQUEST = 'AUTHENTICATION_REQUEST'
 export const AUTHENTICATION_SUCCESS = 'AUTHENTICATION_SUCCESS'
 export const AUTHENTICATION_FAILURE = 'AUTHENTICATION_FAILURE'
+
+// Auth Action Types
+export const LOGIN_REQUEST = 'auth/LOGIN_REQUEST';
+export const LOGIN_SUCCESS = 'auth/LOGIN_SUCCESS';
+export const LOGIN_FAILURE = 'auth/LOGIN_FAILURE';
+export const LOGOUT = 'auth/LOGOUT';
+export const TOKEN_REFRESH = 'auth/TOKEN_REFRESH';
+export const TOKEN_REFRESH_SUCCESS = 'auth/TOKEN_REFRESH_SUCCESS';
+export const TOKEN_REFRESH_FAILURE = 'auth/TOKEN_REFRESH_FAILURE';
+
 export const changeTerminalId = (id) => ({
     type: 'CHANGE_TERMINAL_ID',
     payload: id

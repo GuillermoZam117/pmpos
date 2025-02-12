@@ -1,12 +1,18 @@
-import { createStore, applyMiddleware, combineReducers } from 'redux';
-import { thunk } from 'redux-thunk';
+import { createStore, applyMiddleware, compose, combineReducers } from 'redux';
+import thunk from 'redux-thunk';
 import { Map } from 'immutable';
 import { tokenService } from './services/tokenService';
 
+const composeEnhancers = window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ || compose;
+
 // Action Types
-const AUTH_ACTIONS = {
-    SET_TOKEN: 'SET_TOKEN',
-    CLEAR_TOKEN: 'CLEAR_TOKEN',
+export const AUTH_ACTIONS = {
+    LOGIN_REQUEST: 'AUTH_LOGIN_REQUEST',
+    LOGIN_SUCCESS: 'AUTH_LOGIN_SUCCESS',
+    LOGIN_FAILURE: 'AUTH_LOGIN_FAILURE',
+    LOGOUT: 'AUTH_LOGOUT',
+    SET_TOKEN: 'AUTH_SET_TOKEN',
+    CLEAR_TOKEN: 'AUTH_CLEAR_TOKEN',
     AUTH_ERROR: 'AUTH_ERROR'
 };
 
@@ -105,8 +111,7 @@ const rootReducer = combineReducers({
 // Create store with middleware
 export const store = createStore(
     rootReducer,
-    initialState,
-    applyMiddleware(thunk)
+    composeEnhancers(applyMiddleware(thunk))
 );
 
 // Enable HMR for reducers
@@ -126,5 +131,3 @@ store.subscribe(() => {
         tokenService.setToken(token, new Date(expiryDate));
     }
 });
-
-export { AUTH_ACTIONS };

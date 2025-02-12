@@ -38,7 +38,7 @@ const PinPad = ({ onAuthenticate }) => {
     
     try {
       console.log('Attempting login with PIN');
-      await dispatch(login(pin));
+      await dispatch(login({ pin }));
       console.log('✅ Login successful');
     } catch (error) {
       console.error('❌ Login failed:', error);

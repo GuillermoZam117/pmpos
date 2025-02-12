@@ -3,153 +3,109 @@ import { appconfig, TOKEN_CONFIG } from '../config';
 import * as types from '../constants/ActionTypes';
 import { authenticate } from '../queries';
 import Debug from 'debug';
+import { createAction } from 'redux-actions';
+import { tokenService } from '../services/tokenService';
 
 const debug = Debug('pmpos:auth');
 
 // Action Types
-export const AUTH_TYPES = {
-    LOGIN_REQUEST: 'LOGIN_REQUEST',
-    LOGIN_SUCCESS: 'LOGIN_SUCCESS',
-    LOGIN_FAILURE: 'LOGIN_FAILURE',
-    TOKEN_REFRESH: 'TOKEN_REFRESH',
-    TOKEN_REFRESH_SUCCESS: 'TOKEN_REFRESH_SUCCESS',
-    TOKEN_REFRESH_FAILURE: 'TOKEN_REFRESH_FAILURE',
-    LOGOUT: 'LOGOUT'
+export const AUTH_ACTIONS = {
+    LOGIN_REQUEST: 'AUTH_LOGIN_REQUEST',
+    LOGIN_SUCCESS: 'AUTH_LOGIN_SUCCESS',
+    LOGIN_FAILURE: 'AUTH_LOGIN_FAILURE',
+    LOGOUT: 'AUTH_LOGOUT',
+    TOKEN_REFRESH: 'AUTH_TOKEN_REFRESH',
+    TOKEN_REFRESH_SUCCESS: 'AUTH_TOKEN_REFRESH_SUCCESS',
+    TOKEN_REFRESH_FAILURE: 'AUTH_TOKEN_REFRESH_FAILURE'
 };
 
 // Action Creators
-const actions = {
-    loginRequest: () => ({
-        type: AUTH_TYPES.LOGIN_REQUEST
-    }),
-
-    loginSuccess: (token, expiry) => ({
-        type: AUTH_TYPES.LOGIN_SUCCESS,
-        payload: { token, expiry }
-    }),
-
-    loginFailure: (error) => ({
-        type: AUTH_TYPES.LOGIN_FAILURE,
-        error
-    }),
-
-    tokenRefresh: () => ({
-        type: AUTH_TYPES.TOKEN_REFRESH
-    }),
-
-    tokenRefreshSuccess: (token, expiry) => ({
-        type: AUTH_TYPES.TOKEN_REFRESH_SUCCESS,
-        payload: { token, expiry }
-    }),
-
-    tokenRefreshFailure: (error) => ({
-        type: AUTH_TYPES.TOKEN_REFRESH_FAILURE,
-        error
-    }),
-
-    logout: () => ({
-        type: AUTH_TYPES.LOGOUT
-    })
+export const authActions = {
+    loginRequest: () => ({ type: AUTH_ACTIONS.LOGIN_REQUEST }),
+    loginSuccess: (token) => ({ type: AUTH_ACTIONS.LOGIN_SUCCESS, payload: { token } }),
+    loginFailure: (error) => ({ type: AUTH_ACTIONS.LOGIN_FAILURE, payload: { error } }),
+    logout: () => ({ type: AUTH_ACTIONS.LOGOUT }),
+    tokenRefresh: () => ({ type: AUTH_ACTIONS.TOKEN_REFRESH }),
+    tokenRefreshSuccess: (token) => ({ type: AUTH_ACTIONS.TOKEN_REFRESH_SUCCESS, payload: { token } }),
+    tokenRefreshFailure: (error) => ({ type: AUTH_ACTIONS.TOKEN_REFRESH_FAILURE, payload: { error } })
 };
 
 // Thunk Actions
-export const login = (username, password) => async (dispatch) => {
-    dispatch(actions.loginRequest());
+export const login = (credentials) => async (dispatch) => {
+    dispatch(authActions.loginRequest());
     
     try {
-        const client = createGraphQLClient();
-        const config = appconfig();
-        
-        const variables = {
-            username: username || config.userName,
-            password: password || config.password
-        };
-
-        const { authenticate: { token, refreshToken } } = await client.request(queries.login, variables);
-        
-        const expiryDate = new Date(Date.now() + TOKEN_CONFIG.TOKEN_VALIDITY);
-        dispatch(actions.loginSuccess(token, expiryDate.toISOString()));
-
-        localStorage.setItem('token', token);
-        localStorage.setItem('refreshToken', refreshToken);
-        
+        console.log('🔑 Attempting login...');
+        const token = await tokenService.authenticate(credentials);
+        dispatch(authActions.loginSuccess(token));
         return token;
     } catch (error) {
-        console.error('Authentication failed:', error);
-        dispatch(actions.loginFailure(error.message));
+        console.error('❌ Login failed:', error);
+        dispatch(authActions.loginFailure(error.message));
         throw error;
     }
 };
 
-export const refreshToken = () => async (dispatch, getState) => {
-    const state = getState();
-    const currentRefreshToken = state.login.get('refreshToken');
+export const refreshToken = () => async (dispatch) => {
+    dispatch(authActions.tokenRefresh());
     
-    if (!currentRefreshToken) {
-        throw new Error('No refresh token available');
-    }
-
     try {
-        const response = await fetch(`${appconfig().GQLserv}/Token`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: new URLSearchParams({
-                grant_type: 'refresh_token',
-                refresh_token: currentRefreshToken,
-                client_id: 'graphiql',
-                client_secret: 'test'
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error('Token refresh failed');
-        }
-
-        const data = await response.json();
-        dispatch(authActions.authSuccess({
-            accessToken: data.access_token,
-            refreshToken: data.refresh_token
-        }));
-
-        return data.access_token;
+        console.log('🔄 Refreshing token...');
+        const token = await tokenService.refreshToken();
+        dispatch(authActions.tokenRefreshSuccess(token));
+        return token;
     } catch (error) {
-        dispatch(authActions.authFailure(error.message));
+        console.error('❌ Token refresh failed:', error);
+        dispatch(authActions.tokenRefreshFailure(error.message));
         throw error;
     }
 };
 
 export const authenticateWithPin = (pin) => async (dispatch) => {
+    console.log('🔐 Attempting authentication with PIN');
+    dispatch({ type: 'AUTHENTICATION_REQUEST' });
+    
     try {
-        dispatch({ type: 'AUTHENTICATION_REQUEST' });
         const config = appconfig();
-        const response = await fetch(config.authUrl, {  // <-- Issue here
+        const response = await fetch(config.authUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
             body: new URLSearchParams({
                 grant_type: 'password',
-                username: 'graphiql',
-                password: 'graphiql',
+                username: config.userName,
+                password: config.password,
                 client_id: 'graphiql'
             })
         });
 
+        console.log('📡 Auth response status:', response.status);
         const data = await response.json();
         
         if (response.ok) {
+            console.log('✅ Authentication successful');
             localStorage.setItem('access_token', data.access_token);
             dispatch({
                 type: 'AUTHENTICATION_SUCCESS',
                 payload: { token: data.access_token }
             });
-        } else {
-            dispatch(authenticationFailure(data.error_description));
+            return true;
         }
+        
+        console.error('❌ Authentication failed:', data.error_description);
+        dispatch({
+            type: 'AUTHENTICATION_FAILURE',
+            error: data.error_description
+        });
+        return false;
     } catch (error) {
-        dispatch(authenticationFailure(error.message));
+        console.error('❌ Auth error:', error);
+        dispatch({
+            type: 'AUTHENTICATION_FAILURE',
+            error: error.message
+        });
+        return false;
     }
 };
 
@@ -229,7 +185,7 @@ export const initiateTokenRefresh = () => async (dispatch) => {
     console.time('Token Refresh Duration');
     console.log('📝 Starting token refresh...');
     
-    dispatch(actions.tokenRefresh());
+    dispatch(authActions.tokenRefresh());
     
     try {
         const config = appconfig();
@@ -304,6 +260,12 @@ export const initializeAuth = () => async (dispatch) => {
     }
 };
 
+export const logout = () => (dispatch) => {
+    console.log('🚪 Logging out...');
+    tokenService.clearToken();
+    dispatch(authActions.logout());
+};
+
 const initialState = {
     isAuthenticated: false,
     user: null,
@@ -317,7 +279,7 @@ export default function authReducer(state = initialState, action) {
     switch (action.type) {
         // ...existing cases...
         
-        case AUTH_TYPES.TOKEN_REFRESH_SUCCESS:
+        case AUTH_ACTIONS.TOKEN_REFRESH_SUCCESS:
             return {
                 ...state,
                 token: action.payload.token,
@@ -331,7 +293,7 @@ export default function authReducer(state = initialState, action) {
 }
 
 // Export what's needed with new names to avoid conflicts
-export const AUTH_ACTION_TYPES = AUTH_TYPES;
+export const AUTH_ACTION_TYPES = AUTH_ACTIONS;
 export const setAuthenticated = authActions.updateAuthState;
 export const initiateAuthentication = authActions.initiateAuth;
 
@@ -340,9 +302,7 @@ export const {
     loginRequest,
     loginSuccess,
     loginFailure,
-    authRequest,
-    authSuccess,
-    authFailure,
-    authRequired,
-    logout
+    tokenRefresh,
+    tokenRefreshSuccess,
+    tokenRefreshFailure
 } = authActions;
