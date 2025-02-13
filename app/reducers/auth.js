@@ -1,4 +1,5 @@
 import { Map } from 'immutable';
+import { AUTH_ACTIONS } from '../actions/types';
 
 const initialState = Map({
     isAuthenticated: false,
@@ -25,7 +26,7 @@ export default function auth(state = initialState, action) {
                 isLoading: false,
                 error: null,
                 token: action.payload.token,
-                tokenExpiry: action.payload.expiry,
+                tokenExpiry: action.payload.tokenExpiry,
                 user: action.payload.user
             });
             
@@ -38,6 +39,9 @@ export default function auth(state = initialState, action) {
                 tokenExpiry: null,
                 user: null
             });
+
+        case AUTH_ACTIONS.LOGOUT:
+            return initialState;
 
         default:
             return state;

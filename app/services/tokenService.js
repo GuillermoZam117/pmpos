@@ -166,23 +166,34 @@ class TokenService {
                     'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
-                    query: getUserByPin(pin)
+                    query: `{
+                        getUser(pin: "${pin}") {
+                            name
+                        }
+                    }`
                 })
             });
 
+            if (!response.ok) {
+                throw new Error(`Network response was not ok: ${response.status}`);
+            }
+
             const result = await response.json();
-            console.log('✅ User validation response:', result);
+            console.log('👤 User validation response:', result);
 
             if (result.errors) {
-                console.error('GraphQL Errors:', result.errors);
-                throw new Error('Authentication failed');
+                throw new Error(result.errors[0]?.message || 'GraphQL Error');
             }
 
             const userName = result.data?.getUser?.name;
+            console.log('User name from response:', userName);
 
             if (!userName || userName === '*') {
                 throw new Error('Invalid PIN');
             }
+
+            // Store user data in localStorage
+            this.setUserData({ name: userName });
 
             return {
                 success: true,
@@ -191,9 +202,10 @@ class TokenService {
                     name: userName
                 }
             };
+
         } catch (error) {
             console.error('❌ PIN validation failed:', error);
-            throw new Error(error.message || 'Authentication failed');
+            throw error;
         }
     }
 

@@ -72,69 +72,26 @@ export const login = (pin) => async (dispatch) => {
     try {
         dispatch({ type: AUTH_ACTIONS.LOGIN_REQUEST });
         
-        // First, ensure we have a valid token for GraphQL requests
-        const config = appconfig();
-        const tokenResponse = await fetch(config.authUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: new URLSearchParams({
-                grant_type: 'password',
-                username: config.userName,
-                password: config.password,
-                client_id: 'graphiql'
-            })
-        });
-
-        if (!tokenResponse.ok) {
-            throw new Error('Failed to acquire access token');
+        // Use the singleton instance instead of creating new one
+        const result = await tokenService.authenticate(pin);
+        
+        if (result.success) {
+            dispatch({
+                type: AUTH_ACTIONS.LOGIN_SUCCESS,
+                payload: {
+                    user: result.user,
+                    token: result.token,
+                    tokenExpiry: result.tokenExpiry
+                }
+            });
+            
+            console.log('✅ Login successful:', result.user.name);
+            console.timeEnd('Login Duration');
+            console.groupEnd();
+            return true;
         }
-
-        const tokenData = await tokenResponse.json();
-        const accessToken = tokenData.access_token;
-
-        console.log('📝 Token acquired, validating PIN...');
-
-        // Now use the token to validate the PIN
-        const userResponse = await fetch(config.graphqlUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${accessToken}`
-            },
-            body: JSON.stringify({
-                query: `{
-                    getUser(pin: "${pin}") {
-                        name
-                    }
-                }`
-            })
-        });
-
-        const userData = await userResponse.json();
-        console.log('👤 User validation response:', userData);
-
-        const userName = userData.data?.getUser?.name;
-
-        if (!userName || userName === '*') {
-            throw new Error('Invalid PIN');
-        }
-
-        // Success! Store token and dispatch success action
-        const success = await dispatch({
-            type: AUTH_ACTIONS.LOGIN_SUCCESS,
-            payload: {
-                token: accessToken,
-                user: userData.data.getUser,
-                expiry: new Date(Date.now() + (8 * 60 * 60 * 1000)) // 8 hours
-            }
-        });
-
-        console.log('✅ Login successful:', userName);
-        console.timeEnd('Login Duration');
-        console.groupEnd();
-        return success;
+        
+        throw new Error('Authentication failed');
 
     } catch (error) {
         console.error('❌ Login failed:', error);
