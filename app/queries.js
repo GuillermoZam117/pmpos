@@ -347,6 +347,8 @@ export const getEntityScreenItems = async (screenName, callback) => {
     }
 };
 
+
+
 export function updateOrderPortionOfTerminalTicket(terminalId, orderUid, portion, callback) {
     var query = getUpdateOrderPortionOfTerminalTicketScript(terminalId, orderUid, portion);
     $.postJSON(query, function (response) {

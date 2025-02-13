@@ -5,6 +5,7 @@ import { authenticate } from '../queries';
 import Debug from 'debug';
 import { createAction } from 'redux-actions';
 import { tokenService } from '../services/tokenService';
+import { navigate } from '../utils/navigation';
 
 const debug = Debug('pmpos:auth');
 
@@ -72,11 +73,10 @@ export const login = (pin) => async (dispatch) => {
     try {
         dispatch({ type: AUTH_ACTIONS.LOGIN_REQUEST });
         
-        // Use the singleton instance instead of creating new one
         const result = await tokenService.authenticate(pin);
         
         if (result.success) {
-            dispatch({
+            await dispatch({
                 type: AUTH_ACTIONS.LOGIN_SUCCESS,
                 payload: {
                     user: result.user,
@@ -88,6 +88,12 @@ export const login = (pin) => async (dispatch) => {
             console.log('✅ Login successful:', result.user.name);
             console.timeEnd('Login Duration');
             console.groupEnd();
+
+            // Use setTimeout to ensure state is updated before navigation
+            setTimeout(() => {
+                navigate('/main');
+            }, 0);
+
             return true;
         }
         
@@ -121,51 +127,35 @@ export const refreshToken = () => async (dispatch) => {
 };
 
 export const authenticateWithPin = (pin) => async (dispatch) => {
-    console.log('🔐 Attempting authentication with PIN:', pin);
-    
-    dispatch({ type: 'LOGIN_REQUEST' });
-    
-    try {
-        const config = appconfig();
-        const response = await fetch(config.authUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: new URLSearchParams({
-                grant_type: 'password',
-                username: config.userName,
-                password: config.password,
-                client_id: 'graphiql'
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+  console.group('🔑 Login Attempt');
+  console.time('Login Duration');
+  
+  try {
+    const result = await tokenService.authenticate(pin);
+    if (result.success) {
+      dispatch({
+        type: AUTH_ACTIONS.LOGIN_SUCCESS,
+        payload: {
+          user: result.user,
+          token: result.token,
+          tokenExpiry: result.tokenExpiry
         }
-
-        const data = await response.json();
-        
-        if (data.access_token) {
-            console.log('✅ Authentication successful');
-            dispatch({
-                type: 'LOGIN_SUCCESS',
-                payload: {
-                    token: data.access_token
-                }
-            });
-            return true;
-        } else {
-            throw new Error('No access token received');
-        }
-    } catch (error) {
-        console.error('❌ Authentication failed:', error);
-        dispatch({
-            type: 'LOGIN_FAILURE',
-            error: error.message
-        });
-        return false;
+      });
+      console.log('✅ Login successful:', result.user?.name);
+      console.timeEnd('Login Duration');
+      console.groupEnd();
+      return true;
     }
+  } catch (error) {
+    dispatch({
+      type: AUTH_ACTIONS.LOGIN_FAILURE,
+      error: error.message
+    });
+    console.error('❌ Login failed:', error);
+  }
+  console.timeEnd('Login Duration');
+  console.groupEnd();
+  return false;
 };
 
 export const loginWithPin = (pin) => async (dispatch) => {

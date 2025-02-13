@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { HashRouter as Router, Route, Switch } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Snackbar, ThemeProvider } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
@@ -14,6 +14,7 @@ import MyTickets from './MyTickets';
 import Login from './Login/Login';
 import EntityList from './Entities/EntityList';
 import PinPad from './PinPad';
+import TableView from './TableView';
 import { 
     setTerminalId,
     setTicket, 
@@ -45,6 +46,12 @@ const theme = createTheme({
     }
   },
 });
+
+const ProtectedRoute = ({ children }) => {
+    const isAuthenticated = useSelector(state => state.auth.get('isAuthenticated'));
+    console.log('🔒 Route Protection:', { isAuthenticated });
+    return isAuthenticated ? children : <Navigate to="/" replace />;
+};
 
 const App = () => {
     const dispatch = useDispatch();
@@ -91,6 +98,10 @@ const App = () => {
         dispatch(closeMessage());
     };
 
+    useEffect(() => {
+        console.log('Auth state changed:', isAuthenticated);
+    }, [isAuthenticated]);
+
     if (isLoading) {
         return <div>Loading...</div>;
     }
@@ -104,30 +115,26 @@ const App = () => {
     return (
         <ThemeProvider theme={darkTheme}>
             <CssBaseline />
-            <Router>
-                <div className="mainDiv">
-                    {isAuthenticated && <Header />}
-                    <div className="mainBody">
-                        <Menu />
-                        <Orders />
-                        <MyTickets />
-                    </div>
-                    <TicketTags />
-                    <Commands />
-                    <TicketTotal />
-                    <Snackbar
-                        open={isMessageOpen}
-                        message={message}
-                        autoHideDuration={4000}
-                        onClose={handleCloseMessage}
+            <HashRouter>
+                <Routes>
+                    <Route 
+                        path="/" 
+                        element={
+                            isAuthenticated ? 
+                            <Navigate to="/tables" replace /> : 
+                            <PinPad />
+                        } 
                     />
-                    <Switch>
-                        <Route path="/" exact component={() => <div>Home</div>} />
-                        <Route path="/entities/:terminalId/:screenName" component={EntityList} />
-                        <Route exact path="/login" component={Login} />
-                    </Switch>
-                </div>
-            </Router>
+                    <Route 
+                        path="/tables" 
+                        element={
+                            <ProtectedRoute>
+                                <TableView />
+                            </ProtectedRoute>
+                        } 
+                    />
+                </Routes>
+            </HashRouter>
         </ThemeProvider>
     );
 };

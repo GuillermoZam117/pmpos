@@ -11,7 +11,7 @@ const initialState = Map({
 });
 
 export default function auth(state = initialState, action) {
-    console.log('📣 Auth Reducer:', action.type);
+    console.log('📣 Auth Reducer:', action.type, action.payload);  // Added payload logging
     
     switch (action.type) {
         case AUTH_ACTIONS.LOGIN_REQUEST:
@@ -21,16 +21,19 @@ export default function auth(state = initialState, action) {
             });
             
         case AUTH_ACTIONS.LOGIN_SUCCESS:
+            console.log('🔐 Login Success - User:', action.payload.user);  // Debug log
+            localStorage.setItem('isAuthenticated', 'true');
             return state.merge({
                 isAuthenticated: true,
                 isLoading: false,
                 error: null,
                 token: action.payload.token,
                 tokenExpiry: action.payload.tokenExpiry,
-                user: action.payload.user
+                user: Map(action.payload.user)  // Convert to Immutable Map
             });
             
         case AUTH_ACTIONS.LOGIN_FAILURE:
+            console.log('❌ Login Failure:', action.error);  // Debug log
             return state.merge({
                 isAuthenticated: false,
                 isLoading: false,

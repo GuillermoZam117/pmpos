@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Box, Button, TextField, Typography } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { login } from '../actions/auth';
 
 const PinButton = styled(Button)(({ theme }) => ({
@@ -13,48 +14,44 @@ const PinButton = styled(Button)(({ theme }) => ({
   backgroundColor: theme.palette.mode === 'light' ? '#f5f5f5' : '#424242'
 }));
 
-const PinPad = ({ onAuthenticate }) => {
+const PinPad = () => {
   const [pin, setPin] = useState('');
   const dispatch = useDispatch();
-  const auth = useSelector(state => state.auth);
+  const navigate = useNavigate();
+  const isAuthenticated = useSelector(state => state.auth.get('isAuthenticated'));
+  const auth = useSelector(state => ({
+    isAuthenticated: state.auth.get('isAuthenticated'),
+    isLoading: state.auth.get('isLoading'),
+    error: state.auth.get('error'),
+    user: state.auth.get('user')?.toJS()  // Convert from Immutable to JS
+  }));
 
   useEffect(() => {
-    console.group('🔐 PIN Pad Component');
-    console.log('PIN pad mounted');
-    return () => {
-      console.log('PIN pad unmounted');
-      console.groupEnd();
-    };
-  }, []);
+    if (isAuthenticated) {
+      console.log('🔄 Redirecting to tables view');
+      navigate('/tables');
+    }
+  }, [isAuthenticated, navigate]);
+
+  const handleSubmit = async () => {
+    console.group('🔑 PIN Submit');
+    try {
+      const success = await dispatch(login(pin));
+      if (success) {
+        console.log('✅ Login successful');
+      }
+    } catch (error) {
+      console.error('❌ Login failed:', error);
+      setPin('');
+    }
+    console.groupEnd();
+  };
 
   const handlePinClick = (value) => {
     if (pin.length < 4) {
       setPin(pin + value);
     }
   };
-
-  const handleSubmit = async () => {
-    console.group('🔑 PIN Submit');
-    console.time('PIN Authentication');
-    
-    try {
-        console.log('Attempting login with PIN');
-        const success = await dispatch(login(pin));
-        if (success) {
-            const userName = auth.user?.name;
-            console.log('✅ Login successful:', userName);
-        } else {
-            console.log('❌ Login failed: Invalid PIN');
-            setPin('');
-        }
-    } catch (error) {
-        console.error('❌ Login failed:', error);
-        setPin('');
-    } finally {
-        console.timeEnd('PIN Authentication');
-        console.groupEnd();
-    }
-};
 
   const handleClear = () => setPin('');
 
