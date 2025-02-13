@@ -757,3 +757,12 @@ const PIN_VALIDATION = `
         }
     }
 `;
+
+// Add this to your exports
+export function getUserByPin(pin) {
+    return `{
+        getUser(pin: "${pin}") {
+            name
+        }
+    }`;
+}

@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useDispatch, useSelector, connect } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { HashRouter as Router, Route, Switch } from 'react-router-dom';
-import PropTypes from 'prop-types';
 import { Snackbar, ThemeProvider } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
@@ -47,19 +46,16 @@ const theme = createTheme({
   },
 });
 
-const App = ({ 
-    terminalId,
-    message,
-    isMessageOpen,
-    isAuthenticated,
-    setTerminalId,
-    setTicket,
-    closeMessage 
-}) => {
+const App = () => {
     const dispatch = useDispatch();
     const auth = useSelector(state => state.auth);
     const [isLoading, setIsLoading] = useState(true);
     const user = useSelector(state => state.auth.user);
+    const message = useSelector(state => state.app.getIn(['message', 'text']));
+    const terminalId = useSelector(state => state.app.get('terminalId'));
+    const isMessageOpen = useSelector(state => state.app.getIn(['message', 'isOpen']));
+    const ticket = useSelector(state => state.app.get('ticket'));
+    const isAuthenticated = useSelector(state => state.auth.isAuthenticated);
 
     useEffect(() => {
         const initApp = async () => {
@@ -91,11 +87,15 @@ const App = ({
         initAuth();
     }, [dispatch]);
 
+    const handleCloseMessage = () => {
+        dispatch(closeMessage());
+    };
+
     if (isLoading) {
         return <div>Loading...</div>;
     }
 
-    if (!auth.isAuthenticated) {
+    if (!isAuthenticated) {
         debug('User not authenticated, showing PinPad');
         return <PinPad />;
     }
@@ -119,7 +119,7 @@ const App = ({
                         open={isMessageOpen}
                         message={message}
                         autoHideDuration={4000}
-                        onClose={closeMessage}
+                        onClose={handleCloseMessage}
                     />
                     <Switch>
                         <Route path="/" exact component={() => <div>Home</div>} />
@@ -132,29 +132,4 @@ const App = ({
     );
 };
 
-App.propTypes = {
-    terminalId: PropTypes.string,
-    message: PropTypes.string,
-    isMessageOpen: PropTypes.bool,
-    isAuthenticated: PropTypes.bool,
-    ticket: PropTypes.object,
-    setTerminalId: PropTypes.func.isRequired,
-    setTicket: PropTypes.func.isRequired,
-    closeMessage: PropTypes.func.isRequired
-};
-
-const mapStateToProps = (state) => ({
-    message: state.app.getIn(['message', 'text']),
-    terminalId: state.app.get('terminalId'),
-    isMessageOpen: state.app.getIn(['message', 'isOpen']),
-    isAuthenticated: state.app.get('isAuthenticated'),
-    ticket: state.app.get('ticket')
-});
-
-const mapDispatchToProps = {
-    setTerminalId,
-    setTicket,
-    closeMessage
-};
-
-export default connect(mapStateToProps, mapDispatchToProps)(App);
+export default App;

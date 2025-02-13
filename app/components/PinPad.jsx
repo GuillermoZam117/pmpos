@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Button, TextField, Typography } from '@mui/material';
 import { styled } from '@mui/material/styles';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { login } from '../actions/auth';
 
 const PinButton = styled(Button)(({ theme }) => ({
@@ -16,6 +16,7 @@ const PinButton = styled(Button)(({ theme }) => ({
 const PinPad = ({ onAuthenticate }) => {
   const [pin, setPin] = useState('');
   const dispatch = useDispatch();
+  const auth = useSelector(state => state.auth);
 
   useEffect(() => {
     console.group('🔐 PIN Pad Component');
@@ -37,17 +38,23 @@ const PinPad = ({ onAuthenticate }) => {
     console.time('PIN Authentication');
     
     try {
-      console.log('Attempting login with PIN');
-      await dispatch(login({ pin }));
-      console.log('✅ Login successful');
+        console.log('Attempting login with PIN');
+        const success = await dispatch(login(pin));
+        if (success) {
+            const userName = auth.user?.name;
+            console.log('✅ Login successful:', userName);
+        } else {
+            console.log('❌ Login failed: Invalid PIN');
+            setPin('');
+        }
     } catch (error) {
-      console.error('❌ Login failed:', error);
-      setPin('');
+        console.error('❌ Login failed:', error);
+        setPin('');
     } finally {
-      console.timeEnd('PIN Authentication');
-      console.groupEnd();
+        console.timeEnd('PIN Authentication');
+        console.groupEnd();
     }
-  };
+};
 
   const handleClear = () => setPin('');
 
@@ -69,7 +76,7 @@ const PinPad = ({ onAuthenticate }) => {
         value={pin}
         inputProps={{
           style: { 
-            fontSize: '24px',
+            fontSize: '36px',
             textAlign: 'center',
             letterSpacing: '0.5em'
           }
@@ -91,6 +98,12 @@ const PinPad = ({ onAuthenticate }) => {
           </PinButton>
         ))}
       </Box>
+      <Button onClick={handleSubmit}>Submit</Button>
+      {auth.error && (
+        <Typography color="error">
+          {auth.error}
+        </Typography>
+      )}
     </Box>
   );
 };

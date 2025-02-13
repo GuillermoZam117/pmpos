@@ -16,7 +16,7 @@ export const AUTH_ACTIONS = {
     AUTH_ERROR: 'AUTH_ERROR'
 };
 
-// Initial states
+// Initial state
 const initialState = {
     app: Map({
         message: Map({
@@ -26,20 +26,16 @@ const initialState = {
         terminalId: '',
         ticket: null,
         isLoading: false,
-        error: null,
-        isAuthenticated: false
+        error: null
     }),
     auth: Map({
         token: null,
         expiryDate: null,
         isAuthenticated: false,
-        error: null
-    }),
-    login: Map({
-        accessToken: null,
-        refreshToken: null,
         isLoading: false,
-        error: null
+        error: null,
+        accessToken: null,
+        refreshToken: null
     })
 };
 
@@ -48,29 +44,6 @@ const appReducer = (state = initialState.app, action) => {
     switch (action.type) {
         case 'SET_TERMINAL_ID':
             return state.set('terminalId', action.payload);
-        case 'SET_AUTHENTICATED':
-            return state.set('isAuthenticated', action.payload);
-        default:
-            return state;
-    }
-};
-
-const loginReducer = (state = initialState.login, action) => {
-    switch (action.type) {
-        case 'LOGIN_SUCCESS':
-            return state.merge({
-                accessToken: action.payload.accessToken,
-                refreshToken: action.payload.refreshToken,
-                isLoading: false,
-                error: null
-            });
-        case 'LOGIN_FAILURE':
-            return state.merge({
-                accessToken: null,
-                refreshToken: null,
-                isLoading: false,
-                error: action.payload
-            });
         default:
             return state;
     }
@@ -78,6 +51,31 @@ const loginReducer = (state = initialState.login, action) => {
 
 const authReducer = (state = initialState.auth, action) => {
     switch (action.type) {
+        case AUTH_ACTIONS.LOGIN_REQUEST:
+            return state.merge({
+                isLoading: true,
+                error: null
+            });
+        case AUTH_ACTIONS.LOGIN_SUCCESS:
+            return state.merge({
+                token: action.payload.token,
+                expiryDate: action.payload.expiryDate,
+                isAuthenticated: true,
+                isLoading: false,
+                error: null,
+                accessToken: action.payload.accessToken,
+                refreshToken: action.payload.refreshToken
+            });
+        case AUTH_ACTIONS.LOGIN_FAILURE:
+            return state.merge({
+                token: null,
+                expiryDate: null,
+                isAuthenticated: false,
+                isLoading: false,
+                error: action.payload,
+                accessToken: null,
+                refreshToken: null
+            });
         case AUTH_ACTIONS.SET_TOKEN:
             return state.merge({
                 token: action.payload.token,
@@ -104,8 +102,7 @@ const authReducer = (state = initialState.auth, action) => {
 
 const rootReducer = combineReducers({
     app: appReducer,
-    auth: authReducer,
-    login: loginReducer
+    auth: authReducer
 });
 
 // Create store with middleware

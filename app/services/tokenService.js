@@ -1,6 +1,9 @@
 import { appconfig } from '../config';
 import fs from 'fs';
 import path from 'path';
+import { store, AUTH_ACTIONS } from '../store';
+import { getUserByPinQuery, getUserByPin } from '../queries';
+import Debug from 'debug';
 
 const TOKEN_FILE_PATH = path.join(process.cwd(), 'token.txt');
 const TOKEN_STORAGE_KEY = 'sambapos_token_encrypted';
@@ -10,11 +13,7 @@ const REFRESH_THRESHOLD = 7 * 24 * 60 * 60 * 1000; // 7 days
 const TOKEN_VALIDITY = 365 * 24 * 60 * 60 * 1000; // 365 days
 const isDevelopment = process?.env?.NODE_ENV === 'development';
 
-const debug = (message) => {
-    if (isDevelopment) {
-        console.log(`[TokenService] ${message}`);
-    }
-};
+const debug = Debug('pmpos:token');
 
 const AUTH_CONSTANTS = {
     STORAGE_KEYS: {
@@ -34,27 +33,56 @@ const AUTH_CONSTANTS = {
 class TokenService {
     constructor() {
         console.log('Initializing TokenService');
+        this.token = null;
+        this.expiry = null;
         this.pendingRefresh = null;
         this.currentToken = null;
-        this.initializeFromStorage();
+        this.loadToken();
     }
 
-    initializeFromStorage() {
-        try {
-            const token = localStorage.getItem(AUTH_CONSTANTS.STORAGE_KEYS.TOKEN);
-            const expiry = localStorage.getItem(AUTH_CONSTANTS.STORAGE_KEYS.EXPIRY);
+    loadToken() {
+        debug('Loading token from storage...');
+        const storedToken = localStorage.getItem('access_token');
+        const storedExpiry = localStorage.getItem('token_expiry');
+
+        console.group('📦 Token Storage Status');
+        console.log('Stored Token:', storedToken ? '✅ Present' : '❌ Missing');
+        console.log('Stored Expiry:', storedExpiry ? '✅ Present' : '❌ Missing');
+        
+        if (storedToken && storedExpiry) {
+            const expiry = new Date(storedExpiry);
+            console.log('Token Expiry:', expiry);
+            console.log('Current Time:', new Date());
+            console.log('Is Valid:', expiry > new Date() ? '✅ Yes' : '❌ No');
             
-            if (token && expiry && this.isTokenValid(expiry)) {
-                this.currentToken = this.decryptToken(token);
-                console.log('Token loaded from storage');
+            if (expiry > new Date()) {
+                this.token = storedToken;
+                this.expiry = expiry;
+                console.log('✅ Token loaded successfully');
+            } else {
+                console.log('⚠️ Token expired');
+                this.clearToken();
             }
-        } catch (error) {
-            console.error('Error initializing token storage:', error);
-            this.clearToken();
+        } else {
+            console.log('⚠️ No token found in storage');
         }
+        console.groupEnd();
     }
 
     async getToken() {
+        if (this.token && this.expiry > new Date()) {
+            return this.token;
+        }
+
+        const storedToken = localStorage.getItem('token');
+        const storedExpiry = localStorage.getItem('expiry');
+
+        if (storedToken && storedExpiry && new Date(storedExpiry) > new Date()) {
+            this.token = storedToken;
+            this.expiry = new Date(storedExpiry);
+            return this.token;
+        }
+
         try {
             const storedToken = this.currentToken || localStorage.getItem(AUTH_CONSTANTS.STORAGE_KEYS.TOKEN);
             const expiryDate = localStorage.getItem(AUTH_CONSTANTS.STORAGE_KEYS.EXPIRY);
@@ -126,17 +154,62 @@ class TokenService {
         return this.pendingRefresh;
     }
 
-    setToken(token, expiryDate) {
+    async authenticate(pin) {
         try {
-            this.currentToken = token;
-            const encryptedToken = this.encryptToken(token);
-            localStorage.setItem(TOKEN_STORAGE_KEY, encryptedToken);
-            localStorage.setItem(TOKEN_EXPIRY_KEY, expiryDate.toISOString());
-            console.log('Token saved to storage');
+            const token = await this.getToken();
+            console.log('📡 Sending PIN validation...');
+
+            const response = await fetch(appconfig().graphqlUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    query: getUserByPin(pin)
+                })
+            });
+
+            const result = await response.json();
+            console.log('✅ User validation response:', result);
+
+            if (result.errors) {
+                console.error('GraphQL Errors:', result.errors);
+                throw new Error('Authentication failed');
+            }
+
+            const userName = result.data?.getUser?.name;
+
+            if (!userName || userName === '*') {
+                throw new Error('Invalid PIN');
+            }
+
+            return {
+                success: true,
+                message: 'Authentication successful',
+                user: {
+                    name: userName
+                }
+            };
         } catch (error) {
-            console.error('Error saving token:', error);
-            throw error;
+            console.error('❌ PIN validation failed:', error);
+            throw new Error(error.message || 'Authentication failed');
         }
+    }
+
+    setToken(token, expiry) {
+        console.group('💾 Setting Token');
+        console.log('Token:', token ? '✅ Present' : '❌ Missing');
+        console.log('Expiry:', expiry);
+        
+        localStorage.setItem('access_token', token);
+        localStorage.setItem('token_expiry', expiry.toISOString());
+        
+        this.token = token;
+        this.expiry = expiry;
+        
+        console.log('✅ Token saved to storage');
+        console.groupEnd();
     }
 
     isTokenValid(expiryDate = null) {
@@ -157,6 +230,13 @@ class TokenService {
     }
 
     clearToken() {
+        console.group('🗑️ Clearing Token');
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('token_expiry');
+        this.token = null;
+        this.expiry = null;
+        console.log('✅ Token cleared from storage');
+        console.groupEnd();
         try {
             this.currentToken = null;
             localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -217,62 +297,6 @@ class TokenService {
         }
 
         return result.data.validatePin;
-    }
-
-    async authenticate(pin) {
-        try {
-            const token = await this.getToken();
-            console.log('📡 Sending PIN validation...');
-
-            const response = await fetch(appconfig().graphqlUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    query: `
-                        mutation ValidatePin($pin: String!) {
-                            validatePin(pin: $pin) {
-                                success
-                                message
-                            }
-                        }
-                    `,
-                    variables: { pin: pin.toString() }
-                })
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('Server Error:', errorText);
-                throw new Error(`Authentication failed: ${response.status} - ${errorText}`);
-            }
-
-            const result = await response.json();
-            console.log('✅ PIN validation response:', result);
-
-            if (result.errors) {
-                console.error('GraphQL Errors:', result.errors);
-                throw new Error(result.errors[0].message || 'Authentication failed');
-            }
-
-            if (!result.data?.validatePin?.success) {
-                throw new Error('Invalid PIN');
-            }
-
-            return {
-                success: true,
-                message: result.data.validatePin.message
-            };
-        } catch (error) {
-            console.error('❌ PIN validation failed:', error);
-            let errorMessage = 'Authentication service unavailable. Please try again later.';
-            if (error.message === 'Invalid PIN') {
-                errorMessage = 'Invalid PIN';
-            }
-            throw new Error(errorMessage);
-        }
     }
 
     setUserData(user) {

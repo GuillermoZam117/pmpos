@@ -1,36 +1,44 @@
-import * as types from '../constants/ActionTypes';
+import { Map } from 'immutable';
 
-const initialState = {
+const initialState = Map({
     isAuthenticated: false,
+    isLoading: false,
+    error: null,
     token: null,
-    loading: false,
-    error: null
-};
+    tokenExpiry: null,
+    user: null
+});
 
 export default function auth(state = initialState, action) {
+    console.log('📣 Auth Reducer:', action.type);
+    
     switch (action.type) {
-        case 'AUTHENTICATION_REQUEST':
-            return {
-                ...state,
-                loading: true,
+        case AUTH_ACTIONS.LOGIN_REQUEST:
+            return state.merge({
+                isLoading: true,
                 error: null
-            };
-        case 'AUTHENTICATION_SUCCESS':
-            return {
-                ...state,
+            });
+            
+        case AUTH_ACTIONS.LOGIN_SUCCESS:
+            return state.merge({
                 isAuthenticated: true,
+                isLoading: false,
+                error: null,
                 token: action.payload.token,
-                loading: false,
-                error: null
-            };
-        case 'AUTHENTICATION_FAILURE':
-            return {
-                ...state,
+                tokenExpiry: action.payload.expiry,
+                user: action.payload.user
+            });
+            
+        case AUTH_ACTIONS.LOGIN_FAILURE:
+            return state.merge({
                 isAuthenticated: false,
+                isLoading: false,
+                error: action.error,
                 token: null,
-                loading: false,
-                error: action.error
-            };
+                tokenExpiry: null,
+                user: null
+            });
+
         default:
             return state;
     }

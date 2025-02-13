@@ -30,22 +30,120 @@ export const authActions = {
     tokenRefreshFailure: (error) => ({ type: AUTH_ACTIONS.TOKEN_REFRESH_FAILURE, payload: { error } })
 };
 
+// Add this near your other action creators
+export const checkTokenStatus = () => (dispatch) => {
+    console.group('🔍 Token Status Check');
+    
+    const token = localStorage.getItem('access_token');
+    const expiry = localStorage.getItem('token_expiry');
+    
+    console.log('Storage Status:', {
+        token: token ? '✅ Present' : '❌ Missing',
+        expiry: expiry ? '✅ Present' : '❌ Missing'
+    });
+    
+    if (token && expiry) {
+        const expiryDate = new Date(expiry);
+        const now = new Date();
+        
+        console.log('Token Details:', {
+            expiryDate,
+            timeRemaining: (expiryDate - now) / 1000 / 60 / 60, // hours
+            isValid: expiryDate > now
+        });
+    }
+    
+    console.groupEnd();
+    
+    return {
+        type: 'TOKEN_STATUS_CHECK',
+        payload: {
+            hasToken: !!token,
+            expiry: expiry ? new Date(expiry) : null
+        }
+    };
+};
+
 // Thunk Actions
 export const login = (pin) => async (dispatch) => {
+    console.group('🔑 Login Attempt');
+    console.time('Login Duration');
+    
     try {
-        dispatch({ type: 'LOGIN_REQUEST' });
-        const tokenService = new TokenService();
-        const result = await tokenService.authenticate(pin);
+        dispatch({ type: AUTH_ACTIONS.LOGIN_REQUEST });
+        
+        // First, ensure we have a valid token for GraphQL requests
+        const config = appconfig();
+        const tokenResponse = await fetch(config.authUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: new URLSearchParams({
+                grant_type: 'password',
+                username: config.userName,
+                password: config.password,
+                client_id: 'graphiql'
+            })
+        });
 
-        if (result.success) {
-            dispatch({ type: 'LOGIN_SUCCESS', payload: result });
-            return true;
+        if (!tokenResponse.ok) {
+            throw new Error('Failed to acquire access token');
         }
 
-        dispatch({ type: 'LOGIN_FAILURE', error: 'Invalid PIN' });
-        return false;
+        const tokenData = await tokenResponse.json();
+        const accessToken = tokenData.access_token;
+
+        console.log('📝 Token acquired, validating PIN...');
+
+        // Now use the token to validate the PIN
+        const userResponse = await fetch(config.graphqlUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${accessToken}`
+            },
+            body: JSON.stringify({
+                query: `{
+                    getUser(pin: "${pin}") {
+                        name
+                    }
+                }`
+            })
+        });
+
+        const userData = await userResponse.json();
+        console.log('👤 User validation response:', userData);
+
+        const userName = userData.data?.getUser?.name;
+
+        if (!userName || userName === '*') {
+            throw new Error('Invalid PIN');
+        }
+
+        // Success! Store token and dispatch success action
+        const success = await dispatch({
+            type: AUTH_ACTIONS.LOGIN_SUCCESS,
+            payload: {
+                token: accessToken,
+                user: userData.data.getUser,
+                expiry: new Date(Date.now() + (8 * 60 * 60 * 1000)) // 8 hours
+            }
+        });
+
+        console.log('✅ Login successful:', userName);
+        console.timeEnd('Login Duration');
+        console.groupEnd();
+        return success;
+
     } catch (error) {
-        dispatch({ type: 'LOGIN_FAILURE', error: error.message });
+        console.error('❌ Login failed:', error);
+        dispatch({
+            type: AUTH_ACTIONS.LOGIN_FAILURE,
+            error: error.message
+        });
+        console.timeEnd('Login Duration');
+        console.groupEnd();
         return false;
     }
 };
@@ -66,8 +164,9 @@ export const refreshToken = () => async (dispatch) => {
 };
 
 export const authenticateWithPin = (pin) => async (dispatch) => {
-    console.log('🔐 Attempting authentication with PIN');
-    dispatch({ type: 'AUTHENTICATION_REQUEST' });
+    console.log('🔐 Attempting authentication with PIN:', pin);
+    
+    dispatch({ type: 'LOGIN_REQUEST' });
     
     try {
         const config = appconfig();
@@ -84,29 +183,28 @@ export const authenticateWithPin = (pin) => async (dispatch) => {
             })
         });
 
-        console.log('📡 Auth response status:', response.status);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
         const data = await response.json();
         
-        if (response.ok) {
+        if (data.access_token) {
             console.log('✅ Authentication successful');
-            localStorage.setItem('access_token', data.access_token);
             dispatch({
-                type: 'AUTHENTICATION_SUCCESS',
-                payload: { token: data.access_token }
+                type: 'LOGIN_SUCCESS',
+                payload: {
+                    token: data.access_token
+                }
             });
             return true;
+        } else {
+            throw new Error('No access token received');
         }
-        
-        console.error('❌ Authentication failed:', data.error_description);
-        dispatch({
-            type: 'AUTHENTICATION_FAILURE',
-            error: data.error_description
-        });
-        return false;
     } catch (error) {
-        console.error('❌ Auth error:', error);
+        console.error('❌ Authentication failed:', error);
         dispatch({
-            type: 'AUTHENTICATION_FAILURE',
+            type: 'LOGIN_FAILURE',
             error: error.message
         });
         return false;
