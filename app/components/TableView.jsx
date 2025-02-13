@@ -1,87 +1,122 @@
-import React, { useEffect, useState } from 'react';
-import { Box, Grid, Paper, Typography, CircularProgress } from '@mui/material';
-import { styled } from '@mui/material/styles';
-import { appconfig } from '../config';
+import React, { useEffect, useState, useCallback } from 'react';
+import { Box, Typography, Button, Alert, CircularProgress } from '@mui/material';
 import { getEntityScreenItems } from '../queries';
-
-const TableButton = styled(Paper)(({ theme, color }) => ({
-    padding: theme.spacing(2),
-    textAlign: 'center',
-    cursor: 'pointer',
-    height: '120px',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: color || theme.palette.background.paper,
-    '&:hover': {
-        opacity: 0.9,
-        transform: 'scale(1.02)',
-        transition: 'all 0.2s'
-    }
-}));
+import { appconfig } from '../config';
 
 const TableView = () => {
     const [tables, setTables] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const config = appconfig();
 
-    useEffect(() => {
-        console.log('📊 TableView mounted');
-        const loadTables = async () => {
-            try {
-                console.log('📊 Loading entity screen items...');
-                await getEntityScreenItems(config.entityScreenName, (items) => {
-                    console.log('Tables loaded:', items);
-                    setTables(items);
-                    setLoading(false);
-                });
-            } catch (error) {
-                console.error('Error loading tables:', error);
-                setLoading(false);
+    const loadTables = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            console.log('📊 Loading tables...');
+            
+            const items = await getEntityScreenItems(config.entityScreenName);
+            console.log('📊 Tables loaded:', items?.length || 0);
+            
+            if (!Array.isArray(items)) {
+                throw new Error('Invalid response format');
             }
-        };
+            
+            setTables(items);
+        } catch (error) {
+            const errorMessage = error.message.includes('Server error') 
+                ? `Connection error: ${error.message}`
+                : error.message;
+                
+            console.error('❌ Error loading tables:', error);
+            setError(errorMessage);
+        } finally {
+            setLoading(false);
+        }
+    }, [config.entityScreenName]);
 
+    useEffect(() => {
         loadTables();
-    }, []);
+    }, [loadTables]);
 
-    const handleTableClick = (table) => {
-        console.log('Selected table:', table);
-        // Handle table selection
-    };
+    if (loading) {
+        return (
+            <Box display="flex" justifyContent="center" m={4}>
+                <CircularProgress />
+            </Box>
+        );
+    }
+
+    if (error) {
+        return (
+            <Box display="flex" flexDirection="column" alignItems="center" m={4}>
+                <Alert 
+                    severity="error" 
+                    action={
+                        <Button 
+                            color="inherit" 
+                            size="small" 
+                            onClick={loadTables}
+                        >
+                            RETRY
+                        </Button>
+                    }
+                >
+                    {error}
+                </Alert>
+            </Box>
+        );
+    }
 
     return (
-        <Box sx={{ p: 3 }}>
-            <Typography variant="h4" sx={{ mb: 3 }}>
-                Mesas
-            </Typography>
+        <Box sx={{ p: 2 }}>
+            <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                mb: 2 
+            }}>
+                <Typography variant="h4">
+                    {config.departmentName}
+                </Typography>
+                <Button 
+                    variant="outlined" 
+                    onClick={loadTables}
+                >
+                    Refresh
+                </Button>
+            </Box>
             
-            {loading ? (
-                <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-                    <CircularProgress />
-                </Box>
+            {tables.length === 0 ? (
+                <Alert severity="info">No tables available</Alert>
             ) : (
-                <Grid container spacing={2}>
+                <Box sx={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                    gap: 2
+                }}>
                     {tables.map((table) => (
-                        <Grid item xs={12} sm={6} md={4} lg={3} key={table.name}>
-                            <TableButton 
-                                onClick={() => handleTableClick(table)}
-                                color={table.color}
-                            >
-                                <Typography variant="h5" color={table.labelColor || 'inherit'}>
-                                    {table.caption || table.name}
-                                </Typography>
-                                <Typography 
-                                    variant="body2" 
-                                    color={table.labelColor || 'textSecondary'}
-                                    sx={{ mt: 1 }}
-                                >
-                                    {table.type || 'Mesa'}
-                                </Typography>
-                            </TableButton>
-                        </Grid>
+                        <Box 
+                            key={table.id} 
+                            sx={{
+                                p: 2,
+                                border: '1px solid',
+                                borderColor: 'divider',
+                                borderRadius: 1,
+                                cursor: 'pointer',
+                                backgroundColor: table.color,
+                                color: table.labelColor,
+                                '&:hover': {
+                                    opacity: 0.9
+                                }
+                            }}
+                        >
+                            <Typography 
+                                align="center"
+                                dangerouslySetInnerHTML={{ __html: table.caption }}
+                            />
+                        </Box>
                     ))}
-                </Grid>
+                </Box>
             )}
         </Box>
     );

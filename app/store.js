@@ -105,10 +105,17 @@ const rootReducer = combineReducers({
     auth: authReducer
 });
 
+const navigationMiddleware = store => next => action => {
+    if (action.type === 'AUTH_ACTIONS.LOGIN_SUCCESS') {
+        console.log('🔐 Auth Success - Current Route:', window.location.hash);
+    }
+    return next(action);
+};
+
 // Create store with middleware
 export const store = createStore(
     rootReducer,
-    composeEnhancers(applyMiddleware(thunk))
+    composeEnhancers(applyMiddleware(thunk, navigationMiddleware))
 );
 
 // Enable HMR for reducers

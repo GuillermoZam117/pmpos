@@ -39,10 +39,34 @@ module.exports = (env, argv) => {
             port: 8080,
             historyApiFallback: true,
             proxy: {
-                '/api': 'http://localhost:9000',
+                '/api': {
+                    target: 'http://localhost:9000',
+                    pathRewrite: { '^/api': '/api' },
+                    changeOrigin: true,
+                    secure: false,
+                    onProxyReq: (proxyReq, req) => {
+                        // Add debugging for proxy requests
+                        console.log('🔄 Proxy Request:', {
+                            path: proxyReq.path,
+                            headers: proxyReq.getHeaders(),
+                            method: proxyReq.method
+                        });
+                    },
+                    onProxyRes: (proxyRes, req) => {
+                        // Add debugging for proxy responses
+                        console.log('📥 Proxy Response:', {
+                            status: proxyRes.statusCode,
+                            headers: proxyRes.headers
+                        });
+                    }
+                },
                 '/Token': {
                     target: 'http://localhost:9000',
-                    pathRewrite: { '^/Token': '/token' }
+                    changeOrigin: true,
+                    secure: false,
+                    onProxyReq: (proxyReq) => {
+                        console.log('🔑 Token Request:', proxyReq.path);
+                    }
                 },
                 '/signalr': 'http://localhost:9000'
             }

@@ -3,13 +3,14 @@ import 'regenerator-runtime/runtime';
 import React, { StrictMode, Suspense } from 'react';
 import ReactDOM from 'react-dom';
 import { ThemeProvider } from '@mui/material/styles';
-import { BrowserRouter } from 'react-router-dom';
+import { HashRouter } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { store } from './store';
 import { darkTheme } from './theme';
 import Loading from './components/Loading';
 import ErrorBoundary from './components/ErrorBoundary';
 import Debug from 'debug';
+import CircularProgress from '@mui/material/CircularProgress';
 
 // Lazy load components
 const App = React.lazy(() => import('./components/App'));
@@ -20,23 +21,36 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // Root Component
-function RootApp() {
+const RootApp = () => {
     return (
-        <StrictMode>
-            <ErrorBoundary>
-                <Suspense fallback={<Loading />}>
-                    <ThemeProvider theme={darkTheme}>
-                        <Provider store={store}>
-                            <BrowserRouter>
-                                <App />
-                            </BrowserRouter>
-                        </Provider>
-                    </ThemeProvider>
+        <Provider store={store}>
+            <HashRouter>
+                <Suspense fallback={<LoadingFallback />}>
+                    <App />
                 </Suspense>
-            </ErrorBoundary>
-        </StrictMode>
+            </HashRouter>
+        </Provider>
     );
-}
+};
+
+const LoadingFallback = () => (
+  <div style={{ 
+    display: 'flex', 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    height: '100vh' 
+  }}>
+    <CircularProgress />
+  </div>
+);
+
+// Silenciar warnings de React Router
+const router = {
+  future: {
+    v7_startTransition: true,
+    v7_relativeSplatPath: true
+  }
+};
 
 // Initialize token handling
 const initializeAuth = async (retryCount = 3) => {
@@ -58,11 +72,20 @@ const initializeAuth = async (retryCount = 3) => {
 };
 
 // Mount application
-ReactDOM.render(<RootApp />, document.getElementById('root'));
+ReactDOM.render(
+    <Provider store={store}>
+        <HashRouter>
+            <Suspense fallback={<LoadingFallback />}>
+                <App />
+            </Suspense>
+        </HashRouter>
+    </Provider>,
+    document.getElementById('root')
+);
 
 // Enable Hot Module Replacement (HMR)
 if (module.hot) {
     module.hot.accept('./components/App', () => {
         ReactDOM.render(<RootApp />, document.getElementById('root'));
     });
-}
+};

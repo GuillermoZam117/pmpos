@@ -19,22 +19,18 @@ const PinPad = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const isAuthenticated = useSelector(state => state.auth.get('isAuthenticated'));
-  const auth = useSelector(state => ({
-    isAuthenticated: state.auth.get('isAuthenticated'),
-    isLoading: state.auth.get('isLoading'),
-    error: state.auth.get('error'),
-    user: state.auth.get('user')?.toJS()  // Convert from Immutable to JS
-  }));
-
+  const authError = useSelector(state => state.auth.get('error'));
   useEffect(() => {
     if (isAuthenticated) {
-      console.log('🔄 Redirecting to tables view');
-      navigate('/tables');
+      console.log('🔄 Auth state changed - navigating to tables');
+      navigate('/tables', { replace: true });
     }
   }, [isAuthenticated, navigate]);
 
   const handleSubmit = async () => {
-    console.group('🔑 PIN Submit');
+    console.group('🔑 PIN Authentication');
+    console.time('PIN Authentication');
+    
     try {
       const success = await dispatch(login(pin));
       if (success) {
@@ -43,8 +39,10 @@ const PinPad = () => {
     } catch (error) {
       console.error('❌ Login failed:', error);
       setPin('');
+    } finally {
+      console.timeEnd('PIN Authentication');
+      console.groupEnd();
     }
-    console.groupEnd();
   };
 
   const handlePinClick = (value) => {
@@ -95,12 +93,14 @@ const PinPad = () => {
           </PinButton>
         ))}
       </Box>
+      
       <Button onClick={handleSubmit}>Submit</Button>
-      {auth.error && (
-        <Typography color="error">
-          {auth.error}
-        </Typography>
-      )}
+      
+      {authError && (
+      <Typography color="error" sx={{ mt: 2 }}>
+        {authError}
+      </Typography>
+       )}
     </Box>
   );
 };

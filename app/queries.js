@@ -1,6 +1,6 @@
 import $ from 'jquery';
 import jQuery from 'jquery';
-import { appconfig } from './config';
+import { appconfig, DEV_CONFIG } from './config';
 import { store } from './store';
 import * as Actions from './actions';
 import createClient, { queries } from './utils/graphqlClient';
@@ -311,43 +311,73 @@ export function changeEntityOfTerminalTicket(terminalId, type, name, callback) {
     });
 }
 
-export const getEntityScreenItems = async (screenName, callback) => {
-    // Se asegura de obtener un token válido
-    const token = await ensureAuthenticated();
-    // Se construye la consulta GraphQL
-    const query = `
-        query {
-            getEntityScreenItems(screen: "${screenName}") {
-                id
-                name
-                caption
-                type
-                color
-                
-            }
-        }
-    `;
+export const getEntityScreenItems = async (screenName) => {
     try {
-        const response = await fetch(appconfig().GQLurl, {
+        const config = appconfig();
+        const token = localStorage.getItem('access_token');
+
+        console.log('📊 GraphQL Request:', {
+            url: config.GQLurl,
+            screenName,
+            token: token ? '✓' : '✗'
+        });
+
+        // Use the existing query helper function
+        const query = getGetEntityScreenItemsScript(screenName);
+
+        const response = await fetch(config.GQLurl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Accept': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({ query })
         });
-        const data = await response.json();
-        if (data.errors) {
-            console.error('❌ GraphQL errors:', data.errors);
-            return;
+
+        const responseText = await response.text();
+        console.log('📊 Server Response:', responseText);
+
+        try {
+            const data = JSON.parse(responseText);
+            
+            if (!response.ok) {
+                throw new Error(`Server error (${response.status}): ${data.exceptionMessage || response.statusText}`);
+            }
+
+            if (data.errors) {
+                throw new Error(data.errors[0].message);
+            }
+
+            // Use the correct response path based on the query helper
+            const items = data.data?.items;
+            if (!items) {
+                throw new Error('No items found in response');
+            }
+
+            return items;
+        } catch (parseError) {
+            console.error('❌ Parse Error:', parseError);
+            throw new Error(`Failed to process response: ${parseError.message}`);
         }
-        if (callback) callback(data.data.getEntityScreenItems);
     } catch (error) {
-        console.error('❌ getEntityScreenItems fetch error:', error);
+        console.error('❌ GraphQL Error:', error);
+        throw error;
     }
 };
 
-
+function getGetEntityScreenItemsScript(name) {
+    return `query q{
+        items:getEntityScreenItems(name:"${name}"){
+            name,
+            caption,
+            color,
+            labelColor,
+            state,
+            id
+        }
+    }`;
+}
 
 export function updateOrderPortionOfTerminalTicket(terminalId, orderUid, portion, callback) {
     var query = getUpdateOrderPortionOfTerminalTicketScript(terminalId, orderUid, portion);
@@ -539,9 +569,6 @@ function getChangeEntityOfTerminalTicketScript(terminalId, type, name) {
         ${getTicketResult()}}`;
 }
 
-function getGetEntityScreenItemsScript(name) {
-    return `query q{items:getEntityScreenItems(name:"${name}"){name,caption,color,labelColor}}`;
-}
 
 function getGetOrderTagColorsScript() {
     return '{colors:getOrderTagColors{name,value}}';

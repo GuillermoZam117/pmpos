@@ -1,0 +1,14 @@
+-- obtener usuario
+{getUser(pin: "1111") {
+  name
+}}
+
+-- obtener mesas 
+
+{getEntityScreenItems (name:"MESAS") {
+  name
+  caption
+  color
+  labelColor
+  Id
+}}

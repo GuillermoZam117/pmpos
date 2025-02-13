@@ -1,44 +1,58 @@
-export const appconfig = () => ({
-    // SambaPOS API Configuration
-    GQLserv: process.env.SAMBAPOS_API_URL || 'http://localhost:9000',
-    graphqlUrl: 'http://localhost:9000/api/graphql',
-    SIGNALRserv: process.env.SAMBAPOS_SIGNALR_URL || 'http://localhost:9000',
-    SIGNALRurl: process.env.SAMBAPOS_SIGNALR_HUB || 'http://localhost:9000/signalr',
-    authUrl: 'http://localhost:9000/Token',
+export const appconfig = () => {
+    const API_URL = process.env.SAMBAPOS_API_URL || 'http://localhost:9000';
     
-    // Terminal Configuration
-    terminalName: process.env.TERMINAL_NAME || 'SERVIDOR',
-    userName: 'graphiql',
-    password: 'graphiql',
-    
-    // Business Configuration
-    departmentName: 'MESAS',
-    ticketTypeName: 'COMEDOR',
-    menuName: 'MENU',
-    entityScreenName: 'MESAS',
-    
-    // Application Settings
-    autoConnectPrinter: true,
-    defaultPrinter: 'CAJA',
-    tableView: true,
-    showOrderTags: true,
-    allowSplitBill: true,
-    allowMergeTickets: true,
-    
-    // Timeouts
-    connectionTimeout: 30000,
-    refreshInterval: 5000,
+    return {
+        // SambaPOS API Configuration
+        GQLserv: API_URL,
+        GQLurl: `${API_URL}/api/graphql`,
+        graphqlUrl: `${API_URL}/api/graphql`,
+        SIGNALRserv: process.env.SAMBAPOS_SIGNALR_URL || API_URL,
+        SIGNALRurl: `${API_URL}/signalr`,
+        authUrl: `${API_URL}/Token`,
+        
+        // Terminal Configuration
+        terminalName: process.env.TERMINAL_NAME || 'SERVIDOR',
+        userName: 'graphiql',
+        password: 'graphiql',
+        
+        // Business Configuration
+        departmentName: 'MESAS',
+        ticketTypeName: 'COMEDOR',
+        menuName: 'MENU',
+        entityScreenName: 'MESAS',
+        
+        // Application Settings
+        autoConnectPrinter: true,
+        defaultPrinter: 'CAJA',
+        tableView: true,
+        showOrderTags: true,
+        allowSplitBill: true,
+        allowMergeTickets: true,
+        
+        // Timeouts
+        connectionTimeout: 30000,
+        refreshInterval: 5000,
 
-    // Auth Configuration
-    auth: {
-        clientId: 'graphiql',
-        grantType: 'password',
-        tokenEndpoint: '/Token',
-        refreshEndpoint: '/Token/refresh',
-        tokenValidity: 365 * 24 * 60 * 60 * 1000, // 365 days
-        refreshThreshold: 7 * 24 * 60 * 60 * 1000  // 7 days
-    }
-});
+        // Auth Configuration
+        auth: {
+            clientId: 'graphiql',
+            grantType: 'password',
+            tokenEndpoint: '/Token',
+            refreshEndpoint: '/Token/refresh',
+            tokenValidity: 365 * 24 * 60 * 60 * 1000, // 365 days
+            refreshThreshold: 7 * 24 * 60 * 60 * 1000, // 7 days
+            baseUrl: API_URL
+        }
+    };
+};
+
+// Configuración para desarrollo
+export const DEV_CONFIG = {
+    development: true,
+    apiBaseUrl: 'http://localhost:9000',
+    graphqlEndpoint: '/api/graphql',
+    authEndpoint: '/Token'
+};
 
 export const TOKEN_CONFIG = {
     STORAGE_KEY: 'sambapos_token_encrypted',
