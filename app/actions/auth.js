@@ -319,12 +319,12 @@ export const logout = () => async (dispatch) => {
         // Clear user data but keep token
         tokenService.clearAuthentication();
         
-        // Force navigation to PinPad
-        window.location.replace('#/pinpad');
-        
+        // Navigation will be handled by component
         debug('✅ Logout exitoso');
+        return true;
     } catch (error) {
         console.error('❌ Error en logout:', error);
+        return false;
     }
 };
 

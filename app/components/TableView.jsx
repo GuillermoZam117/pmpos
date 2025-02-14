@@ -25,12 +25,28 @@ const debug = Debug('pmpos:tables');
 const TableView = () => {
     const isAuthenticated = useSelector(state => state.auth.get('isAuthenticated'));
     const user = useSelector(state => state.auth.get('user'));
+    const dispatch = useDispatch();
+    const navigate = useNavigate();
+
+    const handleLogout = useCallback(async () => {
+        debug('👋 Iniciando logout...');
+        
+        // Limpiar intervalos y estado
+        setTables([]);
+        
+        try {
+            await dispatch(logout());
+            // Forzar navegación a pinpad
+            navigate('/', { replace: true });
+        } catch (error) {
+            console.error('Error durante logout:', error);
+        }
+    }, [dispatch, navigate]);
+
     const [tables, setTables] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState(null);
-    const navigate = useNavigate();
-    const dispatch = useDispatch();
 
     const loadTables = useCallback(async (showRefresh = false) => {
         if (showRefresh) setRefreshing(true);
@@ -60,8 +76,9 @@ const TableView = () => {
     }, []);
 
     const parseTableStatus = (table) => {
-        if (table.color === '#FFFF00') return 'OCUPADO';
+        if (!table) return 'BLOQUEADO';
         if (table.color === '#FF0000') return 'CUENTA';
+        if (table.color === '#FFFF00') return 'OCUPADO';
         if (table.color === '#FFFFFF' || table.color === '#E5E3D8') return 'LIBRE';
         return 'BLOQUEADO';
     };
@@ -72,56 +89,103 @@ const TableView = () => {
         return match ? parseInt(match[1], 10) * 60000 : null;
     };
 
-    const handleTableClick = useCallback((table) => {
-        debug('🎯 Table clicked:', table);
-        // Add your table click logic here
-        // For example, navigate to table details:
-        navigate(`/tables/${table.name}`, { 
-            state: { 
-                table,
-                returnTo: '/tables'
-            }
-        });
-    }, [navigate]);
+    const handleTableClick = useCallback(async (table) => {
+        debug('🎯 Opening ticket for table:', table.name);
+        
+        try {
+            // Use correct SambaPOS ticket URL format
+            const ticketUrl = `http://localhost:9000/ticket/${table.name}`;
+            
+            // Navigate current window instead of opening popup
+            window.location.href = ticketUrl;
+            
+        } catch (error) {
+            console.error('Error opening ticket:', error);
+            setError(`No se pudo abrir el ticket: ${error.message}`);
+        }
+    }, []);
 
-    const handleLogout = useCallback(() => {
-        debug('👋 Logging out user');
-        dispatch(logout());
-    }, [dispatch]);
+    const handleError = useCallback((err) => {
+        debug('❌ Error:', err);
+        setError(err.message);
+    }, []);
 
     useEffect(() => {
-        // Only fetch tables if authenticated
-        if (isAuthenticated) {
-            loadTables();
-            const interval = setInterval(() => loadTables(true), 30000);
-            return () => clearInterval(interval);
+        if (!isAuthenticated) {
+            navigate('/pinpad', { replace: true });
         }
+    }, [isAuthenticated, navigate]);
+
+    useEffect(() => {
+        let mounted = true;
+        let intervalId = null;
+        
+        if (isAuthenticated) {
+            const fetchTables = async () => {
+                if (!mounted) return;
+                await loadTables();
+            };
+
+            fetchTables();
+            intervalId = setInterval(() => fetchTables(), 30000);
+        }
+        
+        return () => {
+            mounted = false;
+            if (intervalId) {
+                clearInterval(intervalId);
+            }
+        };
     }, [isAuthenticated, loadTables]);
+
+    useEffect(() => {
+        if (!isAuthenticated) {
+            console.log('📤 Usuario no autenticado, limpiando datos...');
+            setTables([]);
+            clearInterval(refreshInterval.current);
+            navigate('/', { replace: true });
+        }
+    }, [isAuthenticated, navigate]);
 
     // If not authenticated, don't render anything
     if (!isAuthenticated) return null;
+
+    if (error) {
+        return (
+            <Alert 
+                severity="error" 
+                action={
+                    <Button color="inherit" onClick={() => window.location.reload()}>
+                        Recargar
+                    </Button>
+                }
+            >
+                {error}
+            </Alert>
+        );
+    }
 
     return (
         <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
             <AppBar position="sticky" color="default" elevation={1}>
                 <Toolbar sx={{ justifyContent: 'space-between' }}>
-                    <Typography variant="h6" component="div">
+                    <Typography variant="h6">
                         SambaPOS
                     </Typography>
                     
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                         <Box sx={{ 
                             display: 'flex', 
-                            alignItems: 'center',
-                            gap: 1,
-                            px: 2,
-                            py: 0.5,
+                            alignItems: 'center', 
+                            gap: 1,  
+                            px: 2, 
+                            py: 0.5, 
                             bgcolor: 'action.selected',
-                            borderRadius: 1
+                            borderRadius: 1 
                         }}>
                             <PersonIcon />
                             <Typography variant="body2">
-                                {user ? user.get('name') : 'Usuario'}
+                                {user?.name || user?.get('name') || 'Usuario'}
                             </Typography>
                         </Box>
 
@@ -190,5 +254,6 @@ const TableView = () => {
         </Box>
     );
 };
+
 
 export default TableView;

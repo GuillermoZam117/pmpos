@@ -1,58 +1,80 @@
 import { Map } from 'immutable';
 import { AUTH_ACTIONS } from '../actions/types';
+import Debug from 'debug';
+
+const debug = Debug('pmpos:auth');
 
 const initialState = Map({
     isAuthenticated: false,
     user: null,
     token: null,
-    error: null
+    tokenExpiry: null,
+    error: null,
+    loading: false,
+    lastCheck: null
 });
 
 export default function auth(state = initialState, action) {
-    console.log('📣 Auth Reducer:', action.type, action.payload);  // Added payload logging
-    
+    debug('📣 Auth Action:', action.type);
+
     switch (action.type) {
         case AUTH_ACTIONS.LOGIN_REQUEST:
+            debug('🔄 Login request started');
             return state.merge({
-                isLoading: true,
+                loading: true,
                 error: null
             });
             
         case AUTH_ACTIONS.LOGIN_SUCCESS:
-            return {
-                ...state,
+            debug('✅ Login successful:', action.payload.user?.name);
+            return state.merge({
                 isAuthenticated: true,
-                user: action.payload.user,
+                user: action.payload.data,
                 token: action.payload.token,
+                tokenExpiry: action.payload.tokenExpiry,
                 loading: false,
-                error: null
-            };
+                error: null,
+                lastCheck: Date.now()
+            });
             
         case AUTH_ACTIONS.LOGIN_FAILURE:
-            console.log('❌ Login Failure:', action.error);  // Debug log
+            debug('❌ Login failed:', action.error);
             return state.merge({
                 isAuthenticated: false,
-                isLoading: false,
+                loading: false,
                 error: action.error,
-                token: null,
-                tokenExpiry: null,
                 user: null
             });
 
         case AUTH_ACTIONS.LOGOUT:
-            return {
-                ...state,
+            debug('🔓 User logout - preserving token');
+            return state.merge({
                 isAuthenticated: false,
                 user: null,
-                error: null
-                // Keep token
-            };
+                error: null,
+                loading: false
+            });
+
+        case AUTH_ACTIONS.TOKEN_CHECK:
+            debug('🔍 Token check:', action.payload?.valid ? 'valid' : 'invalid');
+            return state.merge({
+                lastCheck: Date.now(),
+                error: action.payload?.error
+            });
 
         case AUTH_ACTIONS.TOKEN_EXPIRED:
+            debug('⚠️ Token expired');
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('token_expiry');
+            return initialState;
+
         case AUTH_ACTIONS.UNAUTHORIZED:
-            // Aquí sí limpiamos todo, incluyendo el token
+            debug('🚫 Unauthorized access');
             localStorage.removeItem('access_token');
             return initialState;
+
+        case AUTH_ACTIONS.CLEAR_ERROR:
+            return state.set('error', null);
 
         default:
             return state;
