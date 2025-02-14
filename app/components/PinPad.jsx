@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Button, TextField, Typography } from '@mui/material';
+import { Box, Button, TextField, Typography, Grid, Paper, Alert, CircularProgress } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
@@ -16,6 +16,8 @@ const PinButton = styled(Button)(({ theme }) => ({
 
 const PinPad = () => {
   const [pin, setPin] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const isAuthenticated = useSelector(state => state.auth.get('isAuthenticated'));
@@ -27,21 +29,19 @@ const PinPad = () => {
     }
   }, [isAuthenticated, navigate]);
 
-  const handleSubmit = async () => {
-    console.group('🔑 PIN Authentication');
-    console.time('PIN Authentication');
-    
+  const handlePinSubmit = async () => {
+    setLoading(true);
+    setError(null);
     try {
       const success = await dispatch(login(pin));
-      if (success) {
-        console.log('✅ Login successful');
+      if (!success) {
+        setError('PIN inválido');
+        setPin('');
       }
     } catch (error) {
-      console.error('❌ Login failed:', error);
-      setPin('');
+      setError(error.message);
     } finally {
-      console.timeEnd('PIN Authentication');
-      console.groupEnd();
+      setLoading(false);
     }
   };
 
@@ -55,52 +55,79 @@ const PinPad = () => {
 
   return (
     <Box sx={{
+      height: '100vh',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      p: 3,
-      backgroundColor: (theme) => 
-        theme.palette.mode === 'light' ? '#ffffff' : '#303030'
+      justifyContent: 'center',
+      bgcolor: 'background.default'
     }}>
-      <Typography variant="h5" sx={{ mb: 3 }}>
-        Ingrese PIN
-      </Typography>
-      
-      <TextField
-        type="password"
-        value={pin}
-        inputProps={{
-          style: { 
-            fontSize: '36px',
-            textAlign: 'center',
-            letterSpacing: '0.5em'
-          }
+      <Paper 
+        elevation={3} 
+        sx={{ 
+          p: 4, 
+          width: '100%', 
+          maxWidth: 400,
+          borderRadius: 2 
         }}
-        sx={{ mb: 3, width: '200px' }}
-      />
+      >
+        <Typography variant="h4" align="center" gutterBottom>
+          SambaPOS
+        </Typography>
+        
+        {/* PIN Input with mask */}
+        <TextField
+          fullWidth
+          type="password"
+          value={pin}
+          disabled={loading}
+          placeholder="••••"
+          sx={{ mb: 3 }}
+          inputProps={{
+            maxLength: 4,
+            style: { 
+              fontSize: '2rem',
+              letterSpacing: '0.5em',
+              textAlign: 'center'
+            }
+          }}
+        />
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1 }}>
-        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 'C', 0, '⏎'].map((key) => (
-          <PinButton
-            key={key}
-            onClick={() => {
-              if (key === 'C') handleClear();
-              else if (key === '⏎') handleSubmit();
-              else handlePinClick(key);
-            }}
-          >
-            {key}
-          </PinButton>
-        ))}
-      </Box>
-      
-      <Button onClick={handleSubmit}>Submit</Button>
-      
-      {authError && (
-      <Typography color="error" sx={{ mt: 2 }}>
-        {authError}
-      </Typography>
-       )}
+        {/* Numeric Pad */}
+        <Grid container spacing={2}>
+          {[1,2,3,4,5,6,7,8,9,'C',0,'⏎'].map(key => (
+            <Grid item xs={4} key={key}>
+              <Button
+                fullWidth
+                variant="contained"
+                disabled={loading}
+                onClick={() => {
+                  if (key === 'C') handleClear();
+                  else if (key === '⏎') handlePinSubmit();
+                  else handlePinClick(key);
+                }}
+                sx={{ height: 64 }}
+              >
+                {key}
+              </Button>
+            </Grid>
+          ))}
+        </Grid>
+
+        {/* Error Message */}
+        {error && (
+          <Alert severity="error" sx={{ mt: 2 }}>
+            {error}
+          </Alert>
+        )}
+
+        {/* Loading Indicator */}
+        {loading && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+            <CircularProgress />
+          </Box>
+        )}
+      </Paper>
     </Box>
   );
 };

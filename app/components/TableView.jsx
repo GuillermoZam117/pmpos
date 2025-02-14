@@ -1,122 +1,136 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Box, Typography, Button, Alert, CircularProgress } from '@mui/material';
+import { 
+    Box, 
+    Typography, 
+    Grid, 
+    Alert, 
+    Button,
+    CircularProgress 
+} from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import TableCard from './TableCard';
 import { getEntityScreenItems } from '../queries';
-import { appconfig } from '../config';
+import { useNavigate } from 'react-router-dom';
+import Debug from 'debug';
+
+const debug = Debug('pmpos:tables');
 
 const TableView = () => {
     const [tables, setTables] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState(null);
-    const config = appconfig();
+    const navigate = useNavigate();
 
-    const loadTables = useCallback(async () => {
+    const loadTables = useCallback(async (showRefresh = false) => {
+        if (showRefresh) setRefreshing(true);
+        else setLoading(true);
+
         try {
-            setLoading(true);
+            debug('🔄 Fetching tables from SambaPOS...');
+            const items = await getEntityScreenItems('MESAS');
+            
+            // Process tables data
+            const processedTables = items.map(table => ({
+                ...table,
+                status: parseTableStatus(table),
+                timeElapsed: parseTimeFromCaption(table.caption)
+            }));
+
+            debug(`✅ Loaded ${processedTables.length} tables`);
+            setTables(processedTables);
             setError(null);
-            console.log('📊 Loading tables...');
-            
-            const items = await getEntityScreenItems(config.entityScreenName);
-            console.log('📊 Tables loaded:', items?.length || 0);
-            
-            if (!Array.isArray(items)) {
-                throw new Error('Invalid response format');
-            }
-            
-            setTables(items);
-        } catch (error) {
-            const errorMessage = error.message.includes('Server error') 
-                ? `Connection error: ${error.message}`
-                : error.message;
-                
-            console.error('❌ Error loading tables:', error);
-            setError(errorMessage);
+        } catch (err) {
+            debug('❌ Error loading tables:', err);
+            setError(err.message);
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
-    }, [config.entityScreenName]);
+    }, []);
+
+    const parseTableStatus = (table) => {
+        if (table.color === '#FF0000') return 'OCUPADO';
+        if (table.color === '#FFFF00') return 'RESERVADO';
+        if (table.color === '#E5E3D8') return 'LIBRE';
+        return 'BLOQUEADO';
+    };
+
+    const parseTimeFromCaption = (caption) => {
+        if (!caption) return null;
+        const match = caption.match(/(\d+)\s*min/);
+        return match ? parseInt(match[1], 10) * 60000 : null;
+    };
+
+    const handleTableClick = useCallback((table) => {
+        debug('🎯 Table clicked:', table);
+        // Add your table click logic here
+        // For example, navigate to table details:
+        navigate(`/tables/${table.name}`, { 
+            state: { 
+                table,
+                returnTo: '/tables'
+            }
+        });
+    }, [navigate]);
 
     useEffect(() => {
         loadTables();
+        const interval = setInterval(() => loadTables(true), 30000);
+        return () => clearInterval(interval);
     }, [loadTables]);
 
-    if (loading) {
-        return (
-            <Box display="flex" justifyContent="center" m={4}>
-                <CircularProgress />
+    return (
+        <Box sx={{ p: 3 }}>
+            <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                mb: 3,
+                position: 'sticky',
+                top: 0,
+                bgcolor: 'background.default',
+                zIndex: 1
+            }}>
+                <Typography variant="h4">
+                    Mesas
+                </Typography>
+                <Button
+                    variant="outlined"
+                    onClick={() => loadTables(true)}
+                    disabled={refreshing}
+                    startIcon={<RefreshIcon />}
+                >
+                    Actualizar
+                </Button>
             </Box>
-        );
-    }
 
-    if (error) {
-        return (
-            <Box display="flex" flexDirection="column" alignItems="center" m={4}>
+            {loading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                    <CircularProgress />
+                </Box>
+            ) : error ? (
                 <Alert 
-                    severity="error" 
+                    severity="error"
                     action={
-                        <Button 
-                            color="inherit" 
-                            size="small" 
-                            onClick={loadTables}
-                        >
-                            RETRY
+                        <Button color="inherit" size="small" onClick={() => loadTables()}>
+                            Reintentar
                         </Button>
                     }
                 >
                     {error}
                 </Alert>
-            </Box>
-        );
-    }
-
-    return (
-        <Box sx={{ p: 2 }}>
-            <Box sx={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                mb: 2 
-            }}>
-                <Typography variant="h4">
-                    {config.departmentName}
-                </Typography>
-                <Button 
-                    variant="outlined" 
-                    onClick={loadTables}
-                >
-                    Refresh
-                </Button>
-            </Box>
-            
-            {tables.length === 0 ? (
-                <Alert severity="info">No tables available</Alert>
             ) : (
-                <Box sx={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-                    gap: 2
-                }}>
-                    {tables.map((table) => (
-                        <Box 
-                            key={table.id} 
-                            sx={{
-                                p: 2,
-                                border: '1px solid',
-                                borderColor: 'divider',
-                                borderRadius: 1,
-                                cursor: 'pointer',
-                                backgroundColor: table.color,
-                                color: table.labelColor,
-                                '&:hover': {
-                                    opacity: 0.9
-                                }
-                            }}
-                        >
-                            <Typography 
-                                align="center"
-                                dangerouslySetInnerHTML={{ __html: table.caption }}
+                <Grid container spacing={2}>
+                    {tables.map(table => (
+                        <Grid item xs={12} sm={6} md={4} lg={3} key={table.name}>
+                            <TableCard 
+                                table={table}
+                                onClick={() => handleTableClick(table)}
                             />
-                        </Box>
+                        </Grid>
                     ))}
-                </Box>
+                </Grid>
             )}
         </Box>
     );

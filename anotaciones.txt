@@ -12,3 +12,22 @@
   labelColor
   Id
 }}
+
+# Stop any running processes
+Stop-Process -Name "node" -Force -ErrorAction SilentlyContinue
+
+# Clear npm cache
+npm cache clean --force
+
+# Remove node_modules and package-lock
+Remove-Item -Recurse -Force node_modules
+Remove-Item package-lock.json
+
+# Clear npm's local cache directory
+Remove-Item "$env:APPDATA\npm-cache\*" -Recurse -Force
+
+# Reinstall dependencies
+npm install
+
+# Start dev server
+npm run dev
