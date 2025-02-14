@@ -80,11 +80,14 @@ const PinPad = () => {
           fullWidth
           type="password"
           value={pin}
+          onChange={(e) => setPin(e.target.value)}
           disabled={loading}
           placeholder="••••"
           sx={{ mb: 3 }}
           inputProps={{
-            maxLength: 4,
+            maxLength: 32, // Allow up to 32 digits
+            pattern: '[0-9]*',
+            inputMode: 'numeric',
             style: { 
               fontSize: '2rem',
               letterSpacing: '0.5em',

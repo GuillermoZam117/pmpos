@@ -23,13 +23,14 @@ import Debug from 'debug';
 const debug = Debug('pmpos:tables');
 
 const TableView = () => {
+    const isAuthenticated = useSelector(state => state.auth.get('isAuthenticated'));
+    const user = useSelector(state => state.auth.get('user'));
     const [tables, setTables] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState(null);
     const navigate = useNavigate();
     const dispatch = useDispatch();
-    const user = useSelector(state => state.auth.user);
 
     const loadTables = useCallback(async (showRefresh = false) => {
         if (showRefresh) setRefreshing(true);
@@ -86,14 +87,19 @@ const TableView = () => {
     const handleLogout = useCallback(() => {
         debug('👋 Logging out user');
         dispatch(logout());
-        navigate('/login');
-    }, [dispatch, navigate]);
+    }, [dispatch]);
 
     useEffect(() => {
-        loadTables();
-        const interval = setInterval(() => loadTables(true), 30000);
-        return () => clearInterval(interval);
-    }, [loadTables]);
+        // Only fetch tables if authenticated
+        if (isAuthenticated) {
+            loadTables();
+            const interval = setInterval(() => loadTables(true), 30000);
+            return () => clearInterval(interval);
+        }
+    }, [isAuthenticated, loadTables]);
+
+    // If not authenticated, don't render anything
+    if (!isAuthenticated) return null;
 
     return (
         <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -115,7 +121,7 @@ const TableView = () => {
                         }}>
                             <PersonIcon />
                             <Typography variant="body2">
-                                {user?.name || 'Usuario'}
+                                {user ? user.get('name') : 'Usuario'}
                             </Typography>
                         </Box>
 

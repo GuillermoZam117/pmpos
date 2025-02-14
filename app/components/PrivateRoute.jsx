@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { Box, CircularProgress } from '@mui/material';
+import Debug from 'debug';
+
+const debug = Debug('pmpos:route');
 
 const PrivateRoute = ({ children }) => {
     const location = useLocation();
@@ -9,7 +12,6 @@ const PrivateRoute = ({ children }) => {
     const isAuthenticated = auth.get('isAuthenticated');
     const loading = auth.get('loading');
 
-    // Show loading state
     if (loading) {
         return (
             <Box 
@@ -23,12 +25,11 @@ const PrivateRoute = ({ children }) => {
         );
     }
 
-    // Redirect to login if not authenticated
     if (!isAuthenticated) {
-        return <Navigate to="/" state={{ from: location }} replace />;
+        debug('🔒 Access denied, redirecting to PinPad...');
+        return <Navigate to="/pinpad" state={{ from: location }} replace />;
     }
 
-    // Render protected route content
     return children;
 };
 

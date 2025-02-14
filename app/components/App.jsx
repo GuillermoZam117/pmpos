@@ -53,15 +53,17 @@ const App = () => {
             <div className="app-container">
                 <Suspense fallback={<LoadingComponent />}>
                     <Routes>
-                        <Route path="/" element={<Navigate to="/pinpad" />} />
+                        <Route path="/" element={<Navigate to="/pinpad" replace />} />
                         <Route path="/pinpad" element={<PinPad />} />
-                        <Route path="/tables" element={
-                            <PrivateRoute>
-                                <TableView />
-                            </PrivateRoute>
-                        } />
-                        {/* Add a catch-all route */}
-                        <Route path="*" element={<Navigate to="/pinpad" />} />
+                        <Route 
+                            path="/tables" 
+                            element={
+                                <PrivateRoute>
+                                    <TableView />
+                                </PrivateRoute>
+                            } 
+                        />
+                        <Route path="*" element={<Navigate to="/pinpad" replace />} />
                     </Routes>
                 </Suspense>
             </div>

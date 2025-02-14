@@ -19,16 +19,14 @@ export default function auth(state = initialState, action) {
             });
             
         case AUTH_ACTIONS.LOGIN_SUCCESS:
-            console.log('🔐 Login Success - User:', action.payload.user);  // Debug log
-            localStorage.setItem('isAuthenticated', 'true');
-            return state.merge({
+            return {
+                ...state,
                 isAuthenticated: true,
-                isLoading: false,
-                error: null,
+                user: action.payload.user,
                 token: action.payload.token,
-                tokenExpiry: action.payload.tokenExpiry,
-                user: Map(action.payload.user)  // Convert to Immutable Map
-            });
+                loading: false,
+                error: null
+            };
             
         case AUTH_ACTIONS.LOGIN_FAILURE:
             console.log('❌ Login Failure:', action.error);  // Debug log
@@ -47,7 +45,7 @@ export default function auth(state = initialState, action) {
                 isAuthenticated: false,
                 user: null,
                 error: null
-                // Notice we don't clear the token here
+                // Keep token
             };
 
         case AUTH_ACTIONS.TOKEN_EXPIRED:
