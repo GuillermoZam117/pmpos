@@ -14,7 +14,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PersonIcon from '@mui/icons-material/Person';
 import TableCard from './TableCard';
-import { getEntityScreenItems } from '../queries';
+import { getEntityScreenItems, getTicketByTable } from '../queries';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../actions/auth';
@@ -23,10 +23,58 @@ import Debug from 'debug';
 const debug = Debug('pmpos:tables');
 
 const TableView = () => {
-    const isAuthenticated = useSelector(state => state.auth.get('isAuthenticated'));
+    const [error, setError] = useState(null);
+    const [tables, setTables] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    
     const user = useSelector(state => state.auth.get('user'));
+    const isAuthenticated = useSelector(state => state.auth.get('isAuthenticated'));
     const dispatch = useDispatch();
     const navigate = useNavigate();
+
+    // Error handler first
+    const handleError = useCallback((err) => {
+        debug('❌ Error:', err);
+        setError(err.message);
+    }, []);
+
+    // Then table click handler
+    const handleTableClick = useCallback(async (table) => {
+        debug('🎯 Table clicked:', table);
+        
+        try {
+            if (table.status === 'LIBRE') {
+                window.location.href = `http://localhost:9000/ticket/new?table=${table.name}`;
+                return;
+            }
+
+            const ticket = await getTicketByTable(table.name);
+            if (ticket) {
+                debug('✅ Found ticket:', ticket.id);
+                window.location.href = `http://localhost:9000/ticket/${ticket.id}`;
+            } else {
+                setError('No se encontró el ticket para esta mesa');
+            }
+        } catch (error) {
+            debug('❌ Error getting ticket:', error);
+            handleError(error);
+        }
+    }, [handleError]);
+
+    const parseTableStatus = (table) => {
+        if (!table) return 'BLOQUEADO';
+        if (table.color === '#FF0000') return 'CUENTA';
+        if (table.color === '#FFFF00') return 'OCUPADO';
+        if (table.color === '#FFFFFF' || table.color === '#E5E3D8') return 'LIBRE';
+        return 'BLOQUEADO';
+    };
+
+    const parseTimeFromCaption = (caption) => {
+        if (!caption) return null;
+        const match = caption.match(/(\d+)\s*min/);
+        return match ? parseInt(match[1], 10) * 60000 : null;
+    };
 
     const handleLogout = useCallback(async () => {
         debug('👋 Iniciando logout...');
@@ -42,11 +90,6 @@ const TableView = () => {
             console.error('Error durante logout:', error);
         }
     }, [dispatch, navigate]);
-
-    const [tables, setTables] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [refreshing, setRefreshing] = useState(false);
-    const [error, setError] = useState(null);
 
     const loadTables = useCallback(async (showRefresh = false) => {
         if (showRefresh) setRefreshing(true);
@@ -73,41 +116,6 @@ const TableView = () => {
             setLoading(false);
             setRefreshing(false);
         }
-    }, []);
-
-    const parseTableStatus = (table) => {
-        if (!table) return 'BLOQUEADO';
-        if (table.color === '#FF0000') return 'CUENTA';
-        if (table.color === '#FFFF00') return 'OCUPADO';
-        if (table.color === '#FFFFFF' || table.color === '#E5E3D8') return 'LIBRE';
-        return 'BLOQUEADO';
-    };
-
-    const parseTimeFromCaption = (caption) => {
-        if (!caption) return null;
-        const match = caption.match(/(\d+)\s*min/);
-        return match ? parseInt(match[1], 10) * 60000 : null;
-    };
-
-    const handleTableClick = useCallback(async (table) => {
-        debug('🎯 Opening ticket for table:', table.name);
-        
-        try {
-            // Use correct SambaPOS ticket URL format
-            const ticketUrl = `http://localhost:9000/ticket/${table.name}`;
-            
-            // Navigate current window instead of opening popup
-            window.location.href = ticketUrl;
-            
-        } catch (error) {
-            console.error('Error opening ticket:', error);
-            setError(`No se pudo abrir el ticket: ${error.message}`);
-        }
-    }, []);
-
-    const handleError = useCallback((err) => {
-        debug('❌ Error:', err);
-        setError(err.message);
     }, []);
 
     useEffect(() => {

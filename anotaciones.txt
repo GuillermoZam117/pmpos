@@ -13,6 +13,54 @@
   Id
 }}
 
+
+--obtener tickets 
+{
+  getTickets(isClosed: false, orderBy: date) {
+    id
+    number
+    tags {
+      tag
+      tagName
+    }
+    states {
+      stateName
+      state
+    }
+    orders {
+      name
+      portion
+      quantity
+      tags {
+        tag
+        tagName
+      }
+      priceTag
+      states {
+        stateName
+        state
+        stateValue
+      }
+    }
+    entities {
+      type
+      name
+    }
+    note
+  }
+}
+
+
+-- obtener productos 
+
+query{
+		getProducts{
+			id, name, portions{
+				id, name, price}, 
+				tags{name, value}, 
+				groupCode, barcode}}
+
+
 # Stop any running processes
 Stop-Process -Name "node" -Force -ErrorAction SilentlyContinue
 

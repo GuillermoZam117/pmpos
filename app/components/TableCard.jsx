@@ -3,6 +3,7 @@ import { Paper, Typography, Stack, Chip } from '@mui/material';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import GroupIcon from '@mui/icons-material/Group';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import TableRestaurantIcon from '@mui/icons-material/TableRestaurant';
 
 const TableCard = ({ table, onClick }) => {
     const getStatusChip = (status) => {
@@ -14,6 +15,7 @@ const TableCard = ({ table, onClick }) => {
                         label="CUENTA"
                         color="error"
                         size="small"
+                        sx={{ color: 'white' }}
                     />
                 );
             case 'OCUPADO':
@@ -28,10 +30,15 @@ const TableCard = ({ table, onClick }) => {
             default:
                 return (
                     <Chip
+                        icon={<TableRestaurantIcon />}
                         label="LIBRE"
                         color="default"
                         size="small"
                         variant="outlined"
+                        sx={{ 
+                            color: 'black',
+                            borderColor: 'rgba(0, 0, 0, 0.23)' 
+                        }}
                     />
                 );
         }
@@ -46,7 +53,7 @@ const TableCard = ({ table, onClick }) => {
                 height: '100%',
                 cursor: 'pointer',
                 bgcolor: table.color || '#E5E3D8',
-                color: table.labelColor,
+                color: table.status === 'LIBRE' ? 'black' : 'white',
                 transition: 'all 0.2s',
                 '&:hover': {
                     transform: 'scale(1.02)',
@@ -75,6 +82,9 @@ const TableCard = ({ table, onClick }) => {
                         label={`${Math.floor(table.timeElapsed / 60000)} min`}
                         color={table.status === 'CUENTA' ? 'error' : 'warning'}
                         size="small"
+                        sx={{ 
+                            color: table.status === 'LIBRE' ? 'black' : 'white' 
+                        }}
                     />
                 )}
                 {getStatusChip(table.status)}

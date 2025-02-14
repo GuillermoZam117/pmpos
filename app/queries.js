@@ -6,6 +6,10 @@ import * as Actions from './actions';
 import createClient, { queries } from './utils/graphqlClient';
 import { login } from './actions/auth';
 import { tokenService } from './services/tokenService';
+import { gql } from 'graphql-request';
+import Debug from 'debug';
+
+const debug = Debug('pmpos:queries');
 
 const getStoredToken = () => {
     const token = localStorage.getItem('access_token');
@@ -602,196 +606,54 @@ function getTicketResult() {
 }
 
 function getAddOrderToTicketQuery(ticket, menuItem, quantity = 1) {
-    var {totalAmount, remainingAmount, ...ticket2} = ticket;
-    var ticketStr = JSON.stringify(ticket2);
-    ticketStr = ticketStr.replace(/\"([^(\")"]+)\":/g, '$1:');
-
+    const {totalAmount, remainingAmount, ...ticket2} = ticket;
     return `
-mutation m{ticket:addOrderToTicket(
-  ticket:${ticketStr},menuItem:"${menuItem}",quantity:${quantity}
-){id,uid,type,number,date,totalAmount,remainingAmount,
-  states{stateName,state},
-	orders{
-    id,
-    uid,
-    name,
-    quantity,
-    portion,
-    price,
-    calculatePrice,
-    increaseInventory,
-    decreaseInventory,
-    tags{
-      tag,tagName,price,quantity,rate,userId
-    },
-    states{
-      stateName,state,stateValue
-    }}
-}}`;
-}
-
-function getPostBroadcastMessageScript(msg) {
-    msg = msg.replace(/"/g, '\\"');
-    return 'mutation m {postBroadcastMessage(message:"' + msg + '"){message}}';
-}
-
-// Función para autenticación de usuarios
-export async function authenticateUser(username, password, callback) {
-  // Se construye el body en formato URL encoded con los parámetros requeridos
-  const params = new URLSearchParams();
-  params.append('grant_type', 'password');
-  params.append('user_name', username);      // usuario proporcionado
-  params.append('password', password);       // contraseña proporcionada
-  params.append('client_id', 'graphiql');      // valor fijo según lo indicado
-
-  try {
-    const response = await fetch(appconfig().authUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: params.toString()
-    });
-    
-    const result = await response.json();
-    
-    if (result.error || result.errors) {
-      console.error('❌ Authentication errors:', result.error || result.errors);
-      return;
-    }
-    
-    if (!result.token && !result.data) {
-      console.error('❌ Respuesta inválida en autenticación:', result);
-      return;
-    }
-    
-    // Dependiendo de la respuesta del backend, obtenemos el token:
-    const authData = result.token ? result : result.data.authenticate;
-    
-    if (callback) callback(authData);
-  } catch (error) {
-    console.error('❌ Authentication fetch error:', error);
-  }
-}
-
-// Función para cargar las mesas
-export const getTables = async (callback) => {
-    const query = `
-      query {
-          tables {
-              id
-              number
-              status
-          }
-      }
+        mutation {
+            addOrderToTicket(
+                ticket: ${JSON.stringify(ticket2)},
+                menuItem: ${JSON.stringify(menuItem)},
+                quantity: ${quantity}
+            ) {
+                id
+                number
+                entities {
+                    name
+                    type
+                }
+            }
+        }
     `;
-    try {
-        const response = await fetch(appconfig().GQLurl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ query })
-        });
-        const data = await response.json();
-        if (data.errors) {
-            console.error('❌ Tables errors:', data.errors);
-            return;
-        }
-        if (callback) callback(data.data.tables);
-    } catch (error) {
-        console.error('❌ Tables fetch error:', error);
-    }
-};
+}
 
-// Función para crear un ticket
-export const createTicket = async (ticketData, callback) => {
+// Add ticket queries
+export const getTicketByTable = async (tableName) => {
     const query = `
-      mutation {
-          createTicket(ticketData: ${JSON.stringify(ticketData)}) {
-              id
-              status
-              createdAt
-          }
-      }
+        query GetTickets($isClosed: Boolean) {
+            getTickets(isClosed: $isClosed) {
+                id
+                number
+                states {
+                    stateName
+                    state
+                }
+                entities {
+                    type
+                    name
+                }
+            }
+        }
     `;
-    try {
-        const response = await fetch(appconfig().GQLurl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ query })
-        });
-        const data = await response.json();
-        if (data.errors) {
-            console.error('❌ Create Ticket errors:', data.errors);
-            return;
-        }
-        if (callback) callback(data.data.createTicket);
-    } catch (error) {
-        console.error('❌ Create Ticket fetch error:', error);
-    }
-};
 
-export const authenticate = async () => {
     try {
-        // Realizar la petición POST al endpoint correcto
-        const response = await fetch('http://localhost:9000/Token', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: new URLSearchParams({
-                grant_type: 'password',
-                username: 'graphiql',
-                password: 'graphiql',
-                client_id: 'graphiql'
-            }),
-        });
-        
-        const result = await response.json();
-
-        // En caso de error, lanza la excepción con el mensaje
-        if (!response.ok) {
-            const errorMsg = result.error_description || 'Unknown error';
-            throw new Error(`Authentication failed: ${errorMsg}`);
-        }
-        
-        const token = result.access_token;
-        store.dispatch({
-            type: 'AUTHENTICATION_SUCCESS',
-            payload: {
-                accessToken: token,
-                // Asegúrate de que el refreshToken esté presente en la respuesta,
-                // de lo contrario, este campo podría no ser necesario.
-                refreshToken: result.refresh_token,
-            },
-        });
-        return token;
+        const response = await postJSON(query, { isClosed: false });
+        return response.data?.getTickets?.find(ticket => 
+            ticket.entities?.some(entity => 
+                entity.type === 'Mesas' && 
+                entity.name === tableName
+            )
+        );
     } catch (error) {
-        store.dispatch({ type: 'AUTHENTICATION_FAILURE', error: error.message });
+        debug('❌ Error getting ticket:', error);
         throw error;
     }
 };
-
-// Adding PIN validation query
-const PIN_VALIDATION = `
-    mutation ValidatePin($pin: String!) {
-        validatePin(pin: $pin) {
-            success
-            message
-        }
-    }
-`;
-
-// Add this to your exports
-export function getUserByPin(pin) {
-    return `{
-        getUser(pin: "${pin}") {
-            name
-        }
-    }`;
-}
