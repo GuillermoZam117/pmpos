@@ -5,6 +5,15 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import GroupIcon from '@mui/icons-material/Group';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 
+const getStatusColor = (status) => {
+    switch (status) {
+        case 'OCUPADO': return '#FFFF00';  // Yellow
+        case 'CUENTA': return '#FF0000';   // Red
+        case 'LIBRE': return '#FFFFFF';    // White
+        default: return '#E5E3D8';         // Default gray
+    }
+};
+
 const StyledPaper = styled(Paper)(({ theme, status }) => ({
     padding: theme.spacing(2),
     cursor: 'pointer',
@@ -12,12 +21,8 @@ const StyledPaper = styled(Paper)(({ theme, status }) => ({
     display: 'flex',
     flexDirection: 'column',
     transition: 'all 0.2s ease-in-out',
-    borderLeft: `4px solid ${
-        status === 'OCUPADO' ? theme.palette.warning.main :
-        status === 'RESERVADO' ? theme.palette.info.main :
-        status === 'BLOQUEADO' ? theme.palette.error.main :
-        theme.palette.success.main
-    }`,
+    backgroundColor: getStatusColor(status),
+    color: status === 'LIBRE' ? '#000000' : '#FFFFFF',
     '&:hover': {
         transform: 'translateY(-4px)',
         boxShadow: theme.shadows[4]

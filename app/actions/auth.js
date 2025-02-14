@@ -309,10 +309,23 @@ export const initializeAuth = () => async (dispatch) => {
     }
 };
 
-export const logout = () => (dispatch) => {
-    console.log('🚪 Logging out...');
-    tokenService.clearToken();
-    dispatch(authActions.logout());
+export const logout = () => async (dispatch) => {
+    console.log('🔓 Iniciando logout...');
+    
+    try {
+        // 1. Dispatch logout action
+        dispatch({ type: AUTH_ACTIONS.LOGOUT });
+        
+        // 2. Clear user data but keep token
+        tokenService.clearAuthentication();
+        
+        // 3. Use hash router navigation
+        window.location.hash = '#/pinpad';
+        
+        console.log('✅ Logout exitoso');
+    } catch (error) {
+        console.error('❌ Error en logout:', error);
+    }
 };
 
 const initialState = {

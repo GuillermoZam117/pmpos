@@ -5,12 +5,19 @@ import {
     Grid, 
     Alert, 
     Button,
-    CircularProgress 
+    CircularProgress,
+    AppBar,
+    Toolbar,
+    IconButton 
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import LogoutIcon from '@mui/icons-material/Logout';
+import PersonIcon from '@mui/icons-material/Person';
 import TableCard from './TableCard';
 import { getEntityScreenItems } from '../queries';
 import { useNavigate } from 'react-router-dom';
+import { useSelector, useDispatch } from 'react-redux';
+import { logout } from '../actions/auth';
 import Debug from 'debug';
 
 const debug = Debug('pmpos:tables');
@@ -21,6 +28,8 @@ const TableView = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState(null);
     const navigate = useNavigate();
+    const dispatch = useDispatch();
+    const user = useSelector(state => state.auth.user);
 
     const loadTables = useCallback(async (showRefresh = false) => {
         if (showRefresh) setRefreshing(true);
@@ -50,9 +59,9 @@ const TableView = () => {
     }, []);
 
     const parseTableStatus = (table) => {
-        if (table.color === '#FF0000') return 'OCUPADO';
-        if (table.color === '#FFFF00') return 'RESERVADO';
-        if (table.color === '#E5E3D8') return 'LIBRE';
+        if (table.color === '#FFFF00') return 'OCUPADO';
+        if (table.color === '#FF0000') return 'CUENTA';
+        if (table.color === '#FFFFFF' || table.color === '#E5E3D8') return 'LIBRE';
         return 'BLOQUEADO';
     };
 
@@ -74,6 +83,12 @@ const TableView = () => {
         });
     }, [navigate]);
 
+    const handleLogout = useCallback(() => {
+        debug('👋 Logging out user');
+        dispatch(logout());
+        navigate('/login');
+    }, [dispatch, navigate]);
+
     useEffect(() => {
         loadTables();
         const interval = setInterval(() => loadTables(true), 30000);
@@ -81,57 +96,91 @@ const TableView = () => {
     }, [loadTables]);
 
     return (
-        <Box sx={{ p: 3 }}>
-            <Box sx={{ 
-                display: 'flex', 
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                mb: 3,
-                position: 'sticky',
-                top: 0,
-                bgcolor: 'background.default',
-                zIndex: 1
-            }}>
-                <Typography variant="h4">
-                    Mesas
-                </Typography>
-                <Button
-                    variant="outlined"
-                    onClick={() => loadTables(true)}
-                    disabled={refreshing}
-                    startIcon={<RefreshIcon />}
-                >
-                    Actualizar
-                </Button>
-            </Box>
+        <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+            <AppBar position="sticky" color="default" elevation={1}>
+                <Toolbar sx={{ justifyContent: 'space-between' }}>
+                    <Typography variant="h6" component="div">
+                        SambaPOS
+                    </Typography>
+                    
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Box sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center',
+                            gap: 1,
+                            px: 2,
+                            py: 0.5,
+                            bgcolor: 'action.selected',
+                            borderRadius: 1
+                        }}>
+                            <PersonIcon />
+                            <Typography variant="body2">
+                                {user?.name || 'Usuario'}
+                            </Typography>
+                        </Box>
 
-            {loading ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-                    <CircularProgress />
+                        <IconButton 
+                            color="inherit"
+                            onClick={handleLogout}
+                            title="Cerrar sesión"
+                        >
+                            <LogoutIcon />
+                        </IconButton>
+                    </Box>
+                </Toolbar>
+            </AppBar>
+
+            <Box sx={{ p: 3, flex: 1, overflow: 'auto' }}>
+                <Box sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    mb: 3
+                }}>
+                    <Typography variant="h4">
+                        Mesas
+                    </Typography>
+                    <Button
+                        variant="outlined"
+                        onClick={() => loadTables(true)}
+                        disabled={refreshing}
+                        startIcon={<RefreshIcon />}
+                    >
+                        {refreshing ? 'Actualizando...' : 'Actualizar'}
+                    </Button>
                 </Box>
-            ) : error ? (
-                <Alert 
-                    severity="error"
-                    action={
-                        <Button color="inherit" size="small" onClick={() => loadTables()}>
-                            Reintentar
-                        </Button>
-                    }
-                >
-                    {error}
-                </Alert>
-            ) : (
-                <Grid container spacing={2}>
-                    {tables.map(table => (
-                        <Grid item xs={12} sm={6} md={4} lg={3} key={table.name}>
-                            <TableCard 
-                                table={table}
-                                onClick={() => handleTableClick(table)}
-                            />
-                        </Grid>
-                    ))}
-                </Grid>
-            )}
+
+                {loading ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                        <CircularProgress />
+                    </Box>
+                ) : error ? (
+                    <Alert 
+                        severity="error"
+                        action={
+                            <Button color="inherit" size="small" onClick={() => loadTables()}>
+                                Reintentar
+                            </Button>
+                        }
+                    >
+                        {error}
+                    </Alert>
+                ) : (
+                    <Grid container spacing={2}>
+                        {tables.map(table => (
+                            <Grid item xs={12} sm={6} md={4} lg={3} key={table.name}>
+                                <TableCard 
+                                    table={{
+                                        ...table,
+                                        labelColor: table.status === 'LIBRE' ? '#000000' : '#FFFFFF'
+                                    }}
+                                    onClick={() => handleTableClick(table)}
+                                />
+                            </Grid>
+                        ))}
+                    </Grid>
+                )}
+            </Box>
         </Box>
     );
 };

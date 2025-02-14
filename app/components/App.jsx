@@ -20,6 +20,11 @@ const LoadingComponent = () => (
   </div>
 );
 
+const PrivateRoute = ({ children }) => {
+    const isAuthenticated = useSelector(state => state.auth.get('isAuthenticated'));
+    return isAuthenticated ? children : <Navigate to="/pinpad" />;
+};
+
 const App = () => {
     const dispatch = useDispatch();
     const isAuthenticated = useSelector(state => state.auth.get('isAuthenticated'));
@@ -48,22 +53,15 @@ const App = () => {
             <div className="app-container">
                 <Suspense fallback={<LoadingComponent />}>
                     <Routes>
-                        <Route 
-                            path="/" 
-                            element={
-                                isAuthenticated ? 
-                                <Navigate to="/tables" replace /> : 
-                                <PinPad />
-                            } 
-                        />
-                        <Route 
-                            path="/tables" 
-                            element={
-                                isAuthenticated ? 
-                                <TableView /> : 
-                                <Navigate to="/" replace />
-                            } 
-                        />
+                        <Route path="/" element={<Navigate to="/pinpad" />} />
+                        <Route path="/pinpad" element={<PinPad />} />
+                        <Route path="/tables" element={
+                            <PrivateRoute>
+                                <TableView />
+                            </PrivateRoute>
+                        } />
+                        {/* Add a catch-all route */}
+                        <Route path="*" element={<Navigate to="/pinpad" />} />
                     </Routes>
                 </Suspense>
             </div>

@@ -3,11 +3,9 @@ import { AUTH_ACTIONS } from '../actions/types';
 
 const initialState = Map({
     isAuthenticated: false,
-    isLoading: false,
-    error: null,
+    user: null,
     token: null,
-    tokenExpiry: null,
-    user: null
+    error: null
 });
 
 export default function auth(state = initialState, action) {
@@ -44,6 +42,18 @@ export default function auth(state = initialState, action) {
             });
 
         case AUTH_ACTIONS.LOGOUT:
+            return {
+                ...state,
+                isAuthenticated: false,
+                user: null,
+                error: null
+                // Notice we don't clear the token here
+            };
+
+        case AUTH_ACTIONS.TOKEN_EXPIRED:
+        case AUTH_ACTIONS.UNAUTHORIZED:
+            // Aquí sí limpiamos todo, incluyendo el token
+            localStorage.removeItem('access_token');
             return initialState;
 
         default:

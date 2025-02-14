@@ -329,6 +329,28 @@ class TokenService {
             return null;
         }
     }
+
+    clearAuthentication() {
+        // Solo limpiamos datos de usuario y autenticación
+        localStorage.removeItem('user');
+        this.currentUser = null;
+        
+        // No tocamos el token
+        console.log('🔄 Cleared authentication data but preserved token');
+    }
+
+    revokeToken() {
+        // Este método solo se llama en casos específicos
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('token_expiry');
+        localStorage.removeItem('user');
+        
+        this.token = null;
+        this.tokenExpiry = null;
+        this.currentUser = null;
+        
+        console.log('🗑️ Token and all related data revoked');
+    }
 }
 
 export const tokenService = new TokenService();
