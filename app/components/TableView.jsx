@@ -21,6 +21,8 @@ import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../actions/auth';
 import Debug from 'debug';
 import { TABLE_STATUS } from '../constants/tableStatus';
+import { terminalService } from '../services/terminalService';
+import logo from '../../public/favicon.ico';  // Add this import
 
 const debug = Debug('pmpos:tables');
 
@@ -30,7 +32,11 @@ const TableView = () => {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     
-    const user = useSelector(state => state.auth.get('user'));
+    // Update user selector to handle Immutable.js properly
+    const user = useSelector(state => {
+        const userData = state.auth.get('user');
+        return userData && userData.toJS ? userData.toJS() : userData;
+    });
     const isAuthenticated = useSelector(state => state.auth.get('isAuthenticated'));
     const dispatch = useDispatch();
     const navigate = useNavigate();
@@ -41,27 +47,28 @@ const TableView = () => {
         setError(err.message);
     }, []);
 
-    // Then table click handler
+    // Update handleTableClick to check user properly
     const handleTableClick = useCallback(async (table) => {
+        if (!user || !user.name) {
+            debug('❌ No user found, redirecting to login');
+            navigate('/pinpad');
+            return;
+        }
+
         try {
             if (table.status === 'LIBRE') {
-                // Register terminal and create ticket
+                debug('🎯 Registering terminal for user:', user.name);
                 const terminalId = await terminalService.register(user);
-                const ticket = await terminalService.createTicket(terminalId);
-                
-                // Store terminal ID and ticket info
                 dispatch({ type: 'SET_TERMINAL_ID', payload: terminalId });
-                dispatch({ type: 'SET_CURRENT_TICKET', payload: ticket });
-                
-                // Navigate to order screen
-                navigate(`/ticket/${ticket.uid}`);
+                window.open(`http://${window.location.hostname}:9000/ticket/new?table=${table.name}`, '_blank');
             } else {
                 // Handle existing ticket...
             }
         } catch (error) {
+            debug('❌ Error:', error);
             handleError(error);
         }
-    }, [dispatch, navigate, user]);
+    }, [dispatch, navigate, user, handleError]);
 
     const parseTableStatus = (table) => {
         if (!table) return 'BLOQUEADO';
@@ -167,15 +174,40 @@ const TableView = () => {
     return (
         <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
             <AppBar position="sticky">
-                <Toolbar>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <RestaurantIcon /> {/* Agregar icono */}
-                        <Typography variant="h6">
+                <Toolbar sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    width: '100%',
+                    px: 2 // Add padding
+                }}>
+                    {/* Logo y título */}
+                    <Box sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: 2,
+                        ml: 2 // Add left margin
+                    }}>
+                        <img 
+                            src={logo}
+                            alt="Logo" 
+                            style={{ 
+                                width: '32px',
+                                height: '32px',
+                                objectFit: 'contain',
+                                filter: 'drop-shadow(0px 2px 4px rgba(0,0,0,0.2))'  // Add shadow
+                            }} 
+                        />
+                        <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
                             SambasoftMX
                         </Typography>
                     </Box>
-                    
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+
+                    {/* Usuario y botón de logout */}
+                    <Box sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: 2 
+                    }}>
                         <Box sx={{ 
                             display: 'flex', 
                             alignItems: 'center', 

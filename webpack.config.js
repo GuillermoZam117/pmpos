@@ -28,7 +28,8 @@ module.exports = (env, argv) => {
         output: {
             path: path.resolve(__dirname, 'dist'),
             filename: '[name].[contenthash].js',
-            publicPath: '/'
+            publicPath: '/',
+            assetModuleFilename: 'assets/[name][ext]'
         },
         devtool: 'source-map', // Added source maps for debugging
         devServer: {
@@ -102,6 +103,13 @@ module.exports = (env, argv) => {
                     test: /\.css$/,
                     use: ['style-loader', 'css-loader'], // Changed for development
                 },
+                {
+                    test: /\.(ico|png|jpg|gif)$/i,
+                    type: 'asset/resource',
+                    generator: {
+                        filename: 'assets/[name][ext]'
+                    }
+                }
             ],
         },
         plugins: [
@@ -116,8 +124,12 @@ module.exports = (env, argv) => {
             new CopyWebpackPlugin({
                 patterns: [
                     { 
-                        from: 'app/assets/favicon.ico', 
-                        to: 'favicon.ico' 
+                        from: 'public/favicon.ico',
+                        to: 'assets' 
+                    },
+                    {
+                        from: 'app/assets',
+                        to: 'assets'
                     }
                 ],
             }),
@@ -129,7 +141,8 @@ module.exports = (env, argv) => {
         ],
         resolve: {
             alias: {
-                'react-dom': '@hot-loader/react-dom'
+                'react-dom': '@hot-loader/react-dom',
+                '@assets': path.resolve(__dirname, 'public')
             },
             extensions: ['.js', '.jsx'],
             fallback: {

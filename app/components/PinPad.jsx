@@ -72,7 +72,7 @@ const PinPad = () => {
         }}
       >
         <Typography variant="h4" align="center" gutterBottom>
-          SambaPOS
+          SambasoftMX
         </Typography>
         
         {/* PIN Input with mask */}
