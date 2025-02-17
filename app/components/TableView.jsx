@@ -19,6 +19,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../actions/auth';
 import Debug from 'debug';
+import { TABLE_STATUS } from '../constants/tableStatus';
 
 const debug = Debug('pmpos:tables');
 
@@ -44,15 +45,17 @@ const TableView = () => {
         debug('🎯 Table clicked:', table);
         
         try {
+            const baseUrl = `http://${window.location.hostname}:9000`;
+            
             if (table.status === 'LIBRE') {
-                window.location.href = `http://localhost:9000/ticket/new?table=${table.name}`;
+                window.open(`${baseUrl}/ticket/new?table=${table.name}`, '_blank');
                 return;
             }
 
             const ticket = await getTicketByTable(table.name);
             if (ticket) {
                 debug('✅ Found ticket:', ticket.id);
-                window.location.href = `http://localhost:9000/ticket/${ticket.id}`;
+                window.open(`${baseUrl}/ticket/${ticket.id}`, '_blank');
             } else {
                 setError('No se encontró el ticket para esta mesa');
             }
@@ -119,24 +122,23 @@ const TableView = () => {
     }, []);
 
     useEffect(() => {
-        if (!isAuthenticated) {
-            navigate('/pinpad', { replace: true });
-        }
-    }, [isAuthenticated, navigate]);
-
-    useEffect(() => {
         let mounted = true;
         let intervalId = null;
-        
-        if (isAuthenticated) {
-            const fetchTables = async () => {
-                if (!mounted) return;
-                await loadTables();
-            };
 
-            fetchTables();
-            intervalId = setInterval(() => fetchTables(), 30000);
+        if (!isAuthenticated) {
+            debug('📤 Usuario no autenticado, limpiando datos...');
+            setTables([]);
+            navigate('/', { replace: true });
+            return;
         }
+
+        const fetchTables = async () => {
+            if (!mounted) return;
+            await loadTables();
+        };
+
+        fetchTables();
+        intervalId = setInterval(() => fetchTables(), 30000);
         
         return () => {
             mounted = false;
@@ -144,16 +146,7 @@ const TableView = () => {
                 clearInterval(intervalId);
             }
         };
-    }, [isAuthenticated, loadTables]);
-
-    useEffect(() => {
-        if (!isAuthenticated) {
-            console.log('📤 Usuario no autenticado, limpiando datos...');
-            setTables([]);
-            clearInterval(refreshInterval.current);
-            navigate('/', { replace: true });
-        }
-    }, [isAuthenticated, navigate]);
+    }, [isAuthenticated, loadTables, navigate]);
 
     // If not authenticated, don't render anything
     if (!isAuthenticated) return null;
