@@ -5,6 +5,7 @@ import MenuItems from './MenuItems';
 import Paper from '@mui/material/Paper'; // Updated import for MUI
 import * as Queries from '../../queries';
 import * as Actions from '../../actions';
+import PropTypes from 'prop-types';
 
 class Menu extends React.Component {
   componentDidMount() {
@@ -86,11 +87,26 @@ class Menu extends React.Component {
   }
 }
 
+Menu.propTypes = {
+    menu: PropTypes.shape({
+        categories: PropTypes.arrayOf(PropTypes.shape({
+            name: PropTypes.string.required,
+            color: PropTypes.string,
+            foreground: PropTypes.string
+        }))
+    }),
+    menuItems: PropTypes.array,
+    onMenuItemClick: PropTypes.func
+};
+
 const mapStateToProps = (state) => ({
     selectedCategory: state.app.get('selectedCategory'),
     menu: state.app.get('menu'),
     terminalId: state.app.get('terminalId')
 });
+
+const [loading, setLoading] = useState(false);
+const [error, setError] = useState(null);
 
 const mapDispatchToProps = {
   changeSelectedCategory: Actions.changeSelectedCategory,

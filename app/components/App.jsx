@@ -10,32 +10,49 @@ import Debug from 'debug';
 
 const debug = Debug('pmpos:app');
 
+// Route constants
+const ROUTES = {
+    PINPAD: '/pinpad',
+    TABLES: '/tables'
+};
+
 // Lazy load components
 const PinPad = React.lazy(() => import('./PinPad'));
 const TableView = React.lazy(() => import('./TableView'));
 
+// Loading component with better styling
 const LoadingComponent = () => (
-  <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}>
-    <CircularProgress />
-  </div>
+    <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center',
+        minHeight: '100vh',
+        padding: '2rem' 
+    }}>
+        <CircularProgress />
+    </div>
 );
 
+// Private route using auth selector
 const PrivateRoute = ({ children }) => {
     const isAuthenticated = useSelector(state => state.auth.get('isAuthenticated'));
-    return isAuthenticated ? children : <Navigate to="/pinpad" />;
+    return isAuthenticated ? children : <Navigate to={ROUTES.PINPAD} replace />;
 };
 
 const App = () => {
     const dispatch = useDispatch();
-    const isAuthenticated = useSelector(state => state.auth.get('isAuthenticated'));
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(null);
 
     useEffect(() => {
         const initApp = async () => {
-            debug('Initializing application...');
+            debug('🚀 Initializing application...');
             try {
                 await dispatch(initializeAuth());
-                debug('Authentication initialized');
+                debug('✅ Authentication initialized');
+            } catch (err) {
+                debug('❌ Initialization error:', err);
+                setError(err.message);
             } finally {
                 setIsLoading(false);
             }
@@ -43,8 +60,25 @@ const App = () => {
         initApp();
     }, [dispatch]);
 
+    // Show loading state
     if (isLoading) {
         return <LoadingComponent />;
+    }
+
+    // Show error state if initialization failed
+    if (error) {
+        return (
+            <div style={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center',
+                minHeight: '100vh',
+                padding: '2rem',
+                color: '#ff0000' 
+            }}>
+                <h2>Error: {error}</h2>
+            </div>
+        );
     }
 
     return (
@@ -53,17 +87,25 @@ const App = () => {
             <div className="app-container">
                 <Suspense fallback={<LoadingComponent />}>
                     <Routes>
-                        <Route path="/" element={<Navigate to="/pinpad" replace />} />
-                        <Route path="/pinpad" element={<PinPad />} />
+                        {/* Default route redirects to PinPad */}
                         <Route 
-                            path="/tables" 
+                            path={ROUTES.PINPAD} 
+                            element={<PinPad />} 
+                        />
+                        {/* Protected Tables route */}
+                        <Route 
+                            path={ROUTES.TABLES} 
                             element={
                                 <PrivateRoute>
                                     <TableView />
                                 </PrivateRoute>
                             } 
                         />
-                        <Route path="*" element={<Navigate to="/pinpad" replace />} />
+                        {/* Catch all route redirects to PinPad */}
+                        <Route 
+                            path="*" 
+                            element={<Navigate to={ROUTES.PINPAD} replace />} 
+                        />
                     </Routes>
                 </Suspense>
             </div>

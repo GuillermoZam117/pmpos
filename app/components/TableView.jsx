@@ -13,6 +13,7 @@ import {
 import RefreshIcon from '@mui/icons-material/Refresh';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PersonIcon from '@mui/icons-material/Person';
+import RestaurantIcon from '@mui/icons-material/Restaurant';
 import TableCard from './TableCard';
 import { getEntityScreenItems, getTicketByTable } from '../queries';
 import { useNavigate } from 'react-router-dom';
@@ -42,28 +43,25 @@ const TableView = () => {
 
     // Then table click handler
     const handleTableClick = useCallback(async (table) => {
-        debug('🎯 Table clicked:', table);
-        
         try {
-            const baseUrl = `http://${window.location.hostname}:9000`;
-            
             if (table.status === 'LIBRE') {
-                window.open(`${baseUrl}/ticket/new?table=${table.name}`, '_blank');
-                return;
-            }
-
-            const ticket = await getTicketByTable(table.name);
-            if (ticket) {
-                debug('✅ Found ticket:', ticket.id);
-                window.open(`${baseUrl}/ticket/${ticket.id}`, '_blank');
+                // Register terminal and create ticket
+                const terminalId = await terminalService.register(user);
+                const ticket = await terminalService.createTicket(terminalId);
+                
+                // Store terminal ID and ticket info
+                dispatch({ type: 'SET_TERMINAL_ID', payload: terminalId });
+                dispatch({ type: 'SET_CURRENT_TICKET', payload: ticket });
+                
+                // Navigate to order screen
+                navigate(`/ticket/${ticket.uid}`);
             } else {
-                setError('No se encontró el ticket para esta mesa');
+                // Handle existing ticket...
             }
         } catch (error) {
-            debug('❌ Error getting ticket:', error);
             handleError(error);
         }
-    }, [handleError]);
+    }, [dispatch, navigate, user]);
 
     const parseTableStatus = (table) => {
         if (!table) return 'BLOQUEADO';
@@ -168,11 +166,14 @@ const TableView = () => {
 
     return (
         <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-            <AppBar position="sticky" color="default" elevation={1}>
-                <Toolbar sx={{ justifyContent: 'space-between' }}>
-                    <Typography variant="h6">
-                        SambaPOS
-                    </Typography>
+            <AppBar position="sticky">
+                <Toolbar>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <RestaurantIcon /> {/* Agregar icono */}
+                        <Typography variant="h6">
+                            SambasoftMX
+                        </Typography>
+                    </Box>
                     
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                         <Box sx={{ 
