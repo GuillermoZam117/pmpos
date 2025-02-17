@@ -21,8 +21,11 @@ import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../actions/auth';
 import Debug from 'debug';
 import { TABLE_STATUS } from '../constants/tableStatus';
-import { terminalService } from '../services/terminalService';
 import logo from '../../public/favicon.ico';  // Add this import
+import { createNewTicket } from '../services/ticketService';
+import { terminalService } from '../services/terminalService';
+import { ticketService } from '../services/ticketService';
+import { useAuth } from '../hooks/useAuth'; // Add this import
 
 const debug = Debug('pmpos:tables');
 
@@ -32,12 +35,8 @@ const TableView = () => {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     
-    // Update user selector to handle Immutable.js properly
-    const user = useSelector(state => {
-        const userData = state.auth.get('user');
-        return userData && userData.toJS ? userData.toJS() : userData;
-    });
-    const isAuthenticated = useSelector(state => state.auth.get('isAuthenticated'));
+    // Add auth hook
+    const { user, isAuthenticated, validateUser, logout } = useAuth();
     const dispatch = useDispatch();
     const navigate = useNavigate();
 
@@ -47,28 +46,62 @@ const TableView = () => {
         setError(err.message);
     }, []);
 
-    // Update handleTableClick to check user properly
-    const handleTableClick = useCallback(async (table) => {
-        if (!user || !user.name) {
-            debug('❌ No user found, redirecting to login');
-            navigate('/pinpad');
+    // Update handleTableClick function
+    const handleTableClick = async (table) => {
+        // Validate user before proceeding
+        if (!validateUser()) {
             return;
         }
 
         try {
+            setLoading(true);
+            
             if (table.status === 'LIBRE') {
-                debug('🎯 Registering terminal for user:', user.name);
-                const terminalId = await terminalService.register(user);
-                dispatch({ type: 'SET_TERMINAL_ID', payload: terminalId });
-                window.open(`http://${window.location.hostname}:9000/ticket/new?table=${table.name}`, '_blank');
+                debug('🎯 Creating ticket for:', { table: table.name, user: user.name });
+                
+                const terminalId = await terminalService.register(user.name);
+                debug('✅ Terminal registered:', terminalId);
+                
+                const result = await ticketService.createTicket({
+                    terminalId,
+                    tableId: table.name,
+                    userId: user.name
+                });
+                
+                if (!result.success) {
+                    throw new Error('Error al crear el ticket');
+                }
+                
+                dispatch({ type: 'SET_CURRENT_TICKET', payload: result.ticket });
+                window.open(result.url, '_blank');
+            } else if (table.status === 'OCUPADO') {
+                const existingTicket = await getTicketByTable(table.name);
+                if (existingTicket?.data?.ticket) {
+                    const ticketUrl = ticketService.getTicketUrl(
+                        existingTicket.data.ticket.id, 
+                        table.name
+                    );
+                    window.open(ticketUrl, '_blank');
+                } else {
+                    throw new Error('No se encontró el ticket para esta mesa');
+                }
             } else {
-                // Handle existing ticket...
+                throw new Error('Mesa no disponible');
             }
         } catch (error) {
             debug('❌ Error:', error);
-            handleError(error);
+            
+            // Handle authentication errors
+            if (error.message.includes('unauthorized')) {
+                logout();
+                return;
+            }
+            
+            setError(error.message || 'Error al procesar la mesa');
+        } finally {
+            setLoading(false);
         }
-    }, [dispatch, navigate, user, handleError]);
+    };
 
     const parseTableStatus = (table) => {
         if (!table) return 'BLOQUEADO';

@@ -1,7 +1,7 @@
 import { createGraphQLClient, queries } from '../utils/graphqlClient';
 import { appconfig, TOKEN_CONFIG } from '../config';
 import * as types from '../constants/ActionTypes';
-import { authenticate } from '../queries';
+import { authenticate } from '../services/authService';
 import Debug from 'debug';
 import { createAction } from 'redux-actions';
 import { tokenService } from '../services/tokenService';
@@ -67,47 +67,24 @@ export const checkTokenStatus = () => (dispatch) => {
 
 // Thunk Actions
 export const login = (pin) => async (dispatch) => {
-    console.group('🔑 Login Attempt');
-    console.time('Login Duration');
-    
     try {
-        dispatch({ type: AUTH_ACTIONS.LOGIN_REQUEST });
+        const { token, user } = await authenticate(pin);
         
-        const result = await tokenService.authenticate(pin);
-        
-        if (result.success) {
-            await dispatch({
-                type: AUTH_ACTIONS.LOGIN_SUCCESS,
-                payload: {
-                    user: result.user,
-                    token: result.token,
-                    tokenExpiry: result.tokenExpiry
-                }
-            });
-            
-            console.log('✅ Login successful:', result.user.name);
-            console.timeEnd('Login Duration');
-            console.groupEnd();
-
-            // Use setTimeout to ensure state is updated before navigation
-            setTimeout(() => {
-                navigate('/main');
-            }, 0);
-
-            return true;
-        }
-        
-        throw new Error('Authentication failed');
-
-    } catch (error) {
-        console.error('❌ Login failed:', error);
         dispatch({
-            type: AUTH_ACTIONS.LOGIN_FAILURE,
-            error: error.message
+            type: 'AUTH_SUCCESS',
+            payload: { token, user }
         });
-        console.timeEnd('Login Duration');
-        console.groupEnd();
-        return false;
+
+        return { success: true };
+    } catch (error) {
+        debug('❌ Login failed:', error);
+        
+        dispatch({
+            type: 'AUTH_ERROR',
+            payload: error.message
+        });
+
+        throw error;
     }
 };
 

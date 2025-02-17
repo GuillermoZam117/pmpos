@@ -354,3 +354,32 @@ class TokenService {
 }
 
 export const tokenService = new TokenService();
+
+export const authenticate = async (pin) => {
+    debug('📡 Sending PIN validation...');
+    try {
+        const response = await postJSON('/Token', {
+            pin,
+            terminalName: 'WebClient',
+            deviceId: getDeviceId()
+        });
+
+        if (!response.token) {
+            throw new Error('Invalid PIN');
+        }
+
+        const user = {
+            name: response.userName || 'Usuario',
+            roles: response.roles || []
+        };
+
+        // Guardar token y usuario
+        setToken(response.token);
+        setUser(user);
+
+        return { token: response.token, user };
+    } catch (error) {
+        debug('❌ Authentication failed:', error);
+        throw error;
+    }
+};

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Box, Button, TextField, Typography, Grid, Paper, Alert, CircularProgress } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { useDispatch, useSelector } from 'react-redux';
@@ -22,6 +22,8 @@ const PinPad = () => {
   const navigate = useNavigate();
   const isAuthenticated = useSelector(state => state.auth.get('isAuthenticated'));
   const authError = useSelector(state => state.auth.get('error'));
+  const inputRef = useRef(null);
+
   useEffect(() => {
     if (isAuthenticated) {
       console.log('🔄 Auth state changed - navigating to tables');
@@ -29,29 +31,60 @@ const PinPad = () => {
     }
   }, [isAuthenticated, navigate]);
 
-  const handlePinSubmit = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const success = await dispatch(login(pin));
-      if (!success) {
-        setError('PIN inválido');
-        setPin('');
-      }
-    } catch (error) {
-      setError(error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Autofocus al montar
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
 
   const handlePinClick = (value) => {
-    if (pin.length < 4) {
-      setPin(pin + value);
+    if (loading) return;
+    
+    // Clear error on new input
+    if (error) setError(null);
+
+    if (value === 'C') {
+        setPin('');
+        return;
+    }
+
+    if (value === '⏎') {
+        handlePinSubmit();
+        return;
+    }
+
+    // Only allow numbers and max 4 digits
+    if (pin.length < 4 && /^\d$/.test(value)) {
+        const newPin = pin + value;
+        setPin(newPin);
+        
+        // Auto-submit when PIN is complete
+        if (newPin.length === 4) {
+            handlePinSubmit(newPin);
+        }
     }
   };
 
-  const handleClear = () => setPin('');
+  const handlePinSubmit = async (submittedPin = pin) => {
+    if (submittedPin.length !== 4) {
+        setError('El PIN debe tener 4 dígitos');
+        return;
+    }
+
+    try {
+        setLoading(true);
+        setError(null);
+        
+        const result = await dispatch(login(submittedPin));
+        if (result.success) {
+            navigate('/tables');
+        }
+    } catch (error) {
+        setError(error.message || 'PIN inválido');
+        setPin('');
+    } finally {
+        setLoading(false);
+    }
+  };
 
   return (
     <Box sx={{
@@ -77,15 +110,15 @@ const PinPad = () => {
         
         {/* PIN Input with mask */}
         <TextField
+          inputRef={inputRef}
           fullWidth
           type="password"
           value={pin}
-          onChange={(e) => setPin(e.target.value)}
           disabled={loading}
           placeholder="••••"
           sx={{ mb: 3 }}
           inputProps={{
-            maxLength: 32, // Allow up to 32 digits
+            maxLength: 4, // Allow up to 4 digits
             pattern: '[0-9]*',
             inputMode: 'numeric',
             style: { 
@@ -94,6 +127,8 @@ const PinPad = () => {
               textAlign: 'center'
             }
           }}
+          // Prevenir entrada manual
+          onKeyDown={(e) => e.preventDefault()}
         />
 
         {/* Numeric Pad */}

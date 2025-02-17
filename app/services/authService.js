@@ -1,44 +1,60 @@
+import Debug from 'debug';
 import { appconfig } from '../config';
 
-export const authService = {
-    login: async (username, password) => {
-        const config = appconfig();
-        try {
-            const response = await fetch(`${config.GQLserv}/Token`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'Accept': 'application/json'
-                },
-                body: new URLSearchParams({
-                    grant_type: 'password',
-                    username: config.userName,    // Using config value
-                    password: config.password,    // Using config value
-                    client_id: 'graphiql'
-                }).toString()
-            });
+const debug = Debug('pmpos:auth');
 
-            if (!response.ok) {
-                const error = await response.text();
-                console.error('Auth response:', error);
-                throw new Error('Authentication failed');
-            }
-
-            const data = await response.json();
-            localStorage.setItem('access_token', data.access_token);
-            return data;
-        } catch (error) {
-            console.error('Login error details:', error);
-            throw error;
+export const authenticate = async (pin) => {
+    try {
+        debug('🔐 Authenticating with PIN...');
+        
+        // Validate PIN format
+        if (!pin || pin.length !== 4 || !/^\d+$/.test(pin)) {
+            throw new Error('El PIN debe tener 4 dígitos numéricos');
         }
-    },
 
-    isAuthenticated: () => {
-        const token = localStorage.getItem('access_token');
-        return !!token;
-    },
+        const { apiUrl } = appconfig();
+        const url = `${apiUrl}/Token`;
+        debug('📡 Sending request to:', url);
 
-    logout: () => {
-        localStorage.removeItem('access_token');
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                pin,
+                terminal: 'WebClient',
+                department: 'Restaurant',
+                deviceId: 'web'
+            })
+        });
+
+        if (!response.ok) {
+            debug('❌ Response error:', response.status, response.statusText);
+            throw new Error('PIN inválido');
+        }
+
+        const result = await response.json();
+        debug('✅ Response received:', result);
+
+        if (!result || !result.token) {
+            debug('❌ Invalid response:', result);
+            throw new Error('PIN inválido');
+        }
+
+        debug('✅ Authentication successful');
+        return {
+            success: true,
+            token: result.token,
+            user: {
+                name: result.userName,
+                roles: result.roles || []
+            },
+            tokenExpiry: new Date(result.expires)
+        };
+    } catch (error) {
+        debug('❌ Authentication error:', error);
+        throw new Error('PIN inválido');
     }
 };
