@@ -1,0 +1,17 @@
+export const TICKET_STATES = {
+  OPEN: 'OPEN',
+  IN_PROGRESS: 'IN_PROGRESS',
+  READY: 'READY',
+  DELIVERED: 'DELIVERED',
+  PAID: 'PAID',
+  VOID: 'VOID'
+};
+
+export const TICKET_COLORS = {
+  OPEN: '#E5E3D8',
+  IN_PROGRESS: '#FFFF00',
+  READY: '#00FF00',
+  DELIVERED: '#0000FF',
+  PAID: '#808080',
+  VOID: '#FF0000'
+};

@@ -6,47 +6,43 @@ import * as Actions from './actions';
 import createClient, { queries } from './utils/graphqlClient';
 import { login } from './actions/auth';
 import { tokenService } from './services/tokenService';
-import { gql } from 'graphql-request';
 import Debug from 'debug';
+import { gql } from '@apollo/client';
 
 const debug = Debug('pmpos:queries');
 
-const getStoredToken = () => {
-    const token = localStorage.getItem('access_token');
-    const expiry = localStorage.getItem('token_expiry');
-    
-    if (token && expiry && new Date(expiry) > new Date()) {
-        return token;
-    }
-    return null;
+const getToken = () => {
+    return tokenService.getStoredToken() || localStorage.getItem('access_token');
 };
 
 var config = appconfig();
 
-export function postJSON(query, callback) {
-    const token = getStoredToken();
-    
-    return fetch(appconfig().GQLurl, {
+export async function postJSON(url, body) {
+    const token = getToken();
+    if (!token) {
+        throw new Error('No authentication token available');
+    }
+
+    const response = await fetch(url, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ query })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.errors) {
-            console.error('GraphQL errors:', data.errors);
-            throw new Error(data.errors[0].message);
-        }
-        if (callback) callback(data);
-        return data;
-    })
-    .catch(error => {
-        console.error('Query error:', error);
-        throw error;
+        body: JSON.stringify(body)
     });
+
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    if (data.errors) {
+        throw new Error(data.errors[0]?.message || 'GraphQL Error');
+    }
+    
+    return data;
 }
 
 $.postJSON = function (query, callback) {
@@ -489,9 +485,22 @@ function getRegisterTerminalScript() {
 }
 
 function getCreateTerminalTicketScript(terminalId) {
-    return `mutation m{
-            ticket:createTerminalTicket(terminalId:"${terminalId}")
-        ${getTicketResult()}}`;
+    return `mutation {
+        ticket:createTerminalTicket(
+            terminalId:"${terminalId}"
+        ) {
+            uid
+            type
+            number
+            date
+            entities {
+                name
+                type
+            }
+            totalAmount
+            remainingAmount
+        }
+    }`;
 }
 
 function getGetTerminalTicketScript(terminalId) {
@@ -565,14 +574,28 @@ function getAddOrderToTerminalTicketScript(terminalId, productId, orderTags) {
         ${getTicketResult()}}`;
 }
 
-function getChangeEntityOfTerminalTicketScript(terminalId, type, name) {
-    return `mutation m{
-            ticket:changeEntityOfTerminalTicket(terminalId:"${terminalId}",
-            type:"${type}"
-            name:"${name}")
-        ${getTicketResult()}}`;
+// Update the mutation function with correct parameters
+function getChangeEntityOfTerminalTicketScript(terminalId, ticketId, entityName) {
+    return `mutation {
+        changeEntityOfTerminalTicket(
+            terminalId: "${terminalId}",
+            type: "MESAS",
+            name: "${entityName}"
+        ) {
+            id
+            uid
+            type
+            number
+            date
+            totalAmount
+            remainingAmount
+            entities {
+                name
+                type
+            }
+        }
+    }`;
 }
-
 
 function getGetOrderTagColorsScript() {
     return '{colors:getOrderTagColors{name,value}}';
@@ -654,6 +677,150 @@ export const getTicketByTable = async (tableName) => {
         );
     } catch (error) {
         debug('❌ Error getting ticket:', error);
+        throw error;
+    }
+};
+
+// Remove duplicate registerTerminal function and consolidate mutations
+const TICKET_MUTATIONS = {
+    registerTerminal: gql`
+        mutation RegisterTerminal($terminalId: String!) {
+            registerTerminal(
+                terminal: $terminalId,
+                ticketType: "TICKET",
+                department: "RESTAURANT",
+                user: "ADMIN"
+            )
+        }
+    `,
+
+    createTicket: gql`
+        mutation CreateTicket($input: CreateTicketInput!) {
+            createTicket(input: $input) {
+                id
+                uid
+                type
+                number
+                date
+                totalAmount
+                remainingAmount
+                entities {
+                    name
+                    type
+                }
+            }
+        }
+    `
+};
+
+// Add success handler function for navigation
+export async function handleTicketCreated(ticket, tableId, navigate) {
+    debug('✅ Ticket created successfully:', ticket);
+    return navigate('/pos', { 
+        state: { 
+            ticket,
+            tableId,
+            isNew: true
+        }
+    });
+}
+
+// Remove duplicate declarations and keep only this one
+function getAssignTableMutation(terminalId, tableName) {
+    return `mutation {
+        ticket:changeEntityOfTerminalTicket(
+            terminalId:"${terminalId}",
+            entityType:"Table",
+            entityName:"${tableName}"
+        )
+        ${getTicketResult()}
+    }`;
+}
+
+// Update createEmptyTicket function
+export async function createEmptyTicket(tableId) {
+    debug('Creating empty ticket for table:', tableId);
+    
+    try {
+        const token = getToken();
+        if (!token) {
+            throw new Error('Not authenticated');
+        }
+
+        // 1. Register terminal
+        const registerMutation = `
+            mutation {
+                registerTerminal(
+                    terminal: "SERVIDOR",
+                    ticketType: "COMEDOR",
+                    department: "MESAS",
+                    user: "graphiql"
+                )
+            }
+        `;
+
+        const registerResult = await postJSON(appconfig().GQLurl, {
+            query: registerMutation
+        });
+
+        if (!registerResult?.data?.registerTerminal) {
+            throw new Error('Failed to register terminal');
+        }
+
+        const terminalId = registerResult.data.registerTerminal;
+        debug(`✅ Terminal registered: ${terminalId}`);
+
+        // 2. Create ticket
+        const ticketMutation = `
+            mutation {
+                createTerminalTicket(
+                    terminalId: "${terminalId}"
+                ) {
+                    uid
+                    type
+                    number
+                }
+            }
+        `;
+
+        const ticketResult = await postJSON(appconfig().GQLurl, {
+            query: ticketMutation
+        });
+
+        if (!ticketResult?.data?.createTerminalTicket) {
+            throw new Error('Failed to create ticket');
+        }
+
+        const ticket = ticketResult.data.createTerminalTicket;
+        debug('✅ Ticket created:', ticket);
+
+        // 3. Assign table - with fixed parameter names
+        const assignQuery = getChangeEntityOfTerminalTicketScript(
+            terminalId, 
+            ticket.uid,
+            tableId
+        );
+
+        debug('📝 Assigning table...', {
+            terminalId,
+            type: 'MESAS',
+            name: tableId
+        });
+
+        const assignResult = await postJSON(appconfig().GQLurl, {
+            query: assignQuery
+        });
+
+        if (!assignResult?.data?.changeEntityOfTerminalTicket) {
+            debug('❌ Table assignment failed:', assignResult);
+            throw new Error('Failed to assign table');
+        }
+
+        debug('✅ Table assigned successfully');
+        return assignResult.data.changeEntityOfTerminalTicket;
+
+    } catch (error) {
+        debug('❌ Error creating ticket:', error);
         throw error;
     }
 };

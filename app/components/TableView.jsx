@@ -15,7 +15,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import PersonIcon from '@mui/icons-material/Person';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
 import TableCard from './TableCard';
-import { getEntityScreenItems, getTicketByTable } from '../queries';
+import { getEntityScreenItems, getTicketByTable, createEmptyTicket } from '../queries';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../actions/auth';
@@ -48,27 +48,47 @@ const TableView = () => {
     }, []);
 
     // Update handleTableClick to check user properly
-    const handleTableClick = useCallback(async (table) => {
-        if (!user || !user.name) {
-            debug('❌ No user found, redirecting to login');
-            navigate('/pinpad');
+    const handleTableClick = async (table) => {
+        if (table.status !== 'LIBRE') {
+            debug('❌ Table not available:', table.name);
             return;
         }
 
         try {
-            if (table.status === 'LIBRE') {
-                debug('🎯 Registering terminal for user:', user.name);
-                const terminalId = await terminalService.register(user);
-                dispatch({ type: 'SET_TERMINAL_ID', payload: terminalId });
-                window.open(`http://${window.location.hostname}:9000/ticket/new?table=${table.name}`, '_blank');
-            } else {
-                // Handle existing ticket...
+            setLoading(true);
+            setError(null);
+            
+            // Create ticket and assign table
+            const ticket = await createEmptyTicket(table.name);
+            
+            if (!ticket?.uid) {
+                throw new Error('Error al crear el ticket');
             }
+
+            debug('✅ Ticket created:', ticket);
+
+            // Update redux state
+            dispatch({ 
+                type: 'SET_CURRENT_TICKET', 
+                payload: ticket 
+            });
+
+            // Navigate to POS with ticket info
+            navigate('/pos', { 
+                state: { 
+                    ticket,
+                    tableId: table.name,
+                    isNew: true
+                }
+            });
+
         } catch (error) {
             debug('❌ Error:', error);
-            handleError(error);
+            setError(error.message || 'Error al crear ticket');
+        } finally {
+            setLoading(false);
         }
-    }, [dispatch, navigate, user, handleError]);
+    };
 
     const parseTableStatus = (table) => {
         if (!table) return 'BLOQUEADO';

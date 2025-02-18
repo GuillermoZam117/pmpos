@@ -13,12 +13,14 @@ const debug = Debug('pmpos:app');
 // Route constants
 const ROUTES = {
     PINPAD: '/pinpad',
-    TABLES: '/tables'
+    TABLES: '/tables',
+    POS: '/pos/:ticketId?'  // Optional ticket ID parameter
 };
 
 // Lazy load components
 const PinPad = React.lazy(() => import('./PinPad'));
 const TableView = React.lazy(() => import('./TableView'));
+const POSView = React.lazy(() => import('./POSView'));
 
 // Loading component with better styling
 const LoadingComponent = () => (
@@ -98,6 +100,14 @@ const App = () => {
                             element={
                                 <PrivateRoute>
                                     <TableView />
+                                </PrivateRoute>
+                            } 
+                        />
+                        <Route 
+                            path={ROUTES.POS}
+                            element={
+                                <PrivateRoute>
+                                    <POSView />
                                 </PrivateRoute>
                             } 
                         />

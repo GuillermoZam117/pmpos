@@ -61,6 +61,98 @@ query{
 				groupCode, barcode}}
 
 
+-- 	CRECION DE TICKETS PROCESO 
+
+-- 1. REGISTRAR TERMINAL 
+
+--REQUEST:
+
+mutation m{registerTerminal(
+ticketType:"COMEDOR"
+terminal:"SERVIDOR"
+department:"MESAS"
+user:"graphiql"
+)}
+
+--RESPONSE: 
+
+{
+  "data": {
+    "registerTerminal": "BdWrrzR44ECbqDYnUH-47w"
+  },
+  "errors": null
+}
+
+-- 2. CREAR TICKET 
+--REQUEST:
+
+mutation m2{createTerminalTicket(
+terminalId:"BdWrrzR44ECbqDYnUH-47w")
+{uid}
+}
+--RESPONSE: 
+
+{
+  "data": {
+    "createTerminalTicket": {
+      "uid": "BdWrrzR44ECbqDYnUH-47w"
+    }
+  },
+  "errors": null
+}
+
+--3. ADD ORDER TO TICKET 
+--REQUEST
+
+mutation m3{addOrderToTerminalTicket(
+terminalId:"bJbDVscDpEiKhxHCPcXQVw"
+  productName:"CUARTO POLLO"
+  quantity:3
+  )
+{totalAmount}
+}
+--RESPONSE:
+
+{
+  "data": {
+    "addOrderToTerminalTicket": {
+      "totalAmount": 390
+    }
+  },
+  "errors": null
+}
+
+--4. CLOSE TICKET AND EXECUTE AUTOMATION FLOW IN SAMBAPOS
+REQUEST: 
+
+mutation m4 {closeTerminalTicket(
+terminalId:"bJbDVscDpEiKhxHCPcXQVw"
+)}
+
+RESPONSE: 
+{
+  "data": {
+    "closeTerminalTicket": null
+  },
+  "errors": null
+}
+
+--5. CERRAR SESION DE APERTURA DE NUEVO TICKET 
+REQUEST: 
+
+mutation m5{unregisterTerminal(
+  terminalId:"bJbDVscDpEiKhxHCPcXQVw"
+)}
+
+
+RESPONSE: 
+
+{
+  "data": {
+    "unregisterTerminal": true
+  },
+  "errors": null
+}
 # Stop any running processes
 Stop-Process -Name "node" -Force -ErrorAction SilentlyContinue
 
