@@ -11,14 +11,14 @@ import { gql } from '@apollo/client';
 
 const debug = Debug('pmpos:queries');
 
-const getToken = () => {
-    return tokenService.getStoredToken() || localStorage.getItem('access_token');
+const getToken = async () => {
+    return await tokenService.getToken();
 };
 
 var config = appconfig();
 
 export async function postJSON(url, body) {
-    const token = getToken();
+    const token = await getToken();
     if (!token) {
         throw new Error('No authentication token available');
     }
@@ -300,13 +300,13 @@ export function addOrderToTerminalTicket(terminalId, productId, quantity = 1, or
     });
 }
 
-export function changeEntityOfTerminalTicket(terminalId, type, name, callback) {
-    var query = getChangeEntityOfTerminalTicketScript(terminalId, type, name);
+export function changeEntityOfTerminalTicket(terminalId, entityName, callback) {
+    var query = getChangeEntityOfTerminalTicketScript(terminalId, entityName);
     $.postJSON(query, function (response) {
         if (response.errors) {
             // handle errors
         } else {
-            if (callback) callback(response.data.ticket);
+            if (callback) callback(response.data.changeEntityOfTerminalTicket);
         }
     });
 }
@@ -575,12 +575,12 @@ function getAddOrderToTerminalTicketScript(terminalId, productId, orderTags) {
 }
 
 // Update the mutation function with correct parameters
-function getChangeEntityOfTerminalTicketScript(terminalId, ticketId, entityName) {
+function getChangeEntityOfTerminalTicketScript(terminalId, entityName) {
     return `mutation {
         changeEntityOfTerminalTicket(
             terminalId: "${terminalId}",
-            type: "MESAS",
-            name: "${entityName}"
+            entityType: "Table",
+            entityName: "${entityName}"
         ) {
             id
             uid
@@ -794,26 +794,69 @@ export async function createEmptyTicket(tableId) {
         const ticket = ticketResult.data.createTerminalTicket;
         debug('✅ Ticket created:', ticket);
 
-        // 3. Assign table - with fixed parameter names
-        const assignQuery = getChangeEntityOfTerminalTicketScript(
-            terminalId, 
-            ticket.uid,
-            tableId
-        );
+        // Espera 500ms para evitar problemas de sincronización
+        await new Promise(r => setTimeout(r, 500));
 
-        debug('📝 Assigning table...', {
+        // 3. Intenta asignar la mesa usando ticketId/uid
+        let assignQueryWithUid = `mutation {\n  changeEntityOfTerminalTicket(\n    terminalId: \"${terminalId}\",\n    ticketId: \"${ticket.uid}\",\n    entityType: \"Table\",\n    entityName: \"${tableId}\"\n  ) {\n    id\n    uid\n    type\n    number\n    date\n    totalAmount\n    remainingAmount\n    entities { name type }\n    states { stateName state }\n    tags { tagName tag }\n    orders { id uid productId name quantity portion price priceTag calculatePrice increaseInventory decreaseInventory locked tags { tag tagName price quantity rate userId } states { stateName state stateValue } }\n  }\n}`;
+
+        debug('📝 Assigning table (with ticketId)...', {
             terminalId,
-            type: 'MESAS',
-            name: tableId
+            ticketId: ticket.uid,
+            entityType: 'Table',
+            entityName: tableId
         });
 
-        const assignResult = await postJSON(appconfig().GQLurl, {
-            query: assignQuery
-        });
+        let assignResult;
+        let assignError;
+        try {
+            assignResult = await postJSON(appconfig().GQLurl, {
+                query: assignQueryWithUid
+            });
+        } catch (err) {
+            assignError = err;
+            debug('❌ Table assignment with ticketId threw error, retrying without ticketId:', err);
+            if (err && err.response) {
+                try {
+                    const errorText = await err.response.text();
+                    debug('🔎 Backend response (with ticketId):', errorText);
+                } catch (parseErr) {
+                    debug('🔎 Could not parse backend response (with ticketId):', parseErr);
+                }
+            }
+        }
 
-        if (!assignResult?.data?.changeEntityOfTerminalTicket) {
-            debug('❌ Table assignment failed:', assignResult);
-            throw new Error('Failed to assign table');
+        // Si falla por error HTTP o la respuesta no es exitosa, intenta sin ticketId
+        if (assignError || !assignResult?.data?.changeEntityOfTerminalTicket) {
+            const assignQuery = getAssignTableMutation(
+                terminalId,
+                tableId
+            );
+            debug('📝 Assigning table (without ticketId)...', {
+                terminalId,
+                entityType: 'Table',
+                entityName: tableId
+            });
+            try {
+                assignResult = await postJSON(appconfig().GQLurl, {
+                    query: assignQuery
+                });
+            } catch (err2) {
+                debug('❌ Table assignment without ticketId threw error:', err2);
+                if (err2 && err2.response) {
+                    try {
+                        const errorText2 = await err2.response.text();
+                        debug('🔎 Backend response (without ticketId):', errorText2);
+                    } catch (parseErr2) {
+                        debug('🔎 Could not parse backend response (without ticketId):', parseErr2);
+                    }
+                }
+                throw new Error('Failed to assign table (network/backend error)');
+            }
+            if (!assignResult?.data?.changeEntityOfTerminalTicket) {
+                debug('❌ Table assignment failed:', assignResult);
+                throw new Error('Failed to assign table');
+            }
         }
 
         debug('✅ Table assigned successfully');

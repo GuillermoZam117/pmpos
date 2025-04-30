@@ -47,7 +47,7 @@ const TableCard = ({ table, onClick }) => {
     return (
         <Paper
             elevation={3}
-            onClick={() => onClick(table)}
+            onClick={onClick}
             sx={{
                 p: 2,
                 height: '100%',

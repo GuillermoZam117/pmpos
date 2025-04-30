@@ -49,11 +49,6 @@ const TableView = () => {
 
     // Update handleTableClick to check user properly
     const handleTableClick = async (table) => {
-        if (table.status !== 'LIBRE') {
-            debug('❌ Table not available:', table.name);
-            return;
-        }
-
         try {
             setLoading(true);
             setError(null);
