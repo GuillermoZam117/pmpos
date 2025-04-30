@@ -37,7 +37,7 @@ module.exports = (env, argv) => {
                 directory: path.join(__dirname, 'public'),
             },
             hot: true,
-            port: 8080,
+            port: 8081,
             historyApiFallback: true,
             proxy: {
                 '/api': {

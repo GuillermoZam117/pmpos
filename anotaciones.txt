@@ -171,3 +171,39 @@ npm install
 
 # Start dev server
 npm run dev
+
+
+-- for test
+
+mutation{notifyEvent(
+  event:"AutomationCommandExecuted",
+  parameters:[
+    {name:"AutomationCommandName",value:"Change Customer Address"},
+    {name:"EntityName", value:"Emre Eren"},
+    {name:"Address", value:"Test 1234"}
+  ],
+  user:"Administrator",
+  ticketType:"Ticket",
+  terminal:"Server",
+  department:"Restaurant",
+  state:{ticket:{id:0}}
+){ticket{id}}}
+
+-- reportes
+
+query GetProductSalesReport {
+  getCustomReport(
+    name: "REPORTE DE VENTA DE PRODUCTOS", 
+    startDate: "2025-02-10", 
+    endDate: "2025-02-10"
+  ) {
+    name
+    tables {
+      name
+      rows {
+        cells
+      }
+     
+    }
+  }
+}
