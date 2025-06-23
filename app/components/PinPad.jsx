@@ -4,6 +4,7 @@ import { styled } from '@mui/material/styles';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { login } from '../actions/auth';
+import logo from '../assets/logo.png';
 
 const PinButton = styled(Button)(({ theme }) => ({
   width: '80px',
@@ -71,6 +72,19 @@ const PinPad = () => {
           borderRadius: 2 
         }}
       >
+        {/* SambaPOS Logo */}
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
+          <img 
+            src={logo} 
+            alt="SambaPOS" 
+            style={{ 
+              maxWidth: '200px', 
+              maxHeight: '120px',
+              objectFit: 'contain'
+            }} 
+          />
+        </Box>
+        
         <Typography variant="h4" align="center" gutterBottom>
           SambasoftMX
         </Typography>
