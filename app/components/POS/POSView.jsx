@@ -96,7 +96,13 @@ const POSView = () => {
                     debug('🔄 Received menu data structure:', JSON.stringify(menuData, null, 2));
                     debug('🔄 Categories count:', menuData.categories?.length || 'No categories');
                     debug('🔄 Dispatching setMenu action with data:', menuData);
-                    dispatch(Actions.setMenu(menuData));
+                    
+                    // Create and log the action before dispatching
+                    const setMenuAction = Actions.setMenu(menuData);
+                    debug('🔧 Action to dispatch:', setMenuAction);
+                    
+                    const result = dispatch(setMenuAction);
+                    debug('🔧 Dispatch result:', result);
                     debug('✅ Menu dispatched to Redux');
                     
                     // Force check Redux state after dispatch

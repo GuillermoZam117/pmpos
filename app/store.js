@@ -2,6 +2,7 @@ import { createStore, applyMiddleware, compose, combineReducers } from 'redux';
 import thunk from 'redux-thunk';
 import { Map } from 'immutable';
 import { tokenService } from './services/tokenService';
+import appReducer from './reducers/app';  // Import the complete app reducer
 
 const composeEnhancers = window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ || compose;
 
@@ -39,15 +40,8 @@ const initialState = {
     })
 };
 
-// Reducers
-const appReducer = (state = initialState.app, action) => {
-    switch (action.type) {
-        case 'SET_TERMINAL_ID':
-            return state.set('terminalId', action.payload);
-        default:
-            return state;
-    }
-};
+// Use the imported app reducer instead of defining a simple one here
+// The complete app reducer is imported from ./reducers/app
 
 const authReducer = (state = initialState.auth, action) => {
     switch (action.type) {
