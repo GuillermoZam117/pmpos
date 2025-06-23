@@ -17,33 +17,23 @@ export const AUTH_ACTIONS = {
     AUTH_ERROR: 'AUTH_ERROR'
 };
 
-// Initial state
-const initialState = {
-    app: Map({
-        message: Map({
-            text: '',
-            isOpen: false
-        }),
-        terminalId: '',
-        ticket: null,
-        isLoading: false,
-        error: null
-    }),
-    auth: Map({
-        token: null,
-        expiryDate: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: null,
-        accessToken: null,
-        refreshToken: null
-    })
-};
+// Let individual reducers handle their own initial states
 
 // Use the imported app reducer instead of defining a simple one here
 // The complete app reducer is imported from ./reducers/app
 
-const authReducer = (state = initialState.auth, action) => {
+// Create auth reducer with its own initial state
+const authInitialState = Map({
+    token: null,
+    expiryDate: null,
+    isAuthenticated: false,
+    isLoading: false,
+    error: null,
+    accessToken: null,
+    refreshToken: null
+});
+
+const authReducer = (state = authInitialState, action) => {
     switch (action.type) {
         case AUTH_ACTIONS.LOGIN_REQUEST:
             return state.merge({
