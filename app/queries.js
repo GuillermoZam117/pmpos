@@ -12,7 +12,14 @@ import { gql } from '@apollo/client';
 const debug = Debug('pmpos:queries');
 
 const getToken = async () => {
-    return await tokenService.getToken();
+    try {
+        // Import tokenService here to avoid circular dependencies
+        const { tokenService } = await import('./services/tokenService');
+        return await tokenService.getValidAccessToken();
+    } catch (error) {
+        console.error('Token fetch failed:', error);
+        throw error;
+    }
 };
 
 var config = appconfig();
@@ -153,7 +160,9 @@ export function postRefresh() {
 
 export const ensureAuthenticated = async () => {
     try {
-        return await tokenService.getToken();
+        // Import tokenService here to avoid circular dependencies
+        const { tokenService } = await import('./services/tokenService');
+        return await tokenService.getValidAccessToken();
     } catch (error) {
         console.error('Authentication failed:', error);
         throw error;
@@ -163,6 +172,7 @@ export const ensureAuthenticated = async () => {
 // Función para cargar el menú (ya existente, se validan datos)
 export const getMenu = async (callback) => {
     try {
+        const token = await ensureAuthenticated();
         const response = await fetch(appconfig().GQLurl, {
             method: 'POST',
             headers: {
@@ -314,7 +324,7 @@ export function changeEntityOfTerminalTicket(terminalId, entityName, callback) {
 export const getEntityScreenItems = async (screenName) => {
     try {
         const config = appconfig();
-        const token = localStorage.getItem('access_token');
+        const token = await ensureAuthenticated();
 
         console.log('📊 GraphQL Request:', {
             url: config.GQLurl,
