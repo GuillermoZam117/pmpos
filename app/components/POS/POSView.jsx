@@ -30,8 +30,29 @@ const POSView = () => {
     const dispatch = useDispatch();
     const { ticket, tableId, isNew } = location.state || {};
     
-    // Get menu from Redux store
-    const menu = useSelector(state => state.app?.get('menu')?.toJS ? state.app.get('menu').toJS() : state.app?.get('menu'));
+    // Get menu from Redux store with debug
+    const menu = useSelector(state => {
+        const appState = state.app;
+        debug('🔍 Redux app state type:', typeof appState);
+        debug('🔍 App state methods:', appState ? Object.getOwnPropertyNames(appState.__proto__ || {}) : 'none');
+        
+        let menuData = null;
+        if (appState && typeof appState.get === 'function') {
+            // Immutable.js format
+            menuData = appState.get('menu');
+            if (menuData && typeof menuData.toJS === 'function') {
+                menuData = menuData.toJS();
+            }
+            debug('🔍 Menu from Immutable:', menuData);
+        } else if (appState && typeof appState === 'object') {
+            // Plain object format
+            menuData = appState.menu;
+            debug('🔍 Menu from plain object:', menuData);
+        }
+        
+        debug('🔍 Final menu data:', menuData);
+        return menuData;
+    });
     
     const [loading, setLoading] = useState(true);
     const [orders, setOrders] = useState([]);
@@ -44,6 +65,7 @@ const POSView = () => {
         }
 
         debug('🎫 Loading ticket:', ticket.uid);
+        debug('🔍 Current menu state:', menu);
         
         // Load menu if not already loaded
         const loadMenu = async () => {
@@ -51,8 +73,11 @@ const POSView = () => {
                 debug('🔄 Loading menu...');
                 await getMenu((menuData) => {
                     if (menuData) {
+                        debug('🔄 Dispatching setMenu action with data:', menuData);
                         dispatch(Actions.setMenu(menuData));
-                        debug('✅ Menu loaded successfully');
+                        debug('✅ Menu dispatched to Redux');
+                    } else {
+                        debug('❌ No menu data received');
                     }
                 });
             } catch (error) {
@@ -64,9 +89,10 @@ const POSView = () => {
 
         // Only load menu if not already available
         if (!menu) {
+            debug('🔄 No menu found, loading from server...');
             loadMenu();
         } else {
-            debug('✅ Menu already available from Redux store');
+            debug('✅ Menu already available from Redux store:', menu);
             setLoading(false);
         }
         
