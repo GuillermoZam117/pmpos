@@ -156,10 +156,10 @@ class TokenService {
 
     async authenticate(pin) {
         try {
-            const token = await this.getToken();
+            let token = await this.getToken();
             console.log('📡 Sending PIN validation...');
 
-            const response = await fetch(appconfig().graphqlUrl, {
+            let response = await fetch(appconfig().graphqlUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -173,6 +173,30 @@ class TokenService {
                     }`
                 })
             });
+
+            // If we get 401, the token might be invalid even if not expired
+            // Force a token refresh and try again
+            if (response.status === 401) {
+                console.log('🔄 Token rejected by server, forcing refresh...');
+                this.clearToken(); // Clear the invalid token
+                token = await this.refreshToken(); // Get a fresh token
+                
+                console.log('📡 Retrying PIN validation with fresh token...');
+                response = await fetch(appconfig().graphqlUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        query: `{
+                            getUser(pin: "${pin}") {
+                                name
+                            }
+                        }`
+                    })
+                });
+            }
 
             if (!response.ok) {
                 throw new Error(`Network response was not ok: ${response.status}`);
@@ -243,20 +267,25 @@ class TokenService {
 
     clearToken() {
         console.group('🗑️ Clearing Token');
+        
+        // Clear all possible token storage locations
         localStorage.removeItem('access_token');
         localStorage.removeItem('token_expiry');
+        localStorage.removeItem('token');
+        localStorage.removeItem('expiry');
+        localStorage.removeItem(TOKEN_STORAGE_KEY);
+        localStorage.removeItem(TOKEN_EXPIRY_KEY);
+        localStorage.removeItem(AUTH_CONSTANTS.STORAGE_KEYS.TOKEN);
+        localStorage.removeItem(AUTH_CONSTANTS.STORAGE_KEYS.EXPIRY);
+        
+        // Clear instance variables
         this.token = null;
         this.expiry = null;
-        console.log('✅ Token cleared from storage');
+        this.currentToken = null;
+        this.pendingRefresh = null;
+        
+        console.log('✅ All token data cleared from storage');
         console.groupEnd();
-        try {
-            this.currentToken = null;
-            localStorage.removeItem(TOKEN_STORAGE_KEY);
-            localStorage.removeItem(TOKEN_EXPIRY_KEY);
-            console.log('Token cleared from storage');
-        } catch (error) {
-            console.error('Error clearing token:', error);
-        }
     }
 
     encryptToken(token) {
