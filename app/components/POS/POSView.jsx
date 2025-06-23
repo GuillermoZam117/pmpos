@@ -483,7 +483,7 @@ const POSView = () => {
                     }
                     debug('🏷️ Processed order tags:', orderTagsString);
                     
-                    await createOrderModern(ticket.uid, order.productId, order.quantity, orderTagsString);
+                    await addOrderToTicketModern(ticket.uid, order.productId, order.quantity, orderTagsString);
                     debug('✅ Order added successfully');
                 }
             } else {
