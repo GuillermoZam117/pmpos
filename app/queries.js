@@ -1597,43 +1597,9 @@ export const updateOrderOfTerminalTicket = async (terminalId, orderUid, quantity
     });
 };
 
-export const cancelOrderOnTerminalTicket = async (terminalId, orderUid, callback) => {
-    const mutation = `mutation {
-        cancelOrderOnTerminalTicket(
-            terminalId: "${terminalId}",
-            orderUid: "${orderUid}"
-        ) {
-            success
-        }
-    }`;
-    
-    $.postJSON(mutation, function (response) {
-        if (response.errors) {
-            if (callback) callback(undefined, response.errors[0].message);
-        } else {
-            if (callback) callback(response.data.cancelOrderOnTerminalTicket);
-        }
-    });
-};
 
-export const clearTerminalTicketOrders = async (terminalId, callback) => {
-    const mutation = `mutation {
-        clearTerminalTicketOrders(terminalId: "${terminalId}") {
-            id
-            orders {
-                id
-            }
-        }
-    }`;
-    
-    $.postJSON(mutation, function (response) {
-        if (response.errors) {
-            if (callback) callback(undefined, response.errors[0].message);
-        } else {
-            if (callback) callback(response.data.clearTerminalTicketOrders);
-        }
-    });
-};
+
+
 
 // Automatización y eventos según la guía GraphQL
 export const notifyTerminalTicketEvent = async (terminalId, eventName, parameters = [], callback) => {
@@ -1659,7 +1625,7 @@ export const notifyTerminalTicketEvent = async (terminalId, eventName, parameter
     });
 };
 
-export const executeAutomationCommandForTerminalTicket = async (terminalId, commandName, value = '', callback) => {
+export const executeAutomationCommand = async (terminalId, commandName, value = '', callback) => {
     const mutation = `mutation {
         executeAutomationCommandForTerminalTicket(
             terminalId: "${terminalId}",

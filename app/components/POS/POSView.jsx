@@ -348,7 +348,7 @@ const POSView = () => {
         
         try {
             // Execute payment workflow for automation
-            const { automationService } = await import('../services/automationService');
+            const { automationService } = await import('../../services/automationService');
             await automationService.executeWorkflow(ticket.terminalId, 'PROCESS_PAYMENT', {
                 amount: paymentInfo.amount,
                 paymentType: paymentInfo.paymentType,
@@ -411,7 +411,7 @@ const POSView = () => {
 
         try {
             debug('🗑️ Clearing all orders...');
-            const { orderService } = await import('../services/orderService');
+            const { orderService } = await import('../../services/orderService');
             const result = await orderService.clearAllOrders(ticket.terminalId);
             
             if (result.success) {
@@ -497,7 +497,7 @@ const POSView = () => {
 
             // Execute close table workflow for automation
             try {
-                const { automationService } = await import('../services/automationService');
+                const { automationService } = await import('../../services/automationService');
                 await automationService.executeWorkflow(terminalId, 'CLOSE_TABLE', {
                     tableName: tableId,
                     ticketTotal: calculateTotal(),
