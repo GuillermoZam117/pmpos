@@ -331,7 +331,8 @@ const POSView = () => {
         setClosingTicket(true);
         try {
             debug('🔄 Starting ticket closure process...');
-            debug('📋 Orders to submit:', orders);
+            debug('📋 Ticket type:', isNew ? 'NEW' : 'EXISTING');
+            debug('📋 Orders to process:', orders);
 
             // Get terminal ID from the ticket (set during ticket creation)
             const terminalId = ticket.terminalId;
@@ -340,27 +341,46 @@ const POSView = () => {
             }
             debug('🖥️ Using terminal ID from ticket:', terminalId);
 
-            // Add each order to the terminal ticket
-            for (const order of orders) {
-                debug('➕ Adding order to ticket:', order);
+            // Determine which orders need to be added to SambaPOS
+            let ordersToAdd = [];
+            
+            if (isNew) {
+                // For new tickets, add all orders
+                debug('🆕 New ticket: Adding all orders to SambaPOS...');
+                ordersToAdd = orders;
+            } else {
+                // For existing tickets, only add orders that don't have a UID (newly added orders)
+                ordersToAdd = orders.filter(order => !order.uid);
+                debug(`📋 Existing ticket: Found ${ordersToAdd.length} new orders to add:`, ordersToAdd);
+            }
+            
+            // Add orders to SambaPOS
+            if (ordersToAdd.length > 0) {
+                debug(`➕ Adding ${ordersToAdd.length} orders to SambaPOS...`);
                 
-                // Process order tags to SambaPOS format
-                let orderTagsString = '';
-                if (order.tags && order.tags.length > 0) {
-                    const processedTags = order.tags.map(tag => {
-                        if (tag.startsWith('Comentarios:')) {
-                            // Convert comments to SambaPOS format
-                            const comment = tag.replace('Comentarios:', '');
-                            return `Nota:${comment}`;
-                        }
-                        return tag;
-                    });
-                    orderTagsString = processedTags.join(',');
+                for (const order of ordersToAdd) {
+                    debug('➕ Adding order to ticket:', order);
+                    
+                    // Process order tags to SambaPOS format
+                    let orderTagsString = '';
+                    if (order.orderTags && order.orderTags.length > 0) {
+                        const processedTags = order.orderTags.map(tag => {
+                            if (tag.startsWith('Comentarios:')) {
+                                // Convert comments to SambaPOS format
+                                const comment = tag.replace('Comentarios:', '');
+                                return `Nota:${comment}`;
+                            }
+                            return tag;
+                        });
+                        orderTagsString = processedTags.join(',');
+                    }
+                    debug('🏷️ Processed order tags:', orderTagsString);
+                    
+                    await addOrderToTerminalTicketModern(terminalId, order.productId, order.quantity, orderTagsString);
+                    debug('✅ Order added successfully');
                 }
-                debug('🏷️ Processed order tags:', orderTagsString);
-                
-                await addOrderToTerminalTicketModern(terminalId, order.productId, order.quantity, orderTagsString);
-                debug('✅ Order added successfully');
+            } else {
+                debug('📋 No new orders to add to SambaPOS');
             }
 
             // Close the terminal ticket
