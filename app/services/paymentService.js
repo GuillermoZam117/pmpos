@@ -71,8 +71,9 @@ export const paymentService = {
             debug('✅ Payment types fetched:', data.getPaymentTypes);
             return data.getPaymentTypes;
         } catch (error) {
-            debug('❌ Failed to fetch payment types:', error);
-            // Fallback con tipos de pago por defecto
+            debug('⚠️ Payment types query failed (using fallback):', error.message);
+            // Fallback con tipos de pago por defecto - esto es normal en algunas configuraciones
+            console.info('💳 Using default payment types (SambaPOS configuration may not support custom payment types)');
             return [
                 { id: 1, name: 'Efectivo' },
                 { id: 2, name: 'Tarjeta de Crédito' },

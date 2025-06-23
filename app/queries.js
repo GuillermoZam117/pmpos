@@ -100,9 +100,13 @@ export const registerTerminalAsync = async () => {
         const data = await response.json();
         
         if (data.errors) {
-        console.error('🚨 GraphQL Errors in registerTerminal:', data.errors);
-        console.error('📝 Query:', query);
-        console.error('📋 Variables:', variables);
+        console.warn('⚠️ registerTerminal failed (expected in some SambaPOS configurations):', data.errors[0]?.message);
+        // This is often expected - some SambaPOS setups don't require terminal registration
+        return null;
+    }
+    
+    if (!response.ok) {
+        console.warn('⚠️ registerTerminal HTTP error (non-critical):', response.status, response.statusText);
         return null;
     }
     

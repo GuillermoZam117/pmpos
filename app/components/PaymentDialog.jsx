@@ -280,12 +280,14 @@ const PaymentDialog = ({
             fullWidth
         >
             <DialogTitle>
-                <Typography variant="h5" component="div">
-                    💳 Procesar Pago
-                </Typography>
-                <Typography variant="subtitle2" color="text.secondary">
-                    Ticket: {ticket?.ticketNumber || 'N/A'}
-                </Typography>
+                <Box>
+                    <Typography variant="h5" component="div">
+                        💳 Procesar Pago
+                    </Typography>
+                    <Typography variant="subtitle2" color="text.secondary">
+                        Ticket: {ticket?.ticketNumber || 'N/A'}
+                    </Typography>
+                </Box>
             </DialogTitle>
 
             <DialogContent>
