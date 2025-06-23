@@ -28,6 +28,7 @@ const AUTH_CONSTANTS = {
     DEFAULTS: {
         GRANT_TYPE: 'password',
         CLIENT_ID: 'graphiql',
+        CLIENT_SECRET: 'graphiql',
         USERNAME: 'graphiql',
         PASSWORD: 'graphiql'
     }
@@ -109,7 +110,8 @@ class TokenService {
                     body: new URLSearchParams({
                         grant_type: 'refresh_token',
                         refresh_token: this.refreshToken,
-                        client_id: AUTH_CONSTANTS.DEFAULTS.CLIENT_ID
+                        client_id: AUTH_CONSTANTS.DEFAULTS.CLIENT_ID,
+                        client_secret: AUTH_CONSTANTS.DEFAULTS.CLIENT_SECRET
                     })
                 });
 
@@ -152,6 +154,7 @@ class TokenService {
                 body: new URLSearchParams({
                     grant_type: AUTH_CONSTANTS.DEFAULTS.GRANT_TYPE,
                     client_id: AUTH_CONSTANTS.DEFAULTS.CLIENT_ID,
+                    client_secret: AUTH_CONSTANTS.DEFAULTS.CLIENT_SECRET,
                     username: AUTH_CONSTANTS.DEFAULTS.USERNAME,
                     password: AUTH_CONSTANTS.DEFAULTS.PASSWORD
                 })
