@@ -22,6 +22,7 @@ import { logout } from '../actions/auth';
 import Debug from 'debug';
 import { TABLE_STATUS } from '../constants/tableStatus';
 import { terminalService } from '../services/terminalService';
+import { appconfig } from '../config';
 import logo from '../../public/favicon.ico';  // Add this import
 
 const debug = Debug('pmpos:tables');
@@ -120,7 +121,8 @@ const TableView = () => {
 
         try {
             debug('🔄 Fetching tables from SambaPOS...');
-            const items = await getEntityScreenItems('MESAS');
+            const config = appconfig();
+            const items = await getEntityScreenItems(config.entityScreenName);
             
             // Process tables data
             const processedTables = items.map(table => ({

@@ -589,7 +589,7 @@ function getChangeEntityOfTerminalTicketScript(terminalId, entityName) {
     return `mutation {
         changeEntityOfTerminalTicket(
             terminalId: "${terminalId}",
-            entityType: "Table",
+            entityType: "${config.entityTypeName}",
             entityName: "${entityName}"
         ) {
             id
