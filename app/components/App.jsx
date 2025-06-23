@@ -20,7 +20,7 @@ const ROUTES = {
 // Lazy load components
 const PinPad = React.lazy(() => import('./PinPad'));
 const TableView = React.lazy(() => import('./TableView'));
-const POSView = React.lazy(() => import('./POSView'));
+const POSView = React.lazy(() => import('./POS/POSView'));
 
 // Loading component with better styling
 const LoadingComponent = () => (

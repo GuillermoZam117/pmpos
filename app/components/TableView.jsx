@@ -23,6 +23,7 @@ import Debug from 'debug';
 import { TABLE_STATUS } from '../constants/tableStatus';
 import { terminalService } from '../services/terminalService';
 import { appconfig } from '../config';
+import cacheService from '../services/cacheService';
 import logo from '../../public/favicon.ico';  // Add this import
 
 const debug = Debug('pmpos:tables');
@@ -115,11 +116,24 @@ const TableView = () => {
         }
     }, [dispatch, navigate]);
 
-    const loadTables = useCallback(async (showRefresh = false) => {
+    const loadTables = useCallback(async (forceRefresh = false, showRefresh = false) => {
         if (showRefresh) setRefreshing(true);
         else setLoading(true);
 
         try {
+            // Check cache first (unless forced refresh)
+            if (!forceRefresh) {
+                const cachedTables = cacheService.getTables();
+                if (cachedTables) {
+                    debug(`📦 Using cached tables (${cachedTables.length} tables)`);
+                    setTables(cachedTables);
+                    setError(null);
+                    setLoading(false);
+                    setRefreshing(false);
+                    return;
+                }
+            }
+
             debug('🔄 Fetching tables from SambaPOS...');
             const config = appconfig();
             const items = await getEntityScreenItems(config.entityScreenName);
@@ -131,12 +145,25 @@ const TableView = () => {
                 timeElapsed: parseTimeFromCaption(table.caption)
             }));
 
-            debug(`✅ Loaded ${processedTables.length} tables`);
+            debug(`✅ Loaded ${processedTables.length} tables from server`);
+            
+            // Cache the results
+            cacheService.setTables(processedTables);
+            
             setTables(processedTables);
             setError(null);
         } catch (err) {
             debug('❌ Error loading tables:', err);
-            setError(err.message);
+            
+            // If network fails, try to use cached data as fallback
+            const cachedTables = cacheService.getTables();
+            if (cachedTables) {
+                debug('📦 Using cached tables as fallback');
+                setTables(cachedTables);
+                setError('Usando datos en caché (sin conexión)');
+            } else {
+                setError(err.message);
+            }
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -263,7 +290,7 @@ const TableView = () => {
                     </Typography>
                     <Button
                         variant="outlined"
-                        onClick={() => loadTables(true)}
+                        onClick={() => loadTables(true, true)}
                         disabled={refreshing}
                         startIcon={<RefreshIcon />}
                     >

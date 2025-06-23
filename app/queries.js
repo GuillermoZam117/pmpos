@@ -169,9 +169,23 @@ export const ensureAuthenticated = async () => {
     }
 };
 
-// Función para cargar el menú (ya existente, se validan datos)
-export const getMenu = async (callback) => {
+// Función para cargar el menú con cache
+export const getMenu = async (callback, forceRefresh = false) => {
     try {
+        // Import cache service dynamically to avoid circular imports
+        const { default: cacheService } = await import('./services/cacheService');
+        
+        // Check cache first (unless forced refresh)
+        if (!forceRefresh) {
+            const cachedMenu = cacheService.getMenu();
+            if (cachedMenu) {
+                console.log('📦 Using cached menu');
+                if (callback) callback(cachedMenu);
+                return;
+            }
+        }
+
+        console.log('🔄 Fetching menu from server...');
         const token = await ensureAuthenticated();
         const response = await fetch(appconfig().GQLurl, {
             method: 'POST',
@@ -184,11 +198,36 @@ export const getMenu = async (callback) => {
         const data = await response.json();
         if (data.errors) {
             console.error('❌ GraphQL errors:', data.errors);
+            
+            // Try to use cached data as fallback
+            const cachedMenu = cacheService.getMenu();
+            if (cachedMenu) {
+                console.log('📦 Using cached menu as fallback');
+                if (callback) callback(cachedMenu);
+            }
             return;
         }
+        
+        console.log('✅ Menu loaded from server');
+        
+        // Cache the menu
+        cacheService.setMenu(data.data.menu);
+        
         if (callback) callback(data.data.menu);
     } catch (error) {
         console.error('❌ Menu fetch error:', error);
+        
+        // Try to use cached data as fallback
+        try {
+            const { default: cacheService } = await import('./services/cacheService');
+            const cachedMenu = cacheService.getMenu();
+            if (cachedMenu) {
+                console.log('📦 Using cached menu as fallback after error');
+                if (callback) callback(cachedMenu);
+            }
+        } catch (cacheError) {
+            console.warn('Could not access cache service:', cacheError);
+        }
     }
 };
 

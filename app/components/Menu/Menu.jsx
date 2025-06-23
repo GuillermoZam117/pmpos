@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { connect } from 'react-redux';
 import Categories from './Categories';
 import MenuItems from './MenuItems';
@@ -104,9 +104,6 @@ const mapStateToProps = (state) => ({
     menu: state.app.get('menu'),
     terminalId: state.app.get('terminalId')
 });
-
-const [loading, setLoading] = useState(false);
-const [error, setError] = useState(null);
 
 const mapDispatchToProps = {
   changeSelectedCategory: Actions.changeSelectedCategory,
