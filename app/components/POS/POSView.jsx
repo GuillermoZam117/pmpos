@@ -84,15 +84,16 @@ const POSView = () => {
                     });
                     
                     return {
-                        id: Date.now() + Math.random(), // Generate local ID
-                        uid: order.uid,
+                        id: Date.now() + Math.random(), // Generate local ID for React
+                        uid: order.uid, // SambaPOS UID - indicates this is an EXISTING order
                         productId: order.productId,
                         name: productName,
                         caption: order.caption || productName,
                         quantity: order.quantity,
                         price: order.price,
                         portion: order.portion || 'Normal',
-                        orderTags: order.orderTags ? order.orderTags.split(',').filter(tag => tag.trim()) : []
+                        orderTags: order.orderTags ? order.orderTags.split(',').filter(tag => tag.trim()) : [],
+                        isExisting: true // Flag to clearly mark existing orders
                     };
                 });
                 
@@ -258,13 +259,15 @@ const POSView = () => {
         // Add item to current ticket
         const newOrder = {
             id: Date.now(),
+            uid: null, // No UID = NEW order, not yet in SambaPOS
             name: menuItem.name || menuItem.caption,
             caption: menuItem.caption,
             quantity: 1,
             price: price,
             portion: portionName,
             productId: menuItem.productId,
-            orderTags: selectedTags || []
+            orderTags: selectedTags || [],
+            isExisting: false // Flag to clearly mark new orders
         };
         
         debug('✅ Adding order to ticket:', newOrder);
@@ -345,13 +348,18 @@ const POSView = () => {
             let ordersToAdd = [];
             
             if (isNew) {
-                // For new tickets, add all orders
+                // For new tickets, add all orders (none should be existing)
                 debug('🆕 New ticket: Adding all orders to SambaPOS...');
                 ordersToAdd = orders;
+                debug('📋 All orders for new ticket:', orders);
             } else {
-                // For existing tickets, only add orders that don't have a UID (newly added orders)
-                ordersToAdd = orders.filter(order => !order.uid);
-                debug(`📋 Existing ticket: Found ${ordersToAdd.length} new orders to add:`, ordersToAdd);
+                // For existing tickets, only add orders that are NOT existing (no UID or isExisting = false)
+                ordersToAdd = orders.filter(order => !order.uid && !order.isExisting);
+                debug(`📋 Existing ticket analysis:`);
+                debug(`   - Total orders: ${orders.length}`);
+                debug(`   - Existing orders (already in SambaPOS): ${orders.filter(order => order.isExisting).length}`);
+                debug(`   - New orders to add: ${ordersToAdd.length}`);
+                debug('   - New orders details:', ordersToAdd);
             }
             
             // Add orders to SambaPOS
@@ -593,7 +601,39 @@ const POSView = () => {
                                         <CardContent sx={{ py: 1, '&:last-child': { pb: 1 } }}>
                                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                 <Box>
-                                                    <Typography variant="body1">{order.name}</Typography>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                        <Typography variant="body1">{order.name}</Typography>
+                                                        {order.isExisting && (
+                                                            <Typography 
+                                                                variant="caption" 
+                                                                sx={{ 
+                                                                    bgcolor: 'success.light', 
+                                                                    color: 'success.contrastText',
+                                                                    px: 1, 
+                                                                    py: 0.25, 
+                                                                    borderRadius: 1,
+                                                                    fontSize: '0.7rem'
+                                                                }}
+                                                            >
+                                                                ENVIADO
+                                                            </Typography>
+                                                        )}
+                                                        {!order.isExisting && (
+                                                            <Typography 
+                                                                variant="caption" 
+                                                                sx={{ 
+                                                                    bgcolor: 'warning.light', 
+                                                                    color: 'warning.contrastText',
+                                                                    px: 1, 
+                                                                    py: 0.25, 
+                                                                    borderRadius: 1,
+                                                                    fontSize: '0.7rem'
+                                                                }}
+                                                            >
+                                                                NUEVO
+                                                            </Typography>
+                                                        )}
+                                                    </Box>
                                                     <Typography variant="body2" color="text.secondary">
                                                         Cantidad: {order.quantity} {order.portion && ` • ${order.portion}`}
                                                     </Typography>
