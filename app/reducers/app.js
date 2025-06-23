@@ -32,6 +32,10 @@ export default function appReducer(state = initialState, action) {
       return state.set('ticket', action.ticket);
     case 'SET_TICKET':
       return state.set('ticket', action.payload);
+    case types.SET_MENU:
+      return state.set('menu', action.menu);
+    case types.CHANGE_SELECTED_CATEGORY:
+      return state.set('selectedCategory', action.category);
     case 'AUTHENTICATION_SUCCESS':
       return state.merge({
         isAuthenticated: true,

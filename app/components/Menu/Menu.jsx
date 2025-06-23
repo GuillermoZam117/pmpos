@@ -1,19 +1,16 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { connect } from 'react-redux';
 import Categories from './Categories';
 import MenuItems from './MenuItems';
 import Paper from '@mui/material/Paper'; // Updated import for MUI
-import * as Queries from '../../queries';
 import * as Actions from '../../actions';
 import PropTypes from 'prop-types';
 
 class Menu extends React.Component {
   componentDidMount() {
     console.log('🔍 Menu mounting, current menu:', this.props.menu);
-    if (!this.props.menu) {
-        console.log('📋 Refreshing menu...');
-        this.refreshMenu();
-    }
+    // Don't auto-load menu here - let POSView handle it
+    // The menu should be passed as props from the parent component
   }
 
   render() {
@@ -22,44 +19,25 @@ class Menu extends React.Component {
       menuItems,
       onMenuItemClick = () => {},
     } = this.props;
+    
+    // Show loading if no menu yet
+    if (!menu) {
+      return (
+        <Paper className="menu" sx={{ p: 2, textAlign: 'center' }}>
+          <div>Cargando menú...</div>
+        </Paper>
+      );
+    }
+    
     return (
       <Paper className="menu">
         <Categories
-          categories={menu ? menu.categories : undefined}
-          onCategoryClick={this.onCategoryClick} // Usa el nombre correcto de la prop
+          categories={menu.categories || []}
+          onCategoryClick={this.onCategoryClick}
         />
         <MenuItems menuItems={menuItems} onClick={onMenuItemClick} />
       </Paper>
     );
-  }
-
-  refreshMenu() {
-    console.log('🔄 Getting menu from server...');
-    const token = localStorage.getItem('access_token');
-    
-    if (!token) {
-        console.error('No authentication token found');
-        return;
-    }
-
-    Queries.getMenu((menu) => {
-        console.log('📦 Received menu:', menu);
-        
-        if (menu) {
-            Queries.getOrderTagColors((colors) => {
-                if (colors) {
-                    this.props.setOrderTagColors(colors);
-                }
-            }, token);
-
-            this.props.setMenu(menu);
-            if (menu.categories && menu.categories.length > 0) {
-                this.props.changeSelectedCategory(menu.categories[0].name);
-            }
-        } else {
-            console.error('Failed to load menu');
-        }
-    }, token);
   }
 
   onCategoryClick = (category) => {

@@ -19,6 +19,7 @@ import RestaurantMenuIcon from '@mui/icons-material/RestaurantMenu';
 import TableRestaurantIcon from '@mui/icons-material/TableRestaurant';
 import Menu from '../Menu/Menu';
 import { getMenu } from '../../queries';
+import * as Actions from '../../actions';
 import Debug from 'debug';
 
 const debug = Debug('pmpos:pos');
@@ -28,6 +29,9 @@ const POSView = () => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
     const { ticket, tableId, isNew } = location.state || {};
+    
+    // Get menu from Redux store
+    const menu = useSelector(state => state.app?.get('menu')?.toJS ? state.app.get('menu').toJS() : state.app?.get('menu'));
     
     const [loading, setLoading] = useState(true);
     const [orders, setOrders] = useState([]);
@@ -41,13 +45,13 @@ const POSView = () => {
 
         debug('🎫 Loading ticket:', ticket.uid);
         
-        // Load menu
+        // Load menu if not already loaded
         const loadMenu = async () => {
             try {
                 debug('🔄 Loading menu...');
-                await getMenu((menu) => {
-                    if (menu) {
-                        dispatch({ type: 'SET_MENU', payload: menu });
+                await getMenu((menuData) => {
+                    if (menuData) {
+                        dispatch(Actions.setMenu(menuData));
                         debug('✅ Menu loaded successfully');
                     }
                 });
@@ -58,9 +62,15 @@ const POSView = () => {
             }
         };
 
-        loadMenu();
+        // Only load menu if not already available
+        if (!menu) {
+            loadMenu();
+        } else {
+            debug('✅ Menu already available from Redux store');
+            setLoading(false);
+        }
         
-    }, [ticket, navigate, dispatch]);
+    }, [ticket, navigate, dispatch, menu]);
 
     const handleMenuItemClick = (menuItem) => {
         debug('🍽️ Menu item clicked:', menuItem);
@@ -138,7 +148,7 @@ const POSView = () => {
                     {loading ? (
                         <Typography>Cargando menú...</Typography>
                     ) : (
-                        <Menu onMenuItemClick={handleMenuItemClick} />
+                        <Menu menu={menu} onMenuItemClick={handleMenuItemClick} />
                     )}
                 </Box>
 
