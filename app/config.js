@@ -20,6 +20,7 @@ export const appconfig = () => {
         ticketTypeName: 'COMEDOR',
         menuName: 'MENU',
         entityScreenName: 'MESAS',
+        entityTypeName: 'MESAS',
         
         // Application Settings
         autoConnectPrinter: true,

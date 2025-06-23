@@ -660,6 +660,7 @@ function getAddOrderToTicketQuery(ticket, menuItem, quantity = 1) {
 
 // Add ticket queries
 export const getTicketByTable = async (tableName) => {
+    const config = appconfig();
     const query = `
         query GetTickets($isClosed: Boolean) {
             getTickets(isClosed: $isClosed) {
@@ -681,7 +682,7 @@ export const getTicketByTable = async (tableName) => {
         const response = await postJSON(query, { isClosed: false });
         return response.data?.getTickets?.find(ticket => 
             ticket.entities?.some(entity => 
-                entity.type === 'Mesas' && 
+                entity.type === config.entityTypeName && 
                 entity.name === tableName
             )
         );
@@ -737,10 +738,11 @@ export async function handleTicketCreated(ticket, tableId, navigate) {
 
 // Remove duplicate declarations and keep only this one
 function getAssignTableMutation(terminalId, tableName) {
+    const config = appconfig();
     return `mutation {
         ticket:changeEntityOfTerminalTicket(
             terminalId:"${terminalId}",
-            entityType:"Table",
+            entityType:"${config.entityTypeName}",
             entityName:"${tableName}"
         )
         ${getTicketResult()}
@@ -758,19 +760,22 @@ export async function createEmptyTicket(tableId) {
             throw new Error('Not authenticated');
         }
 
+        // Get configuration
+        const config = appconfig();
+
         // 1. Register terminal (based on official documentation)
         const registerMutation = `
             mutation {
                 registerTerminal(
-                    terminal: "SERVIDOR",
-                    ticketType: "COMEDOR", 
-                    department: "MESAS",
-                    user: "graphiql"
+                    terminal: "${config.terminalName}",
+                    ticketType: "${config.ticketTypeName}", 
+                    department: "${config.departmentName}",
+                    user: "${config.userName}"
                 )
             }
         `;
 
-        const registerResult = await postJSON(appconfig().GQLurl, {
+        const registerResult = await postJSON(config.GQLurl, {
             query: registerMutation
         });
 
@@ -797,7 +802,7 @@ export async function createEmptyTicket(tableId) {
             }
         `;
 
-        const ticketResult = await postJSON(appconfig().GQLurl, {
+        const ticketResult = await postJSON(config.GQLurl, {
             query: ticketMutation
         });
 
@@ -813,7 +818,7 @@ export async function createEmptyTicket(tableId) {
             mutation {
                 changeEntityOfTerminalTicket(
                     terminalId: "${terminalId}",
-                    entityType: "Tables",
+                    entityType: "${config.entityTypeName}",
                     entityName: "${tableId}"
                 ) {
                     uid
@@ -832,11 +837,11 @@ export async function createEmptyTicket(tableId) {
 
         debug('📝 Assigning table...', {
             terminalId,
-            entityType: 'Tables',
+            entityType: config.entityTypeName,
             entityName: tableId
         });
 
-        const assignResult = await postJSON(appconfig().GQLurl, {
+        const assignResult = await postJSON(config.GQLurl, {
             query: assignMutation
         });
 
