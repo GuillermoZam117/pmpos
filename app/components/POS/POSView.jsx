@@ -91,6 +91,14 @@ const POSView = () => {
     }
     
     debug('🔍 Final menu data for POSView:', menu);
+    
+    // Force load menu if not available
+    useEffect(() => {
+        if (!menu && !loading) {
+            debug('🔄 Menu not available, forcing load...');
+            loadMenu();
+        }
+    }, [menu, loading]);
 
     // Load existing orders if this is an existing ticket
     useEffect(() => {
@@ -276,33 +284,35 @@ const POSView = () => {
                 portionName, 
                 price,
                 rawPrice: defaultPortion.price,
-                allPortions: menuItem.product.portions 
+                allPortions: menuItem.product.portions
             });
         } else {
-            debug('⚠️ No pricing information found for product:', {
-                productId: menuItem.productId,
-                hasProduct: !!menuItem.product,
-                hasPortions: !!(menuItem.product && menuItem.product.portions),
-                portionsLength: menuItem.product?.portions?.length || 0
-            });
+            // Fallback price if no portions found
+            price = parseFloat(menuItem.price) || 50.0; // Default price
+            debug('💰 Using fallback price:', price);
         }
         
-        // Add item to current ticket
+        // Create new order
         const newOrder = {
-            id: Date.now(),
-            uid: null, // No UID = NEW order, not yet in SambaPOS
+            id: Date.now() + Math.random(),
+            productId: menuItem.productId || menuItem.id,
             name: menuItem.name || menuItem.caption,
-            caption: menuItem.caption,
+            caption: menuItem.caption || menuItem.name,
             quantity: 1,
             price: price,
             portion: portionName,
-            productId: menuItem.productId,
-            orderTags: selectedTags || [],
-            isExisting: false // Flag to clearly mark new orders
+            orderTags: selectedTags,
+            isExisting: false // This is a NEW order
         };
         
-        debug('✅ Adding order to ticket:', newOrder);
-        setOrders(prev => [...prev, newOrder]);
+        debug('➕ Adding new order to local state:', newOrder);
+        setOrders(prevOrders => [...prevOrders, newOrder]);
+        
+        // Close order tags modal if open
+        setOrderTagsOpen(false);
+        setSelectedMenuItem(null);
+        
+        debug('✅ Order added to ticket successfully');
     };
 
     const handleOrderTagsConfirm = (selectedTags) => {
@@ -417,9 +427,11 @@ const POSView = () => {
 
     const handleOrderDeleted = (deletedOrder) => {
         debug('🗑️ Order deleted:', deletedOrder);
-        // Remove the order from local state
+        // Remove the order from local state - use id as fallback if uid doesn't exist
         setOrders(prevOrders => 
-            prevOrders.filter(order => order.uid !== deletedOrder.uid)
+            prevOrders.filter(order => 
+                order.uid ? order.uid !== deletedOrder.uid : order.id !== deletedOrder.id
+            )
         );
     };
 
