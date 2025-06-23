@@ -752,17 +752,18 @@ export async function createEmptyTicket(tableId) {
     debug('Creating empty ticket for table:', tableId);
     
     try {
-        const token = getToken();
+        // Fix: Use await to get token properly
+        const token = await ensureAuthenticated();
         if (!token) {
             throw new Error('Not authenticated');
         }
 
-        // 1. Register terminal
+        // 1. Register terminal (based on official documentation)
         const registerMutation = `
             mutation {
                 registerTerminal(
                     terminal: "SERVIDOR",
-                    ticketType: "COMEDOR",
+                    ticketType: "COMEDOR", 
                     department: "MESAS",
                     user: "graphiql"
                 )
@@ -780,7 +781,7 @@ export async function createEmptyTicket(tableId) {
         const terminalId = registerResult.data.registerTerminal;
         debug(`✅ Terminal registered: ${terminalId}`);
 
-        // 2. Create ticket
+        // 2. Create ticket (following official documentation pattern)
         const ticketMutation = `
             mutation {
                 createTerminalTicket(
@@ -789,6 +790,9 @@ export async function createEmptyTicket(tableId) {
                     uid
                     type
                     number
+                    date
+                    totalAmount
+                    remainingAmount
                 }
             }
         `;
@@ -804,73 +808,47 @@ export async function createEmptyTicket(tableId) {
         const ticket = ticketResult.data.createTerminalTicket;
         debug('✅ Ticket created:', ticket);
 
-        // Espera 500ms para evitar problemas de sincronización
-        await new Promise(r => setTimeout(r, 500));
+        // 3. Assign table to ticket (corrected mutation)
+        const assignMutation = `
+            mutation {
+                changeEntityOfTerminalTicket(
+                    terminalId: "${terminalId}",
+                    entityType: "Tables",
+                    entityName: "${tableId}"
+                ) {
+                    uid
+                    type
+                    number
+                    date
+                    totalAmount
+                    remainingAmount
+                    entities {
+                        name
+                        type
+                    }
+                }
+            }
+        `;
 
-        // 3. Intenta asignar la mesa usando ticketId/uid
-        let assignQueryWithUid = `mutation {\n  changeEntityOfTerminalTicket(\n    terminalId: \"${terminalId}\",\n    ticketId: \"${ticket.uid}\",\n    entityType: \"Table\",\n    entityName: \"${tableId}\"\n  ) {\n    id\n    uid\n    type\n    number\n    date\n    totalAmount\n    remainingAmount\n    entities { name type }\n    states { stateName state }\n    tags { tagName tag }\n    orders { id uid productId name quantity portion price priceTag calculatePrice increaseInventory decreaseInventory locked tags { tag tagName price quantity rate userId } states { stateName state stateValue } }\n  }\n}`;
-
-        debug('📝 Assigning table (with ticketId)...', {
+        debug('📝 Assigning table...', {
             terminalId,
-            ticketId: ticket.uid,
-            entityType: 'Table',
+            entityType: 'Tables',
             entityName: tableId
         });
 
-        let assignResult;
-        let assignError;
-        try {
-            assignResult = await postJSON(appconfig().GQLurl, {
-                query: assignQueryWithUid
-            });
-        } catch (err) {
-            assignError = err;
-            debug('❌ Table assignment with ticketId threw error, retrying without ticketId:', err);
-            if (err && err.response) {
-                try {
-                    const errorText = await err.response.text();
-                    debug('🔎 Backend response (with ticketId):', errorText);
-                } catch (parseErr) {
-                    debug('🔎 Could not parse backend response (with ticketId):', parseErr);
-                }
-            }
+        const assignResult = await postJSON(appconfig().GQLurl, {
+            query: assignMutation
+        });
+
+        if (!assignResult?.data?.changeEntityOfTerminalTicket) {
+            debug('❌ Table assignment failed:', assignResult);
+            throw new Error('Failed to assign table to ticket');
         }
 
-        // Si falla por error HTTP o la respuesta no es exitosa, intenta sin ticketId
-        if (assignError || !assignResult?.data?.changeEntityOfTerminalTicket) {
-            const assignQuery = getAssignTableMutation(
-                terminalId,
-                tableId
-            );
-            debug('📝 Assigning table (without ticketId)...', {
-                terminalId,
-                entityType: 'Table',
-                entityName: tableId
-            });
-            try {
-                assignResult = await postJSON(appconfig().GQLurl, {
-                    query: assignQuery
-                });
-            } catch (err2) {
-                debug('❌ Table assignment without ticketId threw error:', err2);
-                if (err2 && err2.response) {
-                    try {
-                        const errorText2 = await err2.response.text();
-                        debug('🔎 Backend response (without ticketId):', errorText2);
-                    } catch (parseErr2) {
-                        debug('🔎 Could not parse backend response (without ticketId):', parseErr2);
-                    }
-                }
-                throw new Error('Failed to assign table (network/backend error)');
-            }
-            if (!assignResult?.data?.changeEntityOfTerminalTicket) {
-                debug('❌ Table assignment failed:', assignResult);
-                throw new Error('Failed to assign table');
-            }
-        }
-
-        debug('✅ Table assigned successfully');
-        return assignResult.data.changeEntityOfTerminalTicket;
+        const finalTicket = assignResult.data.changeEntityOfTerminalTicket;
+        debug('✅ Table assigned successfully:', finalTicket);
+        
+        return finalTicket;
 
     } catch (error) {
         debug('❌ Error creating ticket:', error);
