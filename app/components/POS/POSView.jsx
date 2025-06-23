@@ -25,6 +25,8 @@ import OrderEditDialog from '../OrderEditDialog';
 import { getMenu, addOrderToTerminalTicket, closeTerminalTicket, ensureAuthenticated, exploreOrderStatesAndMutations } from '../../queries';
 import { appconfig } from '../../config';
 import * as Actions from '../../actions';
+import * as paymentService from '../../services/paymentService';
+import * as automationService from '../../services/automationService';
 import Debug from 'debug';
 
 const debug = Debug('pmpos:pos');
@@ -547,15 +549,39 @@ const POSView = () => {
         debug('➕ Adding order to ticket:', { ticketId, productId, quantity, orderTags });
         debug('🏷️ Processed order tags:', orderTags);
         
-        // Try addOrderToTicket mutation (without "Terminal")
-        const mutation = `mutation {
-            addOrderToTicket(
-                ticketId: "${ticketId}",
-                productId: ${productId},
-                quantity: ${quantity},
-                orderTags: "${orderTags}"
-            )
-        }`;
+        // Use the existing getAddOrderToTerminalTicketScript function from queries.js
+        const getAddOrderToTerminalTicketScript = (terminalId, productId, orderTags) => {
+            return `mutation m{
+                ticket:addOrderToTerminalTicket(terminalId:"${terminalId}",
+                productId:${productId}
+                orderTags:"${orderTags}")
+            {id,uid,type,number,date,totalAmount,remainingAmount,
+              entities{name,type},      
+              states{stateName,state},
+              tags{tagName,tag},
+              orders{
+                id,
+                uid,
+                productId,
+                name,
+                quantity,
+                portion,
+                price,
+                priceTag,
+                calculatePrice,
+                increaseInventory,
+                decreaseInventory,
+                locked,
+                tags{
+                  tag,tagName,price,quantity,rate,userId
+                },
+                states{
+                  stateName,state,stateValue
+                }}
+            }}`;
+        };
+        
+        const mutation = getAddOrderToTerminalTicketScript(ticket.terminalId, productId, orderTags);
 
         const response = await fetch(config.GQLurl, {
             method: 'POST',

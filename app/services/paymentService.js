@@ -213,5 +213,60 @@ export const paymentService = {
             isOverpayment: false,
             change: 0
         };
+    },
+
+    /**
+     * Procesa un pago completo (función principal)
+     */
+    async processPayment(terminalId, paymentTypeName, amount, discounts = [], tips = []) {
+        debug('🏦 Processing complete payment:', { terminalId, paymentTypeName, amount, discounts, tips });
+        
+        try {
+            // 1. Aplicar descuentos si los hay
+            for (const discount of discounts) {
+                await this.applyDiscount(terminalId, discount.type, discount.value);
+            }
+            
+            // 2. Aplicar propinas si las hay
+            for (const tip of tips) {
+                await this.applyTip(terminalId, tip.amount);
+            }
+            
+            // 3. Recalcular ticket después de descuentos/propinas
+            await this.recalculateTicket(terminalId, true);
+            
+            // 4. Procesar el pago
+            const paymentResult = await this.payTicket(terminalId, paymentTypeName, amount);
+            
+            debug('✅ Complete payment processed successfully');
+            return paymentResult;
+            
+        } catch (error) {
+            debug('❌ Complete payment failed:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Calcula el total de una lista de orders
+     */
+    calculateTotal(orders) {
+        if (!Array.isArray(orders)) {
+            debug('⚠️ calculateTotal: orders is not an array:', orders);
+            return 0;
+        }
+        
+        const total = orders.reduce((sum, order) => {
+            const quantity = Number(order.quantity) || 0;
+            const price = Number(order.price) || 0;
+            return sum + (quantity * price);
+        }, 0);
+        
+        debug('💰 Calculated total:', { orders: orders.length, total });
+        return total;
     }
-}; 
+};
+
+// Función de conveniencia para acceso directo
+export const processPayment = paymentService.processPayment.bind(paymentService);
+export const calculateTotal = paymentService.calculateTotal.bind(paymentService); 
