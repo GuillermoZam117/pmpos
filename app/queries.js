@@ -1571,6 +1571,199 @@ export const recalculateTicket = async (terminalId, forceRecalculation = false, 
     });
 };
 
+// Gestión avanzada de órdenes según la guía GraphQL
+export const updateOrderOfTerminalTicket = async (terminalId, orderUid, quantity = null, price = null, callback) => {
+    let updateParams = '';
+    if (quantity !== null) updateParams += `quantity: ${quantity}`;
+    if (price !== null) updateParams += `${updateParams ? ', ' : ''}price: ${price}`;
+    
+    const mutation = `mutation {
+        updateOrderOfTerminalTicket(
+            terminalId: "${terminalId}",
+            orderUid: "${orderUid}"${updateParams ? `, ${updateParams}` : ''}
+        ) {
+            id
+            quantity
+            price
+        }
+    }`;
+    
+    $.postJSON(mutation, function (response) {
+        if (response.errors) {
+            if (callback) callback(undefined, response.errors[0].message);
+        } else {
+            if (callback) callback(response.data.updateOrderOfTerminalTicket);
+        }
+    });
+};
+
+export const cancelOrderOnTerminalTicket = async (terminalId, orderUid, callback) => {
+    const mutation = `mutation {
+        cancelOrderOnTerminalTicket(
+            terminalId: "${terminalId}",
+            orderUid: "${orderUid}"
+        ) {
+            success
+        }
+    }`;
+    
+    $.postJSON(mutation, function (response) {
+        if (response.errors) {
+            if (callback) callback(undefined, response.errors[0].message);
+        } else {
+            if (callback) callback(response.data.cancelOrderOnTerminalTicket);
+        }
+    });
+};
+
+export const clearTerminalTicketOrders = async (terminalId, callback) => {
+    const mutation = `mutation {
+        clearTerminalTicketOrders(terminalId: "${terminalId}") {
+            id
+            orders {
+                id
+            }
+        }
+    }`;
+    
+    $.postJSON(mutation, function (response) {
+        if (response.errors) {
+            if (callback) callback(undefined, response.errors[0].message);
+        } else {
+            if (callback) callback(response.data.clearTerminalTicketOrders);
+        }
+    });
+};
+
+// Automatización y eventos según la guía GraphQL
+export const notifyTerminalTicketEvent = async (terminalId, eventName, parameters = [], callback) => {
+    const parametersString = parameters.length > 0 
+        ? `parameters: [${parameters.map(p => `{name: "${p.name}", value: "${p.value}"}`).join(', ')}]`
+        : '';
+    
+    const mutation = `mutation {
+        notifyTerminalTicketEvent(
+            terminalId: "${terminalId}",
+            name: "${eventName}"${parametersString ? `, ${parametersString}` : ''}
+        ) {
+            success
+        }
+    }`;
+    
+    $.postJSON(mutation, function (response) {
+        if (response.errors) {
+            if (callback) callback(undefined, response.errors[0].message);
+        } else {
+            if (callback) callback(response.data.notifyTerminalTicketEvent);
+        }
+    });
+};
+
+export const executeAutomationCommandForTerminalTicket = async (terminalId, commandName, value = '', callback) => {
+    const mutation = `mutation {
+        executeAutomationCommandForTerminalTicket(
+            terminalId: "${terminalId}",
+            name: "${commandName}"${value ? `, value: "${value}"` : ''}
+        ) {
+            success
+        }
+    }`;
+    
+    $.postJSON(mutation, function (response) {
+        if (response.errors) {
+            if (callback) callback(undefined, response.errors[0].message);
+        } else {
+            if (callback) callback(response.data.executeAutomationCommandForTerminalTicket);
+        }
+    });
+};
+
+export const updateEntityState = async (entityTypeName, entityName, stateName, state, callback) => {
+    const mutation = `mutation {
+        updateEntityState(
+            entityTypeName: "${entityTypeName}",
+            entityName: "${entityName}",
+            stateName: "${stateName}",
+            state: "${state}"
+        ) {
+            success
+        }
+    }`;
+    
+    $.postJSON(mutation, function (response) {
+        if (response.errors) {
+            if (callback) callback(undefined, response.errors[0].message);
+        } else {
+            if (callback) callback(response.data.updateEntityState);
+        }
+    });
+};
+
+// Consultas de entidades según la guía GraphQL
+export const isEntityExists = async (type, name, callback) => {
+    const query = `query {
+        isEntityExists(type: "${type}", name: "${name}")
+    }`;
+    
+    $.postJSON(query, function (response) {
+        if (response.errors) {
+            if (callback) callback(undefined, response.errors[0].message);
+        } else {
+            if (callback) callback(response.data.isEntityExists);
+        }
+    });
+};
+
+export const getEntity = async (type, name, callback) => {
+    const query = `query {
+        getEntity(type: "${type}", name: "${name}") {
+            id
+            name
+            customData
+            states {
+                stateName
+                state
+                stateValue
+            }
+        }
+    }`;
+    
+    $.postJSON(query, function (response) {
+        if (response.errors) {
+            if (callback) callback(undefined, response.errors[0].message);
+        } else {
+            if (callback) callback(response.data.getEntity);
+        }
+    });
+};
+
+export const getEntitiesByType = async (type, search = null, state = null, callback) => {
+    let filterParams = '';
+    if (search) filterParams += `search: "${search}"`;
+    if (state) filterParams += `${filterParams ? ', ' : ''}state: "${state}"`;
+    
+    const query = `query {
+        getEntities(type: "${type}"${filterParams ? `, ${filterParams}` : ''}) {
+            id
+            name
+            customData
+            states {
+                stateName
+                state
+                stateValue
+            }
+        }
+    }`;
+    
+    $.postJSON(query, function (response) {
+        if (response.errors) {
+            if (callback) callback(undefined, response.errors[0].message);
+        } else {
+            if (callback) callback(response.data.getEntities);
+        }
+    });
+};
+
 export const exploreOrderStatesAndMutations = async () => {
     try {
         const token = await ensureAuthenticated();

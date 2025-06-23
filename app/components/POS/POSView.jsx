@@ -21,6 +21,7 @@ import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import Menu from '../Menu/Menu';
 import OrderTags from '../OrderTags';
 import PaymentDialog from '../PaymentDialog';
+import OrderEditDialog from '../OrderEditDialog';
 import { getMenu, addOrderToTerminalTicket, closeTerminalTicket, ensureAuthenticated, exploreOrderStatesAndMutations } from '../../queries';
 import { appconfig } from '../../config';
 import * as Actions from '../../actions';
@@ -45,6 +46,8 @@ const POSView = () => {
     const [closingTicket, setClosingTicket] = useState(false);
     const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
     const [currentTerminalId, setCurrentTerminalId] = useState(null);
+    const [orderEditDialogOpen, setOrderEditDialogOpen] = useState(false);
+    const [orderToEdit, setOrderToEdit] = useState(null);
 
     // Redux state for menu
     const appState = useSelector(state => state.app);
@@ -340,8 +343,23 @@ const POSView = () => {
         setPaymentDialogOpen(true);
     };
 
-    const handlePaymentSuccess = (updatedTicket, paymentInfo) => {
+    const handlePaymentSuccess = async (updatedTicket, paymentInfo) => {
         debug('✅ Payment successful:', { updatedTicket, paymentInfo });
+        
+        try {
+            // Execute payment workflow for automation
+            const { automationService } = await import('../services/automationService');
+            await automationService.executeWorkflow(ticket.terminalId, 'PROCESS_PAYMENT', {
+                amount: paymentInfo.amount,
+                paymentType: paymentInfo.paymentType,
+                tableName: tableId,
+                printReceipt: true
+            });
+            debug('✅ Payment workflow executed');
+        } catch (error) {
+            debug('⚠️ Payment workflow failed (non-critical):', error);
+            // Don't prevent payment success for automation failures
+        }
         
         // Show success message
         alert(`Pago de $${paymentInfo.amount} procesado exitosamente. ${paymentInfo.change > 0 ? `Cambio: $${paymentInfo.change.toFixed(2)}` : ''}`);
@@ -355,6 +373,55 @@ const POSView = () => {
     const handlePaymentError = (error) => {
         debug('❌ Payment error:', error);
         alert('Error al procesar el pago: ' + error.message);
+    };
+
+    const handleOrderEdit = (order) => {
+        debug('✏️ Opening order for editing:', order);
+        setOrderToEdit(order);
+        setOrderEditDialogOpen(true);
+    };
+
+    const handleOrderUpdated = (updatedOrder) => {
+        debug('📝 Order updated:', updatedOrder);
+        // Update the local orders state
+        setOrders(prevOrders => 
+            prevOrders.map(order => 
+                order.uid === updatedOrder.uid ? { ...order, ...updatedOrder } : order
+            )
+        );
+    };
+
+    const handleOrderDeleted = (deletedOrder) => {
+        debug('🗑️ Order deleted:', deletedOrder);
+        // Remove the order from local state
+        setOrders(prevOrders => 
+            prevOrders.filter(order => order.uid !== deletedOrder.uid)
+        );
+    };
+
+    const handleClearAllOrders = async () => {
+        if (orders.length === 0) {
+            debug('⚠️ No orders to clear');
+            return;
+        }
+
+        if (!window.confirm('¿Estás seguro de que quieres eliminar todas las órdenes?')) {
+            return;
+        }
+
+        try {
+            debug('🗑️ Clearing all orders...');
+            const { orderService } = await import('../services/orderService');
+            const result = await orderService.clearAllOrders(ticket.terminalId);
+            
+            if (result.success) {
+                setOrders([]);
+                debug('✅ All orders cleared successfully');
+            }
+        } catch (error) {
+            debug('❌ Error clearing orders:', error);
+            alert('Error al limpiar órdenes: ' + error.message);
+        }
     };
 
     const handleCloseTicket = async () => {
@@ -427,6 +494,20 @@ const POSView = () => {
             debug('🔒 Closing terminal ticket...');
             const closeResult = await closeTerminalTicketModern(terminalId);
             debug('✅ Ticket closed successfully, result:', closeResult);
+
+            // Execute close table workflow for automation
+            try {
+                const { automationService } = await import('../services/automationService');
+                await automationService.executeWorkflow(terminalId, 'CLOSE_TABLE', {
+                    tableName: tableId,
+                    ticketTotal: calculateTotal(),
+                    printBill: true
+                });
+                debug('✅ Close table workflow executed');
+            } catch (error) {
+                debug('⚠️ Close table workflow failed (non-critical):', error);
+                // Don't prevent ticket closure for automation failures
+            }
 
             // Wait a moment for SambaPOS to process the closure
             debug('⏳ Waiting for SambaPOS to process ticket closure...');
@@ -622,9 +703,21 @@ const POSView = () => {
 
                     {/* Orders List */}
                     <Paper elevation={1} sx={{ p: 2 }}>
-                        <Typography variant="h6" gutterBottom>
-                            Órdenes
-                        </Typography>
+                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                            <Typography variant="h6">
+                                Órdenes ({orders.length})
+                            </Typography>
+                            {orders.length > 0 && (
+                                <Button
+                                    size="small"
+                                    color="error"
+                                    onClick={handleClearAllOrders}
+                                    sx={{ fontSize: '0.75rem' }}
+                                >
+                                    🗑️ Limpiar Todo
+                                </Button>
+                            )}
+                        </Box>
                         
                         {orders.length === 0 ? (
                             <Typography color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
@@ -644,17 +737,8 @@ const POSView = () => {
                                         }}
                                         onClick={() => {
                                             debug('🔧 Order clicked for editing:', order);
-                                            // Set order edit mode and open order tags modal
-                                            setSelectedOrder(order);
-                                            setOrderEditMode(true);
-                                            // Find the original menu item for this order
-                                            const menuItem = findMenuItemByProductId(order.productId);
-                                            if (menuItem) {
-                                                setSelectedMenuItem(menuItem);
-                                                setOrderTagsOpen(true);
-                                            } else {
-                                                debug('⚠️ Could not find menu item for product:', order.productId);
-                                            }
+                                            // Open advanced order edit dialog
+                                            handleOrderEdit(order);
                                         }}
                                     >
                                         <CardContent sx={{ py: 1, '&:last-child': { pb: 1 } }}>
@@ -763,6 +847,21 @@ const POSView = () => {
                 terminalId={currentTerminalId}
                 onPaymentSuccess={handlePaymentSuccess}
                 onError={handlePaymentError}
+            />
+            
+            {/* Order Edit Dialog */}
+            <OrderEditDialog
+                open={orderEditDialogOpen}
+                onClose={() => {
+                    setOrderEditDialogOpen(false);
+                    setOrderToEdit(null);
+                }}
+                order={orderToEdit}
+                terminalId={ticket?.terminalId}
+                onOrderUpdated={handleOrderUpdated}
+                onOrderDeleted={handleOrderDeleted}
+                onError={(error) => alert('Error: ' + error.message)}
+                availablePortions={[]} // TODO: Load from menu item
             />
         </Box>
     );
