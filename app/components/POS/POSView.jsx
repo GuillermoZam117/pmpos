@@ -20,6 +20,7 @@ import TableRestaurantIcon from '@mui/icons-material/TableRestaurant';
 import Menu from '../Menu/Menu';
 import OrderTags from '../OrderTags';
 import { getMenu, addOrderToTerminalTicket, closeTerminalTicket, ensureAuthenticated } from '../../queries';
+import appconfig from '../../config';
 import * as Actions from '../../actions';
 import Debug from 'debug';
 
@@ -328,7 +329,7 @@ const POSView = () => {
     // Modern version of addOrderToTerminalTicket using fetch
     const addOrderToTerminalTicketModern = async (terminalId, productId, quantity = 1, orderTags = '') => {
         const token = await ensureAuthenticated();
-        const config = await import('../../config').then(m => m.default());
+        const config = appconfig();
         
         const mutation = `mutation {
             ticket: addOrderToTerminalTicket(
@@ -363,7 +364,7 @@ const POSView = () => {
     // Modern version of closeTerminalTicket using fetch
     const closeTerminalTicketModern = async (terminalId) => {
         const token = await ensureAuthenticated();
-        const config = await import('../../config').then(m => m.default());
+        const config = appconfig();
         
         const mutation = `mutation {
             errorMessage: closeTerminalTicket(terminalId: "${terminalId}")
