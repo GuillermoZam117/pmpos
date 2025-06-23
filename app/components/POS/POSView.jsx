@@ -19,7 +19,7 @@ import RestaurantMenuIcon from '@mui/icons-material/RestaurantMenu';
 import TableRestaurantIcon from '@mui/icons-material/TableRestaurant';
 import Menu from '../Menu/Menu';
 import OrderTags from '../OrderTags';
-import { getMenu } from '../../queries';
+import { getMenu, addOrderToTerminalTicket, closeTerminalTicket, ensureAuthenticated } from '../../queries';
 import * as Actions from '../../actions';
 import Debug from 'debug';
 
@@ -61,6 +61,7 @@ const POSView = () => {
     const [selectedMenuItem, setSelectedMenuItem] = useState(null);
     const [orderEditMode, setOrderEditMode] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
+    const [closingTicket, setClosingTicket] = useState(false);
     
     // Additional debugging for Redux state changes
     useEffect(() => {
@@ -261,6 +262,130 @@ const POSView = () => {
         return orders.reduce((total, order) => total + (order.price * order.quantity), 0);
     };
 
+    const handleCloseTicket = async () => {
+        if (orders.length === 0) {
+            debug('⚠️ Cannot close ticket: no orders');
+            return;
+        }
+
+        setClosingTicket(true);
+        try {
+            debug('🔄 Starting ticket closure process...');
+            debug('📋 Orders to submit:', orders);
+
+            // Get terminal ID from the ticket (set during ticket creation)
+            const terminalId = ticket.terminalId;
+            if (!terminalId) {
+                throw new Error('No terminal ID found in ticket');
+            }
+            debug('🖥️ Using terminal ID from ticket:', terminalId);
+
+            // Add each order to the terminal ticket
+            for (const order of orders) {
+                debug('➕ Adding order to terminal ticket:', order);
+                
+                // Convert order tags to SambaPOS format
+                let orderTagsString = '';
+                if (order.orderTags && order.orderTags.length > 0) {
+                    // Process tags to proper SambaPOS format
+                    const processedTags = order.orderTags.map(tag => {
+                        if (tag.startsWith('Comentarios:')) {
+                            // Comments become special notes
+                            return `Nota:${tag.replace('Comentarios:', '').trim()}`;
+                        } else if (tag.includes(':')) {
+                            // Keep group:value format
+                            return tag;
+                        } else {
+                            // Simple tags
+                            return `Tag:${tag}`;
+                        }
+                    });
+                    orderTagsString = processedTags.join(',');
+                }
+                debug('🏷️ Processed order tags:', orderTagsString);
+                
+                await addOrderToTerminalTicketModern(terminalId, order.productId, order.quantity, orderTagsString);
+                debug('✅ Order added successfully');
+            }
+
+            // Close the terminal ticket
+            debug('🔒 Closing terminal ticket...');
+            await closeTerminalTicketModern(terminalId);
+            debug('✅ Ticket closed successfully');
+
+            // Navigate back to tables
+            debug('🏠 Navigating back to tables...');
+            navigate('/tables');
+
+        } catch (error) {
+            debug('❌ Error closing ticket:', error);
+            alert('Error al cerrar el ticket: ' + error.message);
+        } finally {
+            setClosingTicket(false);
+        }
+    };
+
+    // Modern version of addOrderToTerminalTicket using fetch
+    const addOrderToTerminalTicketModern = async (terminalId, productId, quantity = 1, orderTags = '') => {
+        const token = await ensureAuthenticated();
+        const config = await import('../../config').then(m => m.default());
+        
+        const mutation = `mutation {
+            ticket: addOrderToTerminalTicket(
+                terminalId: "${terminalId}",
+                productId: ${productId},
+                quantity: ${quantity},
+                orderTags: "${orderTags}"
+            ) {
+                id
+                uid
+                totalAmount
+            }
+        }`;
+
+        const response = await fetch(config.GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ query: mutation })
+        });
+
+        const data = await response.json();
+        if (data.errors) {
+            throw new Error(data.errors[0].message);
+        }
+
+        return data.data.ticket;
+    };
+
+    // Modern version of closeTerminalTicket using fetch
+    const closeTerminalTicketModern = async (terminalId) => {
+        const token = await ensureAuthenticated();
+        const config = await import('../../config').then(m => m.default());
+        
+        const mutation = `mutation {
+            errorMessage: closeTerminalTicket(terminalId: "${terminalId}")
+        }`;
+
+        const response = await fetch(config.GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ query: mutation })
+        });
+
+        const data = await response.json();
+        if (data.errors) {
+            throw new Error(data.errors[0].message);
+        }
+
+        return data.data.errorMessage;
+    };
+
     if (!ticket?.uid) {
         return null;
     }
@@ -292,8 +417,10 @@ const POSView = () => {
                             color="inherit" 
                             variant="outlined"
                             startIcon={<RestaurantMenuIcon />}
+                            onClick={handleCloseTicket}
+                            disabled={orders.length === 0 || closingTicket}
                         >
-                            Cerrar Ticket
+                            {closingTicket ? 'Cerrando...' : 'Cerrar Ticket'}
                         </Button>
                     </Box>
                 </Toolbar>
