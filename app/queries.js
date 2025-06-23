@@ -1371,57 +1371,61 @@ export const findTicketByTableAlternative = async (tableName) => {
         
         // Approach 3: Try to use ticket number directly if we know it
         console.log('\n=== APPROACH 3: Direct ticket lookup ===');
-        try {
-            // Try to get ticket by number (we saw it's ticket #1)
-            const query3 = `query {
-                ticket: getTicket(id: "1") {
-                    id
-                    uid
-                    number
-                    date
-                    totalAmount
-                    remainingAmount
-                    entities {
-                        type
-                        name
-                    }
-                    orders {
+        const ticketIds = ['46', '64', '1', '2', '3']; // Try different possible IDs
+        
+        for (const ticketId of ticketIds) {
+            try {
+                console.log(`Trying direct ticket lookup for ID: ${ticketId}`);
+                const query3 = `query {
+                    ticket: getTicket(id: "${ticketId}") {
                         id
                         uid
-                        productId
-                        name
-                        quantity
-                        price
-                        portion
-                        tags {
-                            tagName
-                            tag
+                        number
+                        date
+                        totalAmount
+                        remainingAmount
+                        entities {
+                            type
+                            name
+                        }
+                        orders {
+                            id
+                            uid
+                            productId
+                            name
+                            quantity
+                            price
+                            portion
+                            tags {
+                                tagName
+                                tag
+                            }
                         }
                     }
+                }`;
+                
+                const response3 = await fetch(config.GQLurl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ query: query3 })
+                });
+                
+                const data3 = await response3.json();
+                console.log(`Direct ticket lookup response for ID ${ticketId}:`, data3);
+                
+                if (data3.data && data3.data.ticket) {
+                    const ticket = data3.data.ticket;
+                    if (ticket.entities && ticket.entities.some(entity => entity.name === tableName)) {
+                        console.log(`✅ Found ticket using direct lookup ID ${ticketId}:`, ticket);
+                        return ticket;
+                    }
                 }
-            }`;
-            
-            const response3 = await fetch(config.GQLurl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ query: query3 })
-            });
-            
-            const data3 = await response3.json();
-            console.log('Direct ticket lookup response:', data3);
-            
-            if (data3.data && data3.data.ticket) {
-                const ticket = data3.data.ticket;
-                if (ticket.entities && ticket.entities.some(entity => entity.name === tableName)) {
-                    console.log('✅ Found ticket using direct lookup:', ticket);
-                    return ticket;
-                }
+            } catch (error) {
+                console.log(`❌ Direct lookup for ID ${ticketId} failed:`, error.message);
             }
-        } catch (error) {
-            console.log('❌ Approach 3 failed:', error.message);
         }
         
         console.log('❌ No ticket found for table:', tableName);
