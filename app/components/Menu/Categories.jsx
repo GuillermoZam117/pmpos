@@ -38,8 +38,8 @@ const mapStateToProps = (state) => {
         // Immutable.js format
         menu = appState.get('menu');
         selectedCategory = appState.get('selectedCategory');
-        const menuData = appState.getIn(['menu', 'categories']);
-        categories = menuData ? menuData.toJS() : [];
+        // The menu itself might be a plain object stored in Immutable state
+        categories = menu?.categories || [];
     } else if (appState && typeof appState === 'object') {
         // Plain object format
         menu = appState.menu;
