@@ -56,6 +56,15 @@ const POSView = () => {
     
     const [loading, setLoading] = useState(true);
     const [orders, setOrders] = useState([]);
+    
+    // Additional debugging for Redux state changes
+    useEffect(() => {
+        debug('🔄 Redux menu state changed:', menu ? 'PRESENT' : 'UNDEFINED');
+        if (menu) {
+            debug('🎉 Menu is now available in Redux!');
+            setLoading(false);
+        }
+    }, [menu]);
 
     useEffect(() => {
         if (!ticket?.uid) {
@@ -84,9 +93,16 @@ const POSView = () => {
                 });
                 
                 if (menuData) {
+                    debug('🔄 Received menu data structure:', JSON.stringify(menuData, null, 2));
+                    debug('🔄 Categories count:', menuData.categories?.length || 'No categories');
                     debug('🔄 Dispatching setMenu action with data:', menuData);
                     dispatch(Actions.setMenu(menuData));
                     debug('✅ Menu dispatched to Redux');
+                    
+                    // Force check Redux state after dispatch
+                    setTimeout(() => {
+                        debug('🔍 Checking Redux state after dispatch...');
+                    }, 100);
                 } else {
                     debug('❌ No menu data received');
                 }
