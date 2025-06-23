@@ -6,14 +6,23 @@ const httpLink = createHttpLink({
     uri: 'http://localhost:9000/api/graphql',
 });
 
-const authLink = setContext((_, { headers }) => {
-    const token = tokenService.getToken();
-    return {
-        headers: {
-            ...headers,
-            authorization: token ? `Bearer ${token}` : "",
-        }
-    };
+const authLink = setContext(async (_, { headers }) => {
+    try {
+        const token = await tokenService.getValidAccessToken();
+        return {
+            headers: {
+                ...headers,
+                authorization: token ? `Bearer ${token}` : "",
+            }
+        };
+    } catch (error) {
+        console.error('❌ Failed to get valid access token:', error);
+        return {
+            headers: {
+                ...headers,
+            }
+        };
+    }
 });
 
 export const client = new ApolloClient({
