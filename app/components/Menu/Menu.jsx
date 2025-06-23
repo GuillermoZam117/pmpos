@@ -51,17 +51,33 @@ class Menu extends React.Component {
     const { menu } = this.props;
     if (!menu || !menu.categories) {
       // Se muestra una notificación o se llama a una acción para reportar el error
-      this.props.showMessage('El menú o las categorías no están cargados');
+      console.warn('El menú o las categorías no están cargados');
       return;
     }
-    const selectedCategory = menu.categories.find(c => c.name === categoryName);
+    
+    // Extract categories from both Immutable and plain object formats
+    let categories = [];
+    if (menu && typeof menu.get === 'function') {
+      // Immutable.js format
+      categories = menu.get('categories') || [];
+      if (categories && typeof categories.toJS === 'function') {
+        categories = categories.toJS();
+      }
+    } else if (menu && menu.categories) {
+      // Plain object format
+      categories = menu.categories;
+    }
+    
+    const selectedCategory = categories.find(c => c.name === categoryName);
     if (!selectedCategory) {
-      this.props.showMessage(`No se encontró la categoría: ${categoryName}`);
+      console.warn(`No se encontró la categoría: ${categoryName}`);
       return;
     }
-   // Aquí continúa la lógica de actualización de los items basados en la categoría
-    // Por ejemplo, se puede despachar una acción para refrescar el estado del menú
-    this.props.updateMenuItems(selectedCategory.items);
+    
+    // Update menu items for the selected category
+    if (this.props.setMenuItems && selectedCategory.items) {
+      this.props.setMenuItems(selectedCategory.items);
+    }
   }
 }
 
@@ -85,6 +101,7 @@ const mapStateToProps = (state) => {
         return {
             selectedCategory: appState.get('selectedCategory'),
             menu: appState.get('menu'),
+            menuItems: appState.get('menuItems'),
             terminalId: appState.get('terminalId')
         };
     } else if (appState && typeof appState === 'object') {
@@ -92,6 +109,7 @@ const mapStateToProps = (state) => {
         return {
             selectedCategory: appState.selectedCategory,
             menu: appState.menu,
+            menuItems: appState.menuItems,
             terminalId: appState.terminalId
         };
     }
@@ -99,6 +117,7 @@ const mapStateToProps = (state) => {
     return {
         selectedCategory: null,
         menu: null,
+        menuItems: null,
         terminalId: null
     };
 };

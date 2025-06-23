@@ -38,6 +38,9 @@ export default function appReducer(state = initialState, action) {
       const newState = state.set('menu', action.menu);
       console.log('🔧 New state after SET_MENU:', newState.toJS());
       return newState;
+    case types.SET_MENU_ITEMS:
+      console.log('🔧 Reducer SET_MENU_ITEMS action:', action);
+      return state.set('menuItems', action.menuItems);
     case types.CHANGE_SELECTED_CATEGORY:
       return state.set('selectedCategory', action.category);
     case 'AUTHENTICATION_SUCCESS':
