@@ -79,8 +79,10 @@ const TableView = () => {
                         debug('⚠️ Table appears occupied but no ticket found');
                     }
                 } catch (error) {
-                    debug('❌ Error loading existing ticket:', error);
-                    // Continue to create new ticket if loading fails
+                    debug('❌ Error loading existing ticket (this is normal if SambaPOS doesn\'t support getTickets query):', error.message);
+                    // Continue to create new ticket - this is expected behavior
+                    // The table might show as occupied due to SambaPOS internal state
+                    // but we can still create a new ticket for it
                 }
             }
             

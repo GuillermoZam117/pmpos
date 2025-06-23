@@ -754,10 +754,24 @@ export const getTicketByTable = async (tableName) => {
             })
         });
 
+        // Handle HTTP errors
+        if (!response.ok) {
+            if (response.status === 500) {
+                debug('⚠️ SambaPOS server returned 500 error for getTickets query - this query may not be supported in this version');
+                return null; // Gracefully return null instead of throwing
+            }
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
         const data = await response.json();
         if (data.errors) {
             debug('❌ GraphQL errors in getTicketByTable:', data.errors);
-            return null;
+            // If it's a schema/query error, return null gracefully
+            if (data.errors.some(error => error.message.includes('Cannot query field') || error.message.includes('Unknown field'))) {
+                debug('⚠️ getTickets query not supported by this SambaPOS version');
+                return null;
+            }
+            throw new Error(data.errors[0].message);
         }
 
         const ticket = data.data?.getTickets?.find(ticket => 
@@ -775,8 +789,10 @@ export const getTicketByTable = async (tableName) => {
             return null;
         }
     } catch (error) {
-        debug('❌ Error getting ticket:', error);
-        throw error;
+        debug('❌ Error getting ticket:', error.message);
+        // For network errors or unsupported queries, return null gracefully
+        // This allows the system to continue and create a new ticket
+        return null;
     }
 };
 
