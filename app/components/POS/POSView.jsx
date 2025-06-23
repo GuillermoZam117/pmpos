@@ -18,6 +18,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import RestaurantMenuIcon from '@mui/icons-material/RestaurantMenu';
 import TableRestaurantIcon from '@mui/icons-material/TableRestaurant';
 import Menu from '../Menu/Menu';
+import OrderTags from '../OrderTags';
 import { getMenu } from '../../queries';
 import * as Actions from '../../actions';
 import Debug from 'debug';
@@ -56,6 +57,8 @@ const POSView = () => {
     
     const [loading, setLoading] = useState(true);
     const [orders, setOrders] = useState([]);
+    const [orderTagsOpen, setOrderTagsOpen] = useState(false);
+    const [selectedMenuItem, setSelectedMenuItem] = useState(null);
     
     // Additional debugging for Redux state changes
     useEffect(() => {
@@ -132,16 +135,71 @@ const POSView = () => {
 
     const handleMenuItemClick = (menuItem) => {
         debug('🍽️ Menu item clicked:', menuItem);
+        debug('🔍 MenuItem data:', {
+            id: menuItem.id,
+            name: menuItem.name,
+            caption: menuItem.caption,
+            productId: menuItem.productId,
+            defaultOrderTags: menuItem.defaultOrderTags,
+            product: menuItem.product
+        });
+        
+        // Check if product has order tags
+        if (menuItem.defaultOrderTags && menuItem.defaultOrderTags.length > 0) {
+            debug('🏷️ Product has order tags, opening modal');
+            setSelectedMenuItem(menuItem);
+            setOrderTagsOpen(true);
+            return;
+        }
+        
+        // If no order tags, add directly to ticket
+        addItemToTicket(menuItem, []);
+    };
+
+    const addItemToTicket = (menuItem, selectedTags = []) => {
+        // Get price from first portion (default portion)
+        let price = 0;
+        let portionName = 'Normal';
+        if (menuItem.product && menuItem.product.portions && menuItem.product.portions.length > 0) {
+            const defaultPortion = menuItem.product.portions[0];
+            price = defaultPortion.price || 0;
+            portionName = defaultPortion.name || 'Normal';
+            debug('💰 Found price from default portion:', { 
+                portionName, 
+                price,
+                allPortions: menuItem.product.portions 
+            });
+        } else {
+            debug('⚠️ No pricing information found for product:', menuItem.productId);
+        }
+        
         // Add item to current ticket
         const newOrder = {
             id: Date.now(),
-            name: menuItem.name,
+            name: menuItem.name || menuItem.caption,
+            caption: menuItem.caption,
             quantity: 1,
-            price: menuItem.price || 0,
-            productId: menuItem.productId
+            price: price,
+            portion: portionName,
+            productId: menuItem.productId,
+            orderTags: selectedTags
         };
         
+        debug('✅ Adding order to ticket:', newOrder);
         setOrders(prev => [...prev, newOrder]);
+    };
+
+    const handleOrderTagsConfirm = (selectedTags) => {
+        if (selectedMenuItem) {
+            addItemToTicket(selectedMenuItem, selectedTags);
+        }
+        setOrderTagsOpen(false);
+        setSelectedMenuItem(null);
+    };
+
+    const handleOrderTagsClose = () => {
+        setOrderTagsOpen(false);
+        setSelectedMenuItem(null);
     };
 
     const handleBackToTables = () => {
@@ -267,6 +325,14 @@ const POSView = () => {
                     </Paper>
                 </Box>
             </Box>
+            
+            {/* Order Tags Modal */}
+            <OrderTags
+                open={orderTagsOpen}
+                onClose={handleOrderTagsClose}
+                onConfirm={handleOrderTagsConfirm}
+                menuItem={selectedMenuItem}
+            />
         </Box>
     );
 };

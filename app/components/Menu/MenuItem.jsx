@@ -21,7 +21,7 @@ const MenuItem = ({ menuItem, onClick = () => {} }) => {
         <Button
             style={style}
             variant="contained"
-            onClick={() => onClick(menuItem.productId, menuItem.defaultOrderTags)}
+            onClick={() => onClick(menuItem)}
         >
             <ReactMarkdown className="buttonContent">
                 {menuItem.caption}
