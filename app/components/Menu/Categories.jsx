@@ -30,7 +30,7 @@ const Categories = ({ menu, selectedCategory, categories = [], onCategoryClick }
 };
 
 const mapStateToProps = (state) => {
-    // Handle both Immutable and plain object state
+    // Handle both Immutable and plain object state - Force cache refresh
     const appState = state.app;
     let menu, selectedCategory, categories = [];
     
