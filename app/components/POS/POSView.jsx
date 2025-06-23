@@ -17,9 +17,11 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import RestaurantMenuIcon from '@mui/icons-material/RestaurantMenu';
 import TableRestaurantIcon from '@mui/icons-material/TableRestaurant';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import Menu from '../Menu/Menu';
 import OrderTags from '../OrderTags';
-import { getMenu, addOrderToTerminalTicket, closeTerminalTicket, ensureAuthenticated } from '../../queries';
+import PaymentDialog from '../PaymentDialog';
+import { getMenu, addOrderToTerminalTicket, closeTerminalTicket, ensureAuthenticated, exploreOrderStatesAndMutations } from '../../queries';
 import { appconfig } from '../../config';
 import * as Actions from '../../actions';
 import Debug from 'debug';
@@ -41,6 +43,8 @@ const POSView = () => {
     const [orderEditMode, setOrderEditMode] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [closingTicket, setClosingTicket] = useState(false);
+    const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+    const [currentTerminalId, setCurrentTerminalId] = useState(null);
 
     // Redux state for menu
     const appState = useSelector(state => state.app);
@@ -325,6 +329,34 @@ const POSView = () => {
         return orders.reduce((total, order) => total + (order.price * order.quantity), 0);
     };
 
+    const handleOpenPayment = () => {
+        if (orders.length === 0) {
+            debug('⚠️ Cannot open payment: no orders');
+            return;
+        }
+        
+        // Store terminal ID for payment dialog
+        setCurrentTerminalId(ticket.terminalId);
+        setPaymentDialogOpen(true);
+    };
+
+    const handlePaymentSuccess = (updatedTicket, paymentInfo) => {
+        debug('✅ Payment successful:', { updatedTicket, paymentInfo });
+        
+        // Show success message
+        alert(`Pago de $${paymentInfo.amount} procesado exitosamente. ${paymentInfo.change > 0 ? `Cambio: $${paymentInfo.change.toFixed(2)}` : ''}`);
+        
+        // Navigate back to tables after successful payment
+        setTimeout(() => {
+            navigate('/tables');
+        }, 500);
+    };
+
+    const handlePaymentError = (error) => {
+        debug('❌ Payment error:', error);
+        alert('Error al procesar el pago: ' + error.message);
+    };
+
     const handleCloseTicket = async () => {
         if (orders.length === 0) {
             debug('⚠️ Cannot close ticket: no orders');
@@ -384,7 +416,7 @@ const POSView = () => {
                     }
                     debug('🏷️ Processed order tags:', orderTagsString);
                     
-                    await addOrderToTerminalTicketModern(terminalId, order.productId, order.quantity, orderTagsString);
+                    await createOrderModern(ticket.uid, order.productId, order.quantity, orderTagsString);
                     debug('✅ Order added successfully');
                 }
             } else {
@@ -427,21 +459,21 @@ const POSView = () => {
     };
 
     // Modern version of addOrderToTerminalTicket using fetch
-    const addOrderToTerminalTicketModern = async (terminalId, productId, quantity = 1, orderTags = '') => {
+    const addOrderToTicketModern = async (ticketId, productId, quantity = 1, orderTags = '') => {
         const token = await ensureAuthenticated();
         const config = appconfig();
         
+        debug('➕ Adding order to ticket:', { ticketId, productId, quantity, orderTags });
+        debug('🏷️ Processed order tags:', orderTags);
+        
+        // Try addOrderToTicket mutation (without "Terminal")
         const mutation = `mutation {
-            ticket: addOrderToTerminalTicket(
-                terminalId: "${terminalId}",
+            addOrderToTicket(
+                ticketId: "${ticketId}",
                 productId: ${productId},
                 quantity: ${quantity},
                 orderTags: "${orderTags}"
-            ) {
-                id
-                uid
-                totalAmount
-            }
+            )
         }`;
 
         const response = await fetch(config.GQLurl, {
@@ -458,7 +490,8 @@ const POSView = () => {
             throw new Error(data.errors[0].message);
         }
 
-        return data.data.ticket;
+        debug('✅ Order added successfully:', data);
+        return data.data;
     };
 
     // Modern version of closeTerminalTicket using fetch
@@ -516,12 +549,38 @@ const POSView = () => {
                         </Typography>
                         <Button 
                             color="inherit" 
+                            variant="contained"
+                            startIcon={<AttachMoneyIcon />}
+                            onClick={handleOpenPayment}
+                            disabled={orders.length === 0}
+                            sx={{ mr: 1, bgcolor: 'success.main', '&:hover': { bgcolor: 'success.dark' } }}
+                        >
+                            💳 Pagar
+                        </Button>
+                        <Button 
+                            color="inherit" 
                             variant="outlined"
                             startIcon={<RestaurantMenuIcon />}
                             onClick={handleCloseTicket}
                             disabled={orders.length === 0 || closingTicket}
+                            sx={{ mr: 1 }}
                         >
                             {closingTicket ? 'Cerrando...' : 'Cerrar Ticket'}
+                        </Button>
+                        <Button 
+                            color="inherit" 
+                            variant="outlined"
+                            onClick={async () => {
+                                console.log('🔍 Starting order states exploration...');
+                                try {
+                                    await exploreOrderStatesAndMutations();
+                                } catch (error) {
+                                    console.error('❌ Exploration failed:', error);
+                                }
+                            }}
+                            sx={{ fontSize: '0.8rem' }}
+                        >
+                            Explorar
                         </Button>
                     </Box>
                 </Toolbar>
@@ -690,6 +749,20 @@ const POSView = () => {
                 existingTags={orderEditMode && selectedOrder ? selectedOrder.orderTags : []}
                 isEditMode={orderEditMode}
                 orderInfo={selectedOrder}
+            />
+            
+            {/* Payment Dialog */}
+            <PaymentDialog
+                open={paymentDialogOpen}
+                onClose={() => setPaymentDialogOpen(false)}
+                ticket={{
+                    ...ticket,
+                    totalAmount: calculateTotal(),
+                    remainingAmount: calculateTotal()
+                }}
+                terminalId={currentTerminalId}
+                onPaymentSuccess={handlePaymentSuccess}
+                onError={handlePaymentError}
             />
         </Box>
     );

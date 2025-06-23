@@ -1260,7 +1260,45 @@ export const debugTicketQueries = async (terminalId) => {
         const data3 = await response3.json();
         console.log('Response:', data3);
         
-        return { data1, data2, data3 };
+        // Test 4: Check order states from existing ticket
+        console.log('\n=== TEST 4: Order States from Existing Ticket ===');
+        const orderStatesQuery = `query {
+            tickets: getTickets(isClosed: false) {
+                id
+                number
+                orders {
+                    id
+                    uid
+                    productId
+                    name
+                    quantity
+                    price
+                    states {
+                        stateName
+                        state
+                        stateValue
+                    }
+                    tags {
+                        tagName
+                        tag
+                    }
+                }
+            }
+        }`;
+        
+        const response4 = await fetch(config.GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ query: orderStatesQuery })
+        });
+        
+        const data4 = await response4.json();
+        console.log('Order states from tickets:', data4);
+        
+                 return { introspection: data1, mutations: data2 };
         
     } catch (error) {
         console.error('❌ Error in debugTicketQueries:', error);
@@ -1445,6 +1483,227 @@ export const findTicketByTableAlternative = async (tableName) => {
         
     } catch (error) {
         console.error('❌ Error in findTicketByTableAlternative:', error);
+        throw error;
+    }
+};
+
+// Query to explore order states and available mutations
+// Implementación de funciones de pago según la guía GraphQL
+export const payTerminalTicket = async (terminalId, paymentTypeName, amount, callback) => {
+    const mutation = `mutation {
+        payTerminalTicket(
+            terminalId: "${terminalId}",
+            paymentTypeName: "${paymentTypeName}",
+            amount: ${amount}
+        ) {
+            id
+            remainingAmount
+            totalAmount
+        }
+    }`;
+    
+    $.postJSON(mutation, function (response) {
+        if (response.errors) {
+            if (callback) callback(undefined, response.errors[0].message);
+        } else {
+            if (callback) callback(response.data.payTerminalTicket);
+        }
+    });
+};
+
+export const getPaymentTypes = async (userRoleId = null, callback) => {
+    const query = `query {
+        getPaymentTypes${userRoleId ? `(userRoleId: ${userRoleId})` : ''} {
+            id
+            name
+        }
+    }`;
+    
+    $.postJSON(query, function (response) {
+        if (response.errors) {
+            if (callback) callback(undefined, response.errors[0].message);
+        } else {
+            if (callback) callback(response.data.getPaymentTypes);
+        }
+    });
+};
+
+export const addCalculationToTerminalTicket = async (terminalId, calculationName, amount, callback) => {
+    const mutation = `mutation {
+        addCalculationToTerminalTicket(
+            terminalId: "${terminalId}",
+            calculationName: "${calculationName}",
+            amount: ${amount}
+        ) {
+            id
+            totalAmount
+            remainingAmount
+        }
+    }`;
+    
+    $.postJSON(mutation, function (response) {
+        if (response.errors) {
+            if (callback) callback(undefined, response.errors[0].message);
+        } else {
+            if (callback) callback(response.data.addCalculationToTerminalTicket);
+        }
+    });
+};
+
+export const recalculateTicket = async (terminalId, forceRecalculation = false, callback) => {
+    const mutation = `mutation {
+        recalculateTicket(
+            terminalId: "${terminalId}",
+            forceRecalculation: ${forceRecalculation}
+        ) {
+            id
+            totalAmount
+            remainingAmount
+        }
+    }`;
+    
+    $.postJSON(mutation, function (response) {
+        if (response.errors) {
+            if (callback) callback(undefined, response.errors[0].message);
+        } else {
+            if (callback) callback(response.data.recalculateTicket);
+        }
+    });
+};
+
+export const exploreOrderStatesAndMutations = async () => {
+    try {
+        const token = await ensureAuthenticated();
+        const config = appconfig();
+        
+        console.log('🔍 EXPLORING ORDER STATES AND AVAILABLE MUTATIONS');
+        
+        // Test 1: Get schema information about order states
+        console.log('\n=== TEST 1: Introspection for Order States ===');
+        const introspectionQuery = `query {
+            __schema {
+                types {
+                    name
+                    description
+                    fields {
+                        name
+                        description
+                        type {
+                            name
+                        }
+                    }
+                }
+            }
+        }`;
+        
+        const response1 = await fetch(config.GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ query: introspectionQuery })
+        });
+        
+        const data1 = await response1.json();
+        console.log('Schema introspection:', data1);
+        
+        // Test 2: Try to get available mutations
+        console.log('\n=== TEST 2: Available Mutations ===');
+        const mutationsQuery = `query {
+            __schema {
+                mutationType {
+                    name
+                    fields {
+                        name
+                        description
+                        args {
+                            name
+                            type {
+                                name
+                                kind
+                                ofType {
+                                    name
+                                    kind
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }`;
+        
+        const response2 = await fetch(config.GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ query: mutationsQuery })
+        });
+        
+        const data2 = await response2.json();
+        console.log('Available mutations response:', data2);
+        
+        // Display all mutations clearly
+        if (data2.data && data2.data.__schema && data2.data.__schema.mutationType) {
+            console.log('\n🔧 ALL AVAILABLE MUTATIONS:');
+            data2.data.__schema.mutationType.fields.forEach((mutation, index) => {
+                console.log(`${index + 1}. ${mutation.name}`);
+                if (mutation.args && mutation.args.length > 0) {
+                    console.log('   Arguments:');
+                    mutation.args.forEach(arg => {
+                        const typeName = arg.type.name || arg.type.kind || (arg.type.ofType && arg.type.ofType.name);
+                        console.log(`     - ${arg.name}: ${typeName}`);
+                    });
+                }
+            });
+        } else {
+            console.log('❌ No mutations found or error in response');
+        }
+        
+        // Test 3: Check order states from existing ticket
+        console.log('\n=== TEST 3: Order States from Existing Ticket ===');
+        const orderStatesQuery = `query {
+            tickets: getTickets(isClosed: false) {
+                id
+                number
+                orders {
+                    id
+                    uid
+                    productId
+                    name
+                    quantity
+                    price
+                    states {
+                        stateName
+                        state
+                        stateValue
+                    }
+                    tags {
+                        tagName
+                        tag
+                    }
+                }
+            }
+        }`;
+        
+        const response3 = await fetch(config.GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ query: orderStatesQuery })
+        });
+        
+        const data3 = await response3.json();
+        console.log('Order states from tickets:', data3);
+        
+        return { introspection: data1, mutations: data2, orderStates: data3 };
+        
+    } catch (error) {
+        console.error('❌ Error exploring order states:', error);
         throw error;
     }
 };
