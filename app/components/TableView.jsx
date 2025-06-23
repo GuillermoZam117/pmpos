@@ -15,7 +15,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import PersonIcon from '@mui/icons-material/Person';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
 import TableCard from './TableCard';
-import { getEntityScreenItems, getTicketByTable, createEmptyTicket, getTerminalTicketsForTable, loadTerminalTicketWithOrders, createTerminalTicket, changeEntityOfTerminalTicket } from '../queries';
+import { getEntityScreenItems, getTicketByTable, createEmptyTicket, getTerminalTicketsForTable, loadTerminalTicketWithOrders, createTerminalTicketAsync, changeEntityOfTerminalTicket } from '../queries';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../actions/auth';
@@ -103,7 +103,7 @@ const TableView = () => {
             
             // Create new ticket (either for LIBRE table or as fallback)
             debug(`🆕 Creating new ticket for table:`, table.name);
-            const ticket = await createTerminalTicket(terminalId);
+            const ticket = await createTerminalTicketAsync(terminalId);
             debug('✅ New ticket created:', ticket);
             
             // Assign table to ticket

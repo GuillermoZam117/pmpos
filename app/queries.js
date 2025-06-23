@@ -1075,6 +1075,5 @@ export const changeEntityOfTerminalTicketAsync = async (terminalId, tableName) =
     });
 };
 
-// Export aliases for easier use
-export { createTerminalTicketAsync as createTerminalTicket };
+// Export aliases for easier use (only for functions that don't already exist)
 export { changeEntityOfTerminalTicketAsync as changeEntityOfTerminalTicket };
