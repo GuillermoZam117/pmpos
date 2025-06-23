@@ -12,13 +12,24 @@ import {
     Button,
     Card,
     CardContent,
-    Divider
+    Divider,
+    Menu,
+    MenuItem,
+    ListItemIcon,
+    ListItemText
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import RestaurantMenuIcon from '@mui/icons-material/RestaurantMenu';
 import TableRestaurantIcon from '@mui/icons-material/TableRestaurant';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
-import Menu from '../Menu/Menu';
+import CancelIcon from '@mui/icons-material/Cancel';
+import AutomationIcon from '@mui/icons-material/Settings';
+import PrintIcon from '@mui/icons-material/Print';
+import KitchenIcon from '@mui/icons-material/Kitchen';
+import NotificationsIcon from '@mui/icons-material/Notifications';
+import DisplaySettingsIcon from '@mui/icons-material/DisplaySettings';
+import EventIcon from '@mui/icons-material/Event';
+import MenuComponent from '../Menu/Menu';
 import OrderTags from '../OrderTags';
 import PaymentDialog from '../PaymentDialog';
 import OrderEditDialog from '../OrderEditDialog';
@@ -51,6 +62,7 @@ const POSView = () => {
     const [currentTerminalId, setCurrentTerminalId] = useState(null);
     const [orderEditDialogOpen, setOrderEditDialogOpen] = useState(false);
     const [orderToEdit, setOrderToEdit] = useState(null);
+    const [automationMenuAnchor, setAutomationMenuAnchor] = useState(null);
 
     // Redux state for menu and terminal
     const appState = useSelector(state => state.app);
@@ -436,6 +448,88 @@ const POSView = () => {
         }
     };
 
+    const handleVoidTicket = async () => {
+        if (!window.confirm('⚠️ ¿Estás seguro de que quieres ANULAR este ticket?\n\nEsta acción eliminará todas las órdenes y no se puede deshacer.')) {
+            return;
+        }
+
+        try {
+            debug('❌ Voiding ticket...');
+            const { orderService } = await import('../../services/orderService');
+            const result = await orderService.voidTicket(effectiveTerminalId, 'Ticket anulado por usuario');
+            
+            if (result.success) {
+                debug('✅ Ticket voided successfully:', result.message);
+                alert(`✅ ${result.message}`);
+                
+                // Clear local orders
+                setOrders([]);
+                
+                // Navigate back to tables after voiding
+                setTimeout(() => {
+                    navigate('/tables');
+                }, 1000);
+            }
+        } catch (error) {
+            debug('❌ Error voiding ticket:', error);
+            alert('Error al anular ticket: ' + error.message);
+        }
+    };
+
+    const handleAutomationCommand = async (commandName) => {
+        if (!effectiveTerminalId) {
+            alert('❌ No hay terminal ID disponible');
+            return;
+        }
+
+        try {
+            debug(`🤖 Executing automation command: ${commandName}`);
+            const { automationService } = await import('../../services/automationService');
+            
+            switch (commandName) {
+                case 'PRINT_BILL':
+                    await automationService.executeAutomationCommand(effectiveTerminalId, 'PrintBill');
+                    alert('📄 Comando de impresión de factura enviado');
+                    break;
+                case 'PRINT_RECEIPT':
+                    await automationService.executeAutomationCommand(effectiveTerminalId, 'PrintReceipt');
+                    alert('🧾 Comando de impresión de recibo enviado');
+                    break;
+                case 'SEND_TO_KITCHEN':
+                    await automationService.executeAutomationCommand(effectiveTerminalId, 'SendToKitchen');
+                    alert('👨‍🍳 Órdenes enviadas a cocina');
+                    break;
+                case 'NOTIFY_WAITER':
+                    await automationService.executeAutomationCommand(effectiveTerminalId, 'NotifyWaiter');
+                    alert('🔔 Mesero notificado');
+                    break;
+                case 'UPDATE_DISPLAY':
+                    await automationService.executeAutomationCommand(effectiveTerminalId, 'UpdateDisplay');
+                    alert('📺 Display actualizado');
+                    break;
+                case 'TICKET_CREATED_EVENT':
+                    await automationService.notifyTicketEvent(effectiveTerminalId, 'TicketCreated', [
+                        { name: 'TableName', value: tableId },
+                        { name: 'TicketTotal', value: calculateTotal() }
+                    ]);
+                    alert('📢 Evento TicketCreated enviado');
+                    break;
+                case 'ORDER_ADDED_EVENT':
+                    await automationService.notifyTicketEvent(effectiveTerminalId, 'OrderAdded', [
+                        { name: 'OrderCount', value: orders.length },
+                        { name: 'TableName', value: tableId }
+                    ]);
+                    alert('📢 Evento OrderAdded enviado');
+                    break;
+                default:
+                    alert(`❓ Comando no reconocido: ${commandName}`);
+            }
+        } catch (error) {
+            debug('❌ Error executing automation command:', error);
+            alert(`❌ Error ejecutando comando: ${error.message}`);
+        }
+    };
+
     const handleCloseTicket = async () => {
         if (orders.length === 0) {
             debug('⚠️ Cannot close ticket: no orders');
@@ -685,20 +779,59 @@ const POSView = () => {
                             {closingTicket ? 'Cerrando...' : 'Cerrar Ticket'}
                         </Button>
                         <Button 
+                            color="error" 
+                            variant="outlined"
+                            startIcon={<CancelIcon />}
+                            onClick={handleVoidTicket}
+                            disabled={orders.length === 0}
+                            sx={{ mr: 1 }}
+                        >
+                            ❌ Anular
+                        </Button>
+                        <Button 
                             color="inherit" 
                             variant="outlined"
-                            onClick={async () => {
-                                console.log('🔍 Starting order states exploration...');
-                                try {
-                                    await exploreOrderStatesAndMutations();
-                                } catch (error) {
-                                    console.error('❌ Exploration failed:', error);
-                                }
-                            }}
+                            startIcon={<AutomationIcon />}
+                            onClick={(e) => setAutomationMenuAnchor(e.currentTarget)}
                             sx={{ fontSize: '0.8rem' }}
                         >
-                            Explorar
+                            🤖 Automatización
                         </Button>
+                        <Menu
+                            anchorEl={automationMenuAnchor}
+                            open={Boolean(automationMenuAnchor)}
+                            onClose={() => setAutomationMenuAnchor(null)}
+                        >
+                            <MenuItem onClick={() => { handleAutomationCommand('PRINT_BILL'); setAutomationMenuAnchor(null); }}>
+                                <ListItemIcon><PrintIcon /></ListItemIcon>
+                                <ListItemText primary="📄 Imprimir Factura" />
+                            </MenuItem>
+                            <MenuItem onClick={() => { handleAutomationCommand('PRINT_RECEIPT'); setAutomationMenuAnchor(null); }}>
+                                <ListItemIcon><PrintIcon /></ListItemIcon>
+                                <ListItemText primary="🧾 Imprimir Recibo" />
+                            </MenuItem>
+                            <MenuItem onClick={() => { handleAutomationCommand('SEND_TO_KITCHEN'); setAutomationMenuAnchor(null); }}>
+                                <ListItemIcon><KitchenIcon /></ListItemIcon>
+                                <ListItemText primary="👨‍🍳 Enviar a Cocina" />
+                            </MenuItem>
+                            <MenuItem onClick={() => { handleAutomationCommand('NOTIFY_WAITER'); setAutomationMenuAnchor(null); }}>
+                                <ListItemIcon><NotificationsIcon /></ListItemIcon>
+                                <ListItemText primary="🔔 Notificar Mesero" />
+                            </MenuItem>
+                            <MenuItem onClick={() => { handleAutomationCommand('UPDATE_DISPLAY'); setAutomationMenuAnchor(null); }}>
+                                <ListItemIcon><DisplaySettingsIcon /></ListItemIcon>
+                                <ListItemText primary="📺 Actualizar Display" />
+                            </MenuItem>
+                            <Divider />
+                            <MenuItem onClick={() => { handleAutomationCommand('TICKET_CREATED_EVENT'); setAutomationMenuAnchor(null); }}>
+                                <ListItemIcon><EventIcon /></ListItemIcon>
+                                <ListItemText primary="📢 Evento: Ticket Creado" />
+                            </MenuItem>
+                            <MenuItem onClick={() => { handleAutomationCommand('ORDER_ADDED_EVENT'); setAutomationMenuAnchor(null); }}>
+                                <ListItemIcon><EventIcon /></ListItemIcon>
+                                <ListItemText primary="📢 Evento: Orden Agregada" />
+                            </MenuItem>
+                        </Menu>
                     </Box>
                 </Toolbar>
             </AppBar>
@@ -719,7 +852,7 @@ const POSView = () => {
                     {loading ? (
                         <Typography>Cargando menú...</Typography>
                     ) : (
-                        <Menu onMenuItemClick={handleMenuItemClick} />
+                        <MenuComponent onMenuItemClick={handleMenuItemClick} />
                     )}
                 </Box>
 
