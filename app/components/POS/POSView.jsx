@@ -20,7 +20,7 @@ import TableRestaurantIcon from '@mui/icons-material/TableRestaurant';
 import Menu from '../Menu/Menu';
 import OrderTags from '../OrderTags';
 import { getMenu, addOrderToTerminalTicket, closeTerminalTicket, ensureAuthenticated } from '../../queries';
-import appconfig from '../../config';
+import { appconfig } from '../../config';
 import * as Actions from '../../actions';
 import Debug from 'debug';
 
