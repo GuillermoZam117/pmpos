@@ -30,31 +30,9 @@ const POSView = () => {
     const location = useLocation();
     const navigate = useNavigate();
     const dispatch = useDispatch();
-    const { ticket, tableId, isNew } = location.state || {};
     
-    // Get menu from Redux store with debug
-    const menu = useSelector(state => {
-        const appState = state.app;
-        debug('🔍 Redux app state type:', typeof appState);
-        debug('🔍 App state methods:', appState ? Object.getOwnPropertyNames(appState.__proto__ || {}) : 'none');
-        
-        let menuData = null;
-        if (appState && typeof appState.get === 'function') {
-            // Immutable.js format - use the same method as Menu.jsx
-            menuData = appState.get('menu');
-            debug('🔍 Raw menu from Immutable.get:', menuData);
-            
-            // Don't convert to JS yet - keep it as Immutable for consistency with Menu.jsx
-            debug('🔍 Menu from Immutable (keeping as Immutable):', menuData);
-        } else if (appState && typeof appState === 'object') {
-            // Plain object format
-            menuData = appState.menu;
-            debug('🔍 Menu from plain object:', menuData);
-        }
-        
-        debug('🔍 Final menu data for POSView:', menuData);
-        return menuData;
-    });
+    // Get data from navigation state
+    const { ticket, tableId, isNew = false } = location.state || {};
     
     const [loading, setLoading] = useState(true);
     const [orders, setOrders] = useState([]);
@@ -63,85 +41,143 @@ const POSView = () => {
     const [orderEditMode, setOrderEditMode] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [closingTicket, setClosingTicket] = useState(false);
+
+    // Redux state for menu
+    const appState = useSelector(state => state.app);
+    debug('🔍 Redux app state type:', typeof appState);
+    debug('🔍 App state methods:', Object.getOwnPropertyNames(appState));
     
-    // Additional debugging for Redux state changes
+    // Handle both Immutable and plain object states
+    let menu;
+    if (appState && typeof appState.get === 'function') {
+        const rawMenu = appState.get('menu');
+        debug('🔍 Raw menu from Immutable.get:', rawMenu);
+        menu = rawMenu;
+        debug('🔍 Menu from Immutable (keeping as Immutable):', menu);
+    } else {
+        menu = appState?.menu;
+        debug('🔍 Menu from plain object:', menu);
+    }
+    
+    debug('🔍 Final menu data for POSView:', menu);
+
+    // Load existing orders if this is an existing ticket
     useEffect(() => {
-        debug('🔄 Redux menu state changed:', menu ? 'PRESENT' : 'UNDEFINED');
-        if (menu) {
-            debug('🎉 Menu is now available in Redux!');
-            setLoading(false);
+        const loadExistingOrders = () => {
+            if (!isNew && ticket?.orders) {
+                debug('📋 Loading existing orders from ticket:', ticket.orders);
+                
+                // Convert ticket orders to local order format
+                const convertedOrders = ticket.orders.map(order => ({
+                    id: Date.now() + Math.random(), // Generate local ID
+                    uid: order.uid,
+                    productId: order.productId,
+                    name: order.productName || `Product ${order.productId}`, // Will be updated when menu loads
+                    caption: order.productName || `Product ${order.productId}`,
+                    quantity: order.quantity,
+                    price: order.price,
+                    portion: order.portion || 'Normal',
+                    orderTags: order.orderTags ? order.orderTags.split(',').filter(tag => tag.trim()) : []
+                }));
+                
+                setOrders(convertedOrders);
+                debug('✅ Loaded existing orders:', convertedOrders);
+            }
+        };
+
+        loadExistingOrders();
+    }, [ticket, isNew]);
+
+    // Update order names when menu becomes available
+    useEffect(() => {
+        if (menu && orders.length > 0) {
+            debug('🔄 Updating order names with menu data...');
+            
+            setOrders(prevOrders => prevOrders.map(order => {
+                const menuItem = findMenuItemByProductId(order.productId);
+                if (menuItem) {
+                    return {
+                        ...order,
+                        name: menuItem.name || menuItem.caption,
+                        caption: menuItem.caption || menuItem.name
+                    };
+                }
+                return order;
+            }));
         }
     }, [menu]);
 
+    // Watch for Redux menu state changes
     useEffect(() => {
-        if (!ticket?.uid) {
-            debug('❌ No ticket data, redirecting...');
-            navigate('/tables');
-            return;
+        if (menu) {
+            debug('🔄 Redux menu state changed:', menu ? 'PRESENT' : 'UNDEFINED');
+            if (menu) {
+                debug('🎉 Menu is now available in Redux!');
+            }
         }
+    }, [menu]);
 
-        debug('🎫 Loading ticket:', ticket.uid);
-        debug('🔍 Current menu state:', menu);
-        
-        // Load menu if not already loaded
-        const loadMenu = async () => {
-            try {
-                debug('🔄 Loading menu...');
-                
-                // Force fresh menu data by clearing cache temporarily
-                const { default: cacheService } = await import('../../services/cacheService');
-                cacheService.invalidateMenu();
-                debug('🗑️ Cleared menu cache to get fresh data with prices');
-                
-                const menuData = await new Promise((resolve) => {
-                    getMenu((data) => {
-                        if (data) {
-                            debug('🔄 Received menu data from server:', data);
-                            resolve(data);
-                        } else {
-                            debug('❌ No menu data received');
-                            resolve(null);
-                        }
-                    }, true); // Force refresh
-                });
-                
-                if (menuData) {
-                    debug('🔄 Received menu data structure:', JSON.stringify(menuData, null, 2));
-                    debug('🔄 Categories count:', menuData.categories?.length || 'No categories');
-                    debug('🔄 Dispatching setMenu action with data:', menuData);
-                    
-                    // Create and log the action before dispatching
-                    const setMenuAction = Actions.setMenu(menuData);
-                    debug('🔧 Action to dispatch:', setMenuAction);
-                    
-                    const result = dispatch(setMenuAction);
-                    debug('🔧 Dispatch result:', result);
-                    debug('✅ Menu dispatched to Redux');
-                    
-                    // Force check Redux state after dispatch
-                    setTimeout(() => {
-                        debug('🔍 Checking Redux state after dispatch...');
-                    }, 100);
-                } else {
-                    debug('❌ No menu data received');
-                }
-            } catch (error) {
-                debug('❌ Error loading menu:', error);
-            } finally {
+    // Load ticket and menu
+    useEffect(() => {
+        const loadTicketData = async () => {
+            debug('🎫 Loading ticket:', ticket?.uid);
+            debug('🔍 Current menu state:', menu);
+            
+            if (!menu) {
+                debug('🔄 No menu found, loading from server...');
+                await loadMenu();
+            } else {
+                debug('✅ Menu already available from Redux store:', menu);
                 setLoading(false);
             }
         };
 
-        // Only load menu if not already available
-        if (!menu) {
-            debug('🔄 No menu found, loading from server...');
-            loadMenu();
-        } else {
-            debug('✅ Menu already available from Redux store:', menu);
+        if (ticket?.uid) {
+            loadTicketData();
+        }
+    }, [ticket, menu]);
+
+    // Debug Redux state after dispatch
+    useEffect(() => {
+        debug('🔍 Checking Redux state after dispatch...');
+    }, [appState]);
+
+    const loadMenu = async () => {
+        debug('🔄 Loading menu...');
+        try {
+            // Clear cache to ensure fresh data with prices
+            const { default: cacheService } = await import('../../services/cacheService');
+            cacheService.clearMenu();
+            debug('🗑️ Cleared menu cache to get fresh data with prices');
+            
+            const { getMenu } = await import('../../queries');
+            await getMenu((menuData) => {
+                debug('🔄 Received menu data from server:', menuData);
+                
+                if (menuData) {
+                    debug('🔄 Received menu data structure:', JSON.stringify(menuData, null, 2));
+                    debug('🔄 Categories count:', menuData.categories?.length);
+                    debug('🔄 Dispatching setMenu action with data:', menuData);
+                    
+                    // Dispatch to Redux
+                    const action = { type: 'SET_MENU', menu: menuData };
+                    debug('🔧 Action to dispatch:', action);
+                    
+                    const result = dispatch(action);
+                    debug('🔧 Dispatch result:', result);
+                    debug('✅ Menu dispatched to Redux');
+                    
+                    setLoading(false);
+                } else {
+                    debug('❌ No menu data received');
+                    setLoading(false);
+                }
+            }, true); // Force refresh
+        } catch (error) {
+            debug('❌ Error loading menu:', error);
             setLoading(false);
         }
-        
-    }, [ticket, navigate, dispatch, menu]);
+    };
 
     const handleMenuItemClick = (menuItem) => {
         debug('🍽️ Menu item clicked:', menuItem);
@@ -313,6 +349,12 @@ const POSView = () => {
             debug('🔒 Closing terminal ticket...');
             await closeTerminalTicketModern(terminalId);
             debug('✅ Ticket closed successfully');
+
+            // Clear table cache to ensure status updates
+            debug('🗑️ Clearing table cache to refresh status...');
+            const { default: cacheService } = await import('../../services/cacheService');
+            cacheService.clearTables();
+            debug('✅ Table cache cleared');
 
             // Navigate back to tables
             debug('🏠 Navigating back to tables...');

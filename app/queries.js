@@ -716,7 +716,11 @@ export const getTicketByTable = async (tableName) => {
         query GetTickets($isClosed: Boolean) {
             getTickets(isClosed: $isClosed) {
                 id
+                uid
                 number
+                date
+                totalAmount
+                remainingAmount
                 states {
                     stateName
                     state
@@ -725,20 +729,114 @@ export const getTicketByTable = async (tableName) => {
                     type
                     name
                 }
+                orders {
+                    uid
+                    productId
+                    quantity
+                    price
+                    orderTags
+                }
             }
         }
     `;
 
     try {
-        const response = await postJSON(query, { isClosed: false });
-        return response.data?.getTickets?.find(ticket => 
+        const token = await ensureAuthenticated();
+        const response = await fetch(config.GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ 
+                query,
+                variables: { isClosed: false }
+            })
+        });
+
+        const data = await response.json();
+        if (data.errors) {
+            debug('❌ GraphQL errors in getTicketByTable:', data.errors);
+            return null;
+        }
+
+        const ticket = data.data?.getTickets?.find(ticket => 
             ticket.entities?.some(entity => 
                 entity.type === config.entityTypeName && 
                 entity.name === tableName
             )
         );
+
+        if (ticket) {
+            debug('✅ Found existing ticket for table:', { tableName, ticket });
+            return ticket;
+        } else {
+            debug('🔍 No existing ticket found for table:', tableName);
+            return null;
+        }
     } catch (error) {
         debug('❌ Error getting ticket:', error);
+        throw error;
+    }
+};
+
+// Function to load existing ticket with complete data including orders
+export const loadExistingTicket = async (ticketId, terminalId) => {
+    const config = appconfig();
+    const token = await ensureAuthenticated();
+    
+    const query = `
+        mutation LoadTicket($terminalId: String!, $ticketId: String!) {
+            ticket: loadTerminalTicket(terminalId: $terminalId, ticketId: $ticketId) {
+                id
+                uid
+                number
+                date
+                totalAmount
+                remainingAmount
+                entities {
+                    name
+                    type
+                }
+                orders {
+                    uid
+                    productId
+                    quantity
+                    price
+                    orderTags
+                }
+            }
+        }
+    `;
+
+    try {
+        const response = await fetch(config.GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ 
+                query,
+                variables: { terminalId, ticketId }
+            })
+        });
+
+        const data = await response.json();
+        if (data.errors) {
+            debug('❌ GraphQL errors in loadExistingTicket:', data.errors);
+            throw new Error(data.errors[0].message);
+        }
+
+        const ticket = data.data?.ticket;
+        if (ticket) {
+            debug('✅ Loaded existing ticket with orders:', ticket);
+            return ticket;
+        } else {
+            throw new Error('Ticket not found');
+        }
+    } catch (error) {
+        debug('❌ Error loading existing ticket:', error);
         throw error;
     }
 };

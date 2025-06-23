@@ -55,7 +55,37 @@ const TableView = () => {
             setLoading(true);
             setError(null);
             
-            // Create ticket and assign table
+            const tableStatus = parseTableStatus(table);
+            debug(`🔍 Clicked table ${table.name} with status: ${tableStatus}`);
+            
+            // Check if table is occupied (has existing ticket)
+            if (tableStatus === 'OCUPADO') {
+                debug('🎫 Table is occupied, looking for existing ticket...');
+                try {
+                    const existingTicket = await getTicketByTable(table.name);
+                    if (existingTicket) {
+                        debug('✅ Found existing ticket:', existingTicket);
+                        
+                        // Navigate to POS with existing ticket
+                        navigate('/pos', { 
+                            state: { 
+                                ticket: existingTicket,
+                                tableId: table.name,
+                                isNew: false
+                            }
+                        });
+                        return;
+                    } else {
+                        debug('⚠️ Table appears occupied but no ticket found');
+                    }
+                } catch (error) {
+                    debug('❌ Error loading existing ticket:', error);
+                    // Continue to create new ticket if loading fails
+                }
+            }
+            
+            // Create new ticket for free tables or if existing ticket not found
+            debug('🆕 Creating new ticket for table:', table.name);
             const ticket = await createEmptyTicket(table.name);
             
             if (!ticket?.uid) {

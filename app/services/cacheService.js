@@ -140,6 +140,20 @@ class CacheService {
     invalidateMenu() {
         this.remove(CACHE_KEYS.MENU);
     }
+
+    /**
+     * Clear tables cache (alias for invalidateTables)
+     */
+    clearTables() {
+        this.invalidateTables();
+    }
+
+    /**
+     * Clear menu cache (alias for invalidateMenu)
+     */
+    clearMenu() {
+        this.invalidateMenu();
+    }
 }
 
 export default new CacheService(); 
