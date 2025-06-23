@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Dialog,
     DialogTitle,
@@ -8,11 +8,29 @@ import {
     Typography,
     Chip,
     Box,
-    Divider
+    Divider,
+    TextField
 } from '@mui/material';
 
-const OrderTags = ({ open, onClose, onConfirm, menuItem }) => {
+const OrderTags = ({ open, onClose, onConfirm, menuItem, existingTags = [], isEditMode = false, orderInfo = null }) => {
     const [selectedTags, setSelectedTags] = useState([]);
+    const [comments, setComments] = useState('');
+
+    // Initialize selected tags and comments when opening in edit mode
+    useEffect(() => {
+        if (open && isEditMode && existingTags) {
+            const tags = Array.isArray(existingTags) ? existingTags : [];
+            // Separate comments from other tags
+            const commentTag = tags.find(tag => tag.startsWith('Comentarios:'));
+            const otherTags = tags.filter(tag => !tag.startsWith('Comentarios:'));
+            
+            setSelectedTags(otherTags);
+            setComments(commentTag ? commentTag.replace('Comentarios:', '') : '');
+        } else if (open && !isEditMode) {
+            setSelectedTags([]);
+            setComments('');
+        }
+    }, [open, isEditMode, existingTags]);
 
     const handleTagToggle = (tagGroup, tag) => {
         const tagKey = `${tagGroup}:${tag}`;
@@ -26,13 +44,20 @@ const OrderTags = ({ open, onClose, onConfirm, menuItem }) => {
     };
 
     const handleConfirm = () => {
-        onConfirm(selectedTags);
+        // Combine selected tags with comments
+        const allTags = [...selectedTags];
+        if (comments.trim()) {
+            allTags.push(`Comentarios:${comments.trim()}`);
+        }
+        onConfirm(allTags);
         setSelectedTags([]);
+        setComments('');
         onClose();
     };
 
     const handleCancel = () => {
         setSelectedTags([]);
+        setComments('');
         onClose();
     };
 
@@ -63,11 +88,16 @@ const OrderTags = ({ open, onClose, onConfirm, menuItem }) => {
     return (
         <Dialog open={open} onClose={handleCancel} maxWidth="sm" fullWidth>
             <DialogTitle>
-                Personalizar: {menuItem.name || menuItem.caption}
+                {isEditMode ? 'Editar' : 'Personalizar'}: {menuItem.name || menuItem.caption}
+                {isEditMode && orderInfo && (
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                        Cantidad: {orderInfo.quantity} • {orderInfo.portion || 'Normal'}
+                    </Typography>
+                )}
             </DialogTitle>
             
             <DialogContent>
-                {orderTagGroups.length > 0 ? (
+                {orderTagGroups.length > 0 && (
                     orderTagGroups.map((group, groupIndex) => (
                         <Box key={groupIndex} sx={{ mb: 3 }}>
                             <Typography variant="h6" gutterBottom>
@@ -87,25 +117,34 @@ const OrderTags = ({ open, onClose, onConfirm, menuItem }) => {
                                 ))}
                             </Box>
                             
-                            {groupIndex < orderTagGroups.length - 1 && (
-                                <Divider sx={{ mt: 2 }} />
-                            )}
+                            <Divider sx={{ mt: 2, mb: 3 }} />
                         </Box>
                     ))
-                ) : (
-                    <Box sx={{ py: 4, textAlign: 'center' }}>
-                        <Typography color="text.secondary">
-                            No hay opciones de personalización disponibles para este producto.
-                        </Typography>
-                    </Box>
                 )}
 
-                {selectedTags.length > 0 && (
+                {/* Comments Section - Always Available */}
+                <Box sx={{ mb: 3 }}>
+                    <Typography variant="h6" gutterBottom>
+                        Comentarios
+                    </Typography>
+                    <TextField
+                        fullWidth
+                        multiline
+                        rows={3}
+                        placeholder="Agregar comentarios especiales (ej: sin cebolla, extra picante, etc.)"
+                        value={comments}
+                        onChange={(e) => setComments(e.target.value)}
+                        variant="outlined"
+                        sx={{ mb: 2 }}
+                    />
+                </Box>
+
+                {(selectedTags.length > 0 || comments.trim()) && (
                     <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
                         <Typography variant="body2" gutterBottom>
                             Selecciones:
                         </Typography>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
                             {selectedTags.map((tag, index) => (
                                 <Chip 
                                     key={index} 
@@ -115,6 +154,16 @@ const OrderTags = ({ open, onClose, onConfirm, menuItem }) => {
                                 />
                             ))}
                         </Box>
+                        {comments.trim() && (
+                            <Box sx={{ mt: 1 }}>
+                                <Chip 
+                                    label={`💬 ${comments.trim()}`}
+                                    size="small" 
+                                    color="secondary"
+                                    variant="outlined"
+                                />
+                            </Box>
+                        )}
                     </Box>
                 )}
             </DialogContent>
@@ -126,9 +175,8 @@ const OrderTags = ({ open, onClose, onConfirm, menuItem }) => {
                 <Button 
                     onClick={handleConfirm} 
                     variant="contained"
-                    disabled={orderTagGroups.length > 0 && selectedTags.length === 0}
                 >
-                    Agregar al Ticket
+                    {isEditMode ? 'Actualizar' : 'Agregar al Ticket'}
                 </Button>
             </DialogActions>
         </Dialog>

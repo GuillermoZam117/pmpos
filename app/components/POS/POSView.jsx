@@ -59,6 +59,8 @@ const POSView = () => {
     const [orders, setOrders] = useState([]);
     const [orderTagsOpen, setOrderTagsOpen] = useState(false);
     const [selectedMenuItem, setSelectedMenuItem] = useState(null);
+    const [orderEditMode, setOrderEditMode] = useState(false);
+    const [selectedOrder, setSelectedOrder] = useState(null);
     
     // Additional debugging for Redux state changes
     useEffect(() => {
@@ -83,6 +85,12 @@ const POSView = () => {
         const loadMenu = async () => {
             try {
                 debug('🔄 Loading menu...');
+                
+                // Force fresh menu data by clearing cache temporarily
+                const { default: cacheService } = await import('../../services/cacheService');
+                cacheService.invalidateMenu();
+                debug('🗑️ Cleared menu cache to get fresh data with prices');
+                
                 const menuData = await new Promise((resolve) => {
                     getMenu((data) => {
                         if (data) {
@@ -92,7 +100,7 @@ const POSView = () => {
                             debug('❌ No menu data received');
                             resolve(null);
                         }
-                    });
+                    }, true); // Force refresh
                 });
                 
                 if (menuData) {
@@ -157,20 +165,33 @@ const POSView = () => {
     };
 
     const addItemToTicket = (menuItem, selectedTags = []) => {
+        debug('💰 Processing item for ticket:', {
+            menuItem: menuItem,
+            hasProduct: !!menuItem.product,
+            productData: menuItem.product
+        });
+        
         // Get price from first portion (default portion)
         let price = 0;
         let portionName = 'Normal';
+        
         if (menuItem.product && menuItem.product.portions && menuItem.product.portions.length > 0) {
             const defaultPortion = menuItem.product.portions[0];
-            price = defaultPortion.price || 0;
+            price = parseFloat(defaultPortion.price) || 0;
             portionName = defaultPortion.name || 'Normal';
             debug('💰 Found price from default portion:', { 
                 portionName, 
                 price,
+                rawPrice: defaultPortion.price,
                 allPortions: menuItem.product.portions 
             });
         } else {
-            debug('⚠️ No pricing information found for product:', menuItem.productId);
+            debug('⚠️ No pricing information found for product:', {
+                productId: menuItem.productId,
+                hasProduct: !!menuItem.product,
+                hasPortions: !!(menuItem.product && menuItem.product.portions),
+                portionsLength: menuItem.product?.portions?.length || 0
+            });
         }
         
         // Add item to current ticket
@@ -182,7 +203,7 @@ const POSView = () => {
             price: price,
             portion: portionName,
             productId: menuItem.productId,
-            orderTags: selectedTags
+            orderTags: selectedTags || []
         };
         
         debug('✅ Adding order to ticket:', newOrder);
@@ -190,16 +211,46 @@ const POSView = () => {
     };
 
     const handleOrderTagsConfirm = (selectedTags) => {
-        if (selectedMenuItem) {
+        if (orderEditMode && selectedOrder) {
+            // Edit existing order
+            debug('🔧 Updating existing order with new tags:', { order: selectedOrder, tags: selectedTags });
+            setOrders(prev => prev.map(order => 
+                order.id === selectedOrder.id 
+                    ? { ...order, orderTags: selectedTags }
+                    : order
+            ));
+        } else if (selectedMenuItem) {
+            // Add new item to ticket
             addItemToTicket(selectedMenuItem, selectedTags);
         }
         setOrderTagsOpen(false);
         setSelectedMenuItem(null);
+        setOrderEditMode(false);
+        setSelectedOrder(null);
     };
 
     const handleOrderTagsClose = () => {
         setOrderTagsOpen(false);
         setSelectedMenuItem(null);
+        setOrderEditMode(false);
+        setSelectedOrder(null);
+    };
+
+    const findMenuItemByProductId = (productId) => {
+        if (!menu || !menu.categories) return null;
+        
+        for (const category of menu.categories) {
+            if (category.menuItems) {
+                const menuItem = category.menuItems.find(item => item.productId === productId);
+                if (menuItem) {
+                    debug('🔍 Found menu item for product:', { productId, menuItem });
+                    return menuItem;
+                }
+            }
+        }
+        
+        debug('⚠️ Menu item not found for product:', productId);
+        return null;
     };
 
     const handleBackToTables = () => {
@@ -295,14 +346,58 @@ const POSView = () => {
                         ) : (
                             <Box>
                                 {orders.map((order, index) => (
-                                    <Card key={order.id} sx={{ mb: 1 }}>
+                                    <Card 
+                                        key={order.id} 
+                                        sx={{ 
+                                            mb: 1, 
+                                            cursor: 'pointer',
+                                            '&:hover': {
+                                                bgcolor: 'action.hover'
+                                            }
+                                        }}
+                                        onClick={() => {
+                                            debug('🔧 Order clicked for editing:', order);
+                                            // Set order edit mode and open order tags modal
+                                            setSelectedOrder(order);
+                                            setOrderEditMode(true);
+                                            // Find the original menu item for this order
+                                            const menuItem = findMenuItemByProductId(order.productId);
+                                            if (menuItem) {
+                                                setSelectedMenuItem(menuItem);
+                                                setOrderTagsOpen(true);
+                                            } else {
+                                                debug('⚠️ Could not find menu item for product:', order.productId);
+                                            }
+                                        }}
+                                    >
                                         <CardContent sx={{ py: 1, '&:last-child': { pb: 1 } }}>
                                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                 <Box>
                                                     <Typography variant="body1">{order.name}</Typography>
                                                     <Typography variant="body2" color="text.secondary">
-                                                        Cantidad: {order.quantity}
+                                                        Cantidad: {order.quantity} {order.portion && ` • ${order.portion}`}
                                                     </Typography>
+                                                    {order.orderTags && order.orderTags.length > 0 && (
+                                                        <Box sx={{ mt: 0.5 }}>
+                                                            {order.orderTags.map((tag, tagIndex) => {
+                                                                if (tag.startsWith('Comentarios:')) {
+                                                                    const comment = tag.replace('Comentarios:', '');
+                                                                    return (
+                                                                        <Typography key={tagIndex} variant="caption" color="secondary.main" sx={{ display: 'block', fontStyle: 'italic' }}>
+                                                                            💬 {comment}
+                                                                        </Typography>
+                                                                    );
+                                                                } else {
+                                                                    const displayTag = tag.includes(':') ? tag.split(':')[1] : tag;
+                                                                    return (
+                                                                        <Typography key={tagIndex} variant="caption" color="primary.main" sx={{ display: 'inline', mr: 1 }}>
+                                                                            • {displayTag}
+                                                                        </Typography>
+                                                                    );
+                                                                }
+                                                            })}
+                                                        </Box>
+                                                    )}
                                                 </Box>
                                                 <Typography variant="body1" fontWeight="bold">
                                                     ${(order.price * order.quantity).toFixed(2)}
@@ -332,6 +427,9 @@ const POSView = () => {
                 onClose={handleOrderTagsClose}
                 onConfirm={handleOrderTagsConfirm}
                 menuItem={selectedMenuItem}
+                existingTags={orderEditMode && selectedOrder ? selectedOrder.orderTags : []}
+                isEditMode={orderEditMode}
+                orderInfo={selectedOrder}
             />
         </Box>
     );
