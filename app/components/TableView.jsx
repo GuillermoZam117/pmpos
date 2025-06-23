@@ -15,7 +15,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import PersonIcon from '@mui/icons-material/Person';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
 import TableCard from './TableCard';
-import { getEntityScreenItems, getTicketByTable, createEmptyTicket } from '../queries';
+import { getEntityScreenItems, getTicketByTable, createEmptyTicket, getTerminalTicketsForTable, loadTerminalTicketWithOrders, createTerminalTicket, changeEntityOfTerminalTicket } from '../queries';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../actions/auth';
@@ -58,62 +58,73 @@ const TableView = () => {
             const tableStatus = parseTableStatus(table);
             debug(`🔍 Clicked table ${table.name} with status: ${tableStatus}`);
             
+            // First, register terminal to get terminalId
+            debug('🔄 Registering terminal...');
+            const terminalId = await registerTerminal();
+            debug('✅ Terminal registered:', terminalId);
+            
             // Check if table is occupied (has existing ticket)
             if (tableStatus === 'OCUPADO') {
-                debug('🎫 Table is occupied, looking for existing ticket...');
+                debug('🎫 Table is occupied, looking for existing tickets...');
                 try {
-                    const existingTicket = await getTicketByTable(table.name);
-                    if (existingTicket) {
-                        debug('✅ Found existing ticket:', existingTicket);
+                    // Use native SambaPOS function to get terminal tickets
+                    const existingTickets = await getTerminalTicketsForTable(terminalId, table.name);
+                    if (existingTickets && existingTickets.length > 0) {
+                        // Load the most recent ticket for this table
+                        const ticketForTable = existingTickets.find(ticket => 
+                            ticket.entities && ticket.entities.some(entity => entity.name === table.name)
+                        );
                         
-                        // Navigate to POS with existing ticket
-                        navigate('/pos', { 
-                            state: { 
-                                ticket: existingTicket,
-                                tableId: table.name,
-                                isNew: false
+                        if (ticketForTable) {
+                            debug('✅ Found existing ticket for table:', ticketForTable);
+                            // Load the complete ticket with orders
+                            const fullTicket = await loadTerminalTicketWithOrders(terminalId, ticketForTable.id);
+                            if (fullTicket) {
+                                debug('✅ Loaded complete ticket with orders:', fullTicket);
+                                // Add terminalId to ticket for later use
+                                fullTicket.terminalId = terminalId;
+                                navigate('/pos', { 
+                                    state: { 
+                                        ticket: fullTicket,
+                                        tableId: table.name,
+                                        isNew: false
+                                    }
+                                });
+                                return;
                             }
-                        });
-                        return;
-                    } else {
-                        debug('⚠️ Table appears occupied but no ticket found');
+                        }
                     }
+                    debug('⚠️ No existing ticket found for occupied table, creating new one...');
                 } catch (error) {
-                    debug('❌ Error loading existing ticket (this is normal if SambaPOS doesn\'t support getTickets query):', error.message);
-                    // Continue to create new ticket - this is expected behavior
-                    // The table might show as occupied due to SambaPOS internal state
-                    // but we can still create a new ticket for it
+                    debug('❌ Error loading existing ticket:', error);
+                    debug('⚠️ Falling back to creating new ticket...');
                 }
             }
             
-            // Create new ticket for free tables or if existing ticket not found
-            debug('🆕 Creating new ticket for table:', table.name);
-            const ticket = await createEmptyTicket(table.name);
+            // Create new ticket (either for LIBRE table or as fallback)
+            debug(`🆕 Creating new ticket for table:`, table.name);
+            const ticket = await createTerminalTicket(terminalId);
+            debug('✅ New ticket created:', ticket);
             
-            if (!ticket?.uid) {
-                throw new Error('Error al crear el ticket');
-            }
-
-            debug('✅ Ticket created:', ticket);
-
-            // Update redux state
-            dispatch({ 
-                type: 'SET_CURRENT_TICKET', 
-                payload: ticket 
-            });
-
-            // Navigate to POS with ticket info
+            // Assign table to ticket
+            debug(`🏷️ Assigning table ${table.name} to ticket...`);
+            const updatedTicket = await changeEntityOfTerminalTicket(terminalId, table.name);
+            debug('✅ Table assigned to ticket:', updatedTicket);
+            
+            // Add terminalId to ticket for later use
+            updatedTicket.terminalId = terminalId;
+            
             navigate('/pos', { 
                 state: { 
-                    ticket,
+                    ticket: updatedTicket,
                     tableId: table.name,
                     isNew: true
                 }
             });
-
+            
         } catch (error) {
-            debug('❌ Error:', error);
-            setError(error.message || 'Error al crear ticket');
+            debug('❌ Error in handleTableClick:', error);
+            setError(`Error: ${error.message}`);
         } finally {
             setLoading(false);
         }

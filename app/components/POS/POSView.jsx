@@ -319,23 +319,18 @@ const POSView = () => {
 
             // Add each order to the terminal ticket
             for (const order of orders) {
-                debug('➕ Adding order to terminal ticket:', order);
+                debug('➕ Adding order to ticket:', order);
                 
-                // Convert order tags to SambaPOS format
+                // Process order tags to SambaPOS format
                 let orderTagsString = '';
-                if (order.orderTags && order.orderTags.length > 0) {
-                    // Process tags to proper SambaPOS format
-                    const processedTags = order.orderTags.map(tag => {
+                if (order.tags && order.tags.length > 0) {
+                    const processedTags = order.tags.map(tag => {
                         if (tag.startsWith('Comentarios:')) {
-                            // Comments become special notes
-                            return `Nota:${tag.replace('Comentarios:', '').trim()}`;
-                        } else if (tag.includes(':')) {
-                            // Keep group:value format
-                            return tag;
-                        } else {
-                            // Simple tags
-                            return `Tag:${tag}`;
+                            // Convert comments to SambaPOS format
+                            const comment = tag.replace('Comentarios:', '');
+                            return `Nota:${comment}`;
                         }
+                        return tag;
                     });
                     orderTagsString = processedTags.join(',');
                 }
@@ -347,8 +342,12 @@ const POSView = () => {
 
             // Close the terminal ticket
             debug('🔒 Closing terminal ticket...');
-            await closeTerminalTicketModern(terminalId);
-            debug('✅ Ticket closed successfully');
+            const closeResult = await closeTerminalTicketModern(terminalId);
+            debug('✅ Ticket closed successfully, result:', closeResult);
+
+            // Wait a moment for SambaPOS to process the closure
+            debug('⏳ Waiting for SambaPOS to process ticket closure...');
+            await new Promise(resolve => setTimeout(resolve, 1000));
 
             // Clear table cache to ensure status updates
             debug('🗑️ Clearing table cache to refresh status...');
@@ -356,9 +355,17 @@ const POSView = () => {
             cacheService.clearTables();
             debug('✅ Table cache cleared');
 
-            // Navigate back to tables
+            // Also clear any terminal-related cache if exists
+            if (cacheService.clearTerminal) {
+                cacheService.clearTerminal();
+                debug('✅ Terminal cache cleared');
+            }
+
+            // Navigate back to tables with a small delay to ensure cache is cleared
             debug('🏠 Navigating back to tables...');
-            navigate('/tables');
+            setTimeout(() => {
+                navigate('/tables');
+            }, 500);
 
         } catch (error) {
             debug('❌ Error closing ticket:', error);

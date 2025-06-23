@@ -1002,3 +1002,79 @@ export async function createEmptyTicket(tableId) {
         throw error;
     }
 }
+
+// Add missing functions for existing ticket handling
+export const getTerminalTicketsForTable = async (terminalId, tableName) => {
+    return new Promise((resolve, reject) => {
+        getTerminalTickets(terminalId, (tickets) => {
+            if (tickets) {
+                debug('✅ Got terminal tickets:', tickets);
+                // Filter tickets for this specific table
+                const tableTickets = tickets.filter(ticket => 
+                    ticket.entities && ticket.entities.some(entity => entity.name === tableName)
+                );
+                debug(`📋 Found ${tableTickets.length} tickets for table ${tableName}:`, tableTickets);
+                resolve(tableTickets);
+            } else {
+                debug('❌ No tickets returned from getTerminalTickets');
+                resolve([]);
+            }
+        });
+    });
+};
+
+export const loadTerminalTicketWithOrders = async (terminalId, ticketId) => {
+    return new Promise((resolve, reject) => {
+        loadTerminalTicket(terminalId, ticketId, (ticket) => {
+            if (ticket) {
+                debug('✅ Loaded terminal ticket with orders:', ticket);
+                resolve(ticket);
+            } else {
+                debug('❌ Failed to load terminal ticket');
+                reject(new Error('Failed to load ticket'));
+            }
+        });
+    });
+};
+
+export const createTerminalTicketAsync = async (terminalId) => {
+    return new Promise((resolve, reject) => {
+        createTerminalTicket(terminalId, (ticket) => {
+            if (ticket) {
+                debug('✅ Created terminal ticket:', ticket);
+                resolve(ticket);
+            } else {
+                debug('❌ Failed to create terminal ticket');
+                reject(new Error('Failed to create ticket'));
+            }
+        });
+    });
+};
+
+export const changeEntityOfTerminalTicketAsync = async (terminalId, tableName) => {
+    const config = appconfig();
+    const query = `mutation {
+        ticket:changeEntityOfTerminalTicket(
+            terminalId:"${terminalId}",
+            entityType:"${config.entityTypeName}",
+            entityName:"${tableName}"
+        )
+        ${getTicketResult()}
+    }`;
+
+    return new Promise((resolve, reject) => {
+        $.postJSON(query, function (response) {
+            if (response.errors) {
+                debug('❌ Error assigning table to ticket:', response.errors);
+                reject(new Error(response.errors[0].message));
+            } else {
+                debug('✅ Table assigned to ticket:', response.data.ticket);
+                resolve(response.data.ticket);
+            }
+        });
+    });
+};
+
+// Export aliases for easier use
+export { createTerminalTicketAsync as createTerminalTicket };
+export { changeEntityOfTerminalTicketAsync as changeEntityOfTerminalTicket };

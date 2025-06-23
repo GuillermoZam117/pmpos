@@ -2,6 +2,7 @@
  * Cache Service for PMPOS
  * Manages caching of tables and other frequently accessed data
  */
+import debug from '../utils/debug';
 
 const CACHE_KEYS = {
     TABLES: 'pmpos_cached_tables',
@@ -153,6 +154,27 @@ class CacheService {
      */
     clearMenu() {
         this.invalidateMenu();
+    }
+
+    /**
+     * Clear terminal-related cache
+     */
+    clearTerminal() {
+        // Clear any terminal-related cache keys
+        const terminalKeys = Object.keys(localStorage).filter(key => 
+            key.includes('terminal') || key.includes('ticket')
+        );
+        terminalKeys.forEach(key => localStorage.removeItem(key));
+        debug('🗑️ Cleared terminal cache keys:', terminalKeys);
+    }
+
+    /**
+     * Clear all cache
+     */
+    clearAll() {
+        this.invalidateTables();
+        this.invalidateMenu();
+        this.clearTerminal();
     }
 }
 
