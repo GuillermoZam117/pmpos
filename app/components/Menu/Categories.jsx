@@ -30,13 +30,27 @@ const Categories = ({ menu, selectedCategory, categories = [], onCategoryClick }
 };
 
 const mapStateToProps = (state) => {
-    // Add debug logging
-    console.log('Categories state:', state?.app?.toJS());
+    // Handle both Immutable and plain object state
+    const appState = state.app;
+    let menu, selectedCategory, categories = [];
+    
+    if (appState && typeof appState.get === 'function') {
+        // Immutable.js format
+        menu = appState.get('menu');
+        selectedCategory = appState.get('selectedCategory');
+        const menuData = appState.getIn(['menu', 'categories']);
+        categories = menuData ? menuData.toJS() : [];
+    } else if (appState && typeof appState === 'object') {
+        // Plain object format
+        menu = appState.menu;
+        selectedCategory = appState.selectedCategory;
+        categories = appState.menu?.categories || [];
+    }
     
     return {
-        menu: state.app?.get('menu'),
-        selectedCategory: state.app?.get('selectedCategory'),
-        categories: state.app?.getIn(['menu', 'categories'])?.toJS() || []
+        menu,
+        selectedCategory,
+        categories
     };
 };
 

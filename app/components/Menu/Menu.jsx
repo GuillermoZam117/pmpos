@@ -77,11 +77,31 @@ Menu.propTypes = {
     onMenuItemClick: PropTypes.func
 };
 
-const mapStateToProps = (state) => ({
-    selectedCategory: state.app.get('selectedCategory'),
-    menu: state.app.get('menu'),
-    terminalId: state.app.get('terminalId')
-});
+const mapStateToProps = (state) => {
+    const appState = state.app;
+    
+    if (appState && typeof appState.get === 'function') {
+        // Immutable.js format
+        return {
+            selectedCategory: appState.get('selectedCategory'),
+            menu: appState.get('menu'),
+            terminalId: appState.get('terminalId')
+        };
+    } else if (appState && typeof appState === 'object') {
+        // Plain object format
+        return {
+            selectedCategory: appState.selectedCategory,
+            menu: appState.menu,
+            terminalId: appState.terminalId
+        };
+    }
+    
+    return {
+        selectedCategory: null,
+        menu: null,
+        terminalId: null
+    };
+};
 
 const mapDispatchToProps = {
   changeSelectedCategory: Actions.changeSelectedCategory,
