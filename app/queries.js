@@ -187,15 +187,23 @@ export const getMenu = async (callback, forceRefresh = false) => {
 
         console.log('🔄 Fetching menu from server...');
         const token = await ensureAuthenticated();
+        
+        // Use the proper SambaPOS GraphQL query
+        const query = getMenuScript();
+        console.log('📋 Using query:', query);
+        
         const response = await fetch(appconfig().GQLurl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify({ query: '{ menu { categories { name items { id name price } } } }' })
+            body: JSON.stringify({ query })
         });
+        
         const data = await response.json();
+        console.log('📊 Menu response from server:', data);
+        
         if (data.errors) {
             console.error('❌ GraphQL errors:', data.errors);
             
@@ -210,10 +218,14 @@ export const getMenu = async (callback, forceRefresh = false) => {
         
         console.log('✅ Menu loaded from server');
         
-        // Cache the menu
-        cacheService.setMenu(data.data.menu);
+        // Extract the menu data (should be data.data.menu)
+        const menuData = data.data.menu;
+        console.log('📊 Extracted menu data:', menuData);
         
-        if (callback) callback(data.data.menu);
+        // Cache the menu
+        cacheService.setMenu(menuData);
+        
+        if (callback) callback(menuData);
     } catch (error) {
         console.error('❌ Menu fetch error:', error);
         

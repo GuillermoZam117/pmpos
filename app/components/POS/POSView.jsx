@@ -71,15 +71,25 @@ const POSView = () => {
         const loadMenu = async () => {
             try {
                 debug('🔄 Loading menu...');
-                await getMenu((menuData) => {
-                    if (menuData) {
-                        debug('🔄 Dispatching setMenu action with data:', menuData);
-                        dispatch(Actions.setMenu(menuData));
-                        debug('✅ Menu dispatched to Redux');
-                    } else {
-                        debug('❌ No menu data received');
-                    }
+                const menuData = await new Promise((resolve) => {
+                    getMenu((data) => {
+                        if (data) {
+                            debug('🔄 Received menu data from server:', data);
+                            resolve(data);
+                        } else {
+                            debug('❌ No menu data received');
+                            resolve(null);
+                        }
+                    });
                 });
+                
+                if (menuData) {
+                    debug('🔄 Dispatching setMenu action with data:', menuData);
+                    dispatch(Actions.setMenu(menuData));
+                    debug('✅ Menu dispatched to Redux');
+                } else {
+                    debug('❌ No menu data received');
+                }
             } catch (error) {
                 debug('❌ Error loading menu:', error);
             } finally {
