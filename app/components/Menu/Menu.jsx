@@ -75,8 +75,12 @@ class Menu extends React.Component {
     }
     
     // Update menu items for the selected category
-    if (this.props.setMenuItems && selectedCategory.items) {
-      this.props.setMenuItems(selectedCategory.items);
+    console.log('🔍 Selected category:', selectedCategory);
+    if (this.props.setMenuItems && selectedCategory.menuItems) {
+      console.log('✅ Setting menu items:', selectedCategory.menuItems);
+      this.props.setMenuItems(selectedCategory.menuItems);
+    } else {
+      console.warn('❌ No menuItems found in category:', selectedCategory);
     }
   }
 }
