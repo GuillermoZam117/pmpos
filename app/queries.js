@@ -1158,3 +1158,277 @@ export const registerTerminalAsync = async () => {
         throw error;
     }
 };
+
+// Add a debug function to test different ticket queries
+export const debugTicketQueries = async (terminalId) => {
+    try {
+        const token = await ensureAuthenticated();
+        const config = appconfig();
+        
+        console.log('🔍 DEBUGGING TICKET QUERIES FOR TERMINAL:', terminalId);
+        
+        // Test 1: getTerminalTickets
+        console.log('\n=== TEST 1: getTerminalTickets ===');
+        const query1 = getGetTerminalTicketsScript(terminalId);
+        console.log('Query:', query1);
+        
+        const response1 = await fetch(config.GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ query: query1 })
+        });
+        
+        const data1 = await response1.json();
+        console.log('Response:', data1);
+        
+        // Test 2: Try different ticket query format
+        console.log('\n=== TEST 2: Alternative ticket query ===');
+        const query2 = `query {
+            tickets: getTerminalTickets(terminalId: "${terminalId}") {
+                id
+                uid
+                number
+                date
+                totalAmount
+                remainingAmount
+                entities {
+                    type
+                    name
+                }
+                orders {
+                    id
+                    uid
+                    productId
+                    name
+                    quantity
+                    price
+                }
+            }
+        }`;
+        console.log('Query:', query2);
+        
+        const response2 = await fetch(config.GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ query: query2 })
+        });
+        
+        const data2 = await response2.json();
+        console.log('Response:', data2);
+        
+        // Test 3: Try getTickets (global tickets)
+        console.log('\n=== TEST 3: Global getTickets ===');
+        const query3 = `query {
+            tickets: getTickets(isClosed: false) {
+                id
+                uid
+                number
+                date
+                totalAmount
+                remainingAmount
+                entities {
+                    type
+                    name
+                }
+                orders {
+                    id
+                    uid
+                    productId
+                    name
+                    quantity
+                    price
+                }
+            }
+        }`;
+        console.log('Query:', query3);
+        
+        const response3 = await fetch(config.GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ query: query3 })
+        });
+        
+        const data3 = await response3.json();
+        console.log('Response:', data3);
+        
+        return { data1, data2, data3 };
+        
+    } catch (error) {
+        console.error('❌ Error in debugTicketQueries:', error);
+        throw error;
+    }
+};
+
+// Alternative function to find tickets by table using different approaches
+export const findTicketByTableAlternative = async (tableName) => {
+    try {
+        const token = await ensureAuthenticated();
+        const config = appconfig();
+        
+        console.log('🔍 SEARCHING FOR TICKETS BY TABLE:', tableName);
+        
+        // Approach 1: Try to get all open tickets and filter by table
+        console.log('\n=== APPROACH 1: Get all open tickets ===');
+        try {
+            const query1 = `query {
+                tickets: getTickets(isClosed: false) {
+                    id
+                    uid
+                    number
+                    date
+                    totalAmount
+                    remainingAmount
+                    entities {
+                        type
+                        name
+                    }
+                    orders {
+                        id
+                        uid
+                        productId
+                        name
+                        quantity
+                        price
+                        portion
+                        tags {
+                            tagName
+                            tag
+                        }
+                    }
+                }
+            }`;
+            
+            const response1 = await fetch(config.GQLurl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ query: query1 })
+            });
+            
+            const data1 = await response1.json();
+            console.log('All tickets response:', data1);
+            
+            if (data1.data && data1.data.tickets) {
+                const tableTicket = data1.data.tickets.find(ticket => 
+                    ticket.entities && ticket.entities.some(entity => entity.name === tableName)
+                );
+                
+                if (tableTicket) {
+                    console.log('✅ Found ticket for table using global query:', tableTicket);
+                    return tableTicket;
+                }
+            }
+        } catch (error) {
+            console.log('❌ Approach 1 failed:', error.message);
+        }
+        
+        // Approach 2: Try different terminal IDs
+        console.log('\n=== APPROACH 2: Try different terminal IDs ===');
+        const terminalIds = ['1', '2', 'default', 'POS', 'Terminal1'];
+        
+        for (const terminalId of terminalIds) {
+            try {
+                console.log(`Trying terminal ID: ${terminalId}`);
+                const query2 = getGetTerminalTicketsScript(terminalId);
+                
+                const response2 = await fetch(config.GQLurl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ query: query2 })
+                });
+                
+                const data2 = await response2.json();
+                console.log(`Terminal ${terminalId} response:`, data2);
+                
+                if (data2.data && data2.data.tickets) {
+                    const tableTicket = data2.data.tickets.find(ticket => 
+                        ticket.entities && ticket.entities.some(entity => entity.name === tableName)
+                    );
+                    
+                    if (tableTicket) {
+                        console.log(`✅ Found ticket for table using terminal ${terminalId}:`, tableTicket);
+                        return { ...tableTicket, terminalId };
+                    }
+                }
+            } catch (error) {
+                console.log(`❌ Terminal ${terminalId} failed:`, error.message);
+            }
+        }
+        
+        // Approach 3: Try to use ticket number directly if we know it
+        console.log('\n=== APPROACH 3: Direct ticket lookup ===');
+        try {
+            // Try to get ticket by number (we saw it's ticket #1)
+            const query3 = `query {
+                ticket: getTicket(id: "1") {
+                    id
+                    uid
+                    number
+                    date
+                    totalAmount
+                    remainingAmount
+                    entities {
+                        type
+                        name
+                    }
+                    orders {
+                        id
+                        uid
+                        productId
+                        name
+                        quantity
+                        price
+                        portion
+                        tags {
+                            tagName
+                            tag
+                        }
+                    }
+                }
+            }`;
+            
+            const response3 = await fetch(config.GQLurl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ query: query3 })
+            });
+            
+            const data3 = await response3.json();
+            console.log('Direct ticket lookup response:', data3);
+            
+            if (data3.data && data3.data.ticket) {
+                const ticket = data3.data.ticket;
+                if (ticket.entities && ticket.entities.some(entity => entity.name === tableName)) {
+                    console.log('✅ Found ticket using direct lookup:', ticket);
+                    return ticket;
+                }
+            }
+        } catch (error) {
+            console.log('❌ Approach 3 failed:', error.message);
+        }
+        
+        console.log('❌ No ticket found for table:', tableName);
+        return null;
+        
+    } catch (error) {
+        console.error('❌ Error in findTicketByTableAlternative:', error);
+        throw error;
+    }
+};

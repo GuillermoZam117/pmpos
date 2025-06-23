@@ -15,7 +15,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import PersonIcon from '@mui/icons-material/Person';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
 import TableCard from './TableCard';
-import { getEntityScreenItems, getTicketByTable, createEmptyTicket, getTerminalTicketsForTable, loadTerminalTicketWithOrders, createTerminalTicketAsync, changeEntityOfTerminalTicketAsync, registerTerminalAsync } from '../queries';
+import { getEntityScreenItems, getTicketByTable, createEmptyTicket, getTerminalTicketsForTable, loadTerminalTicketWithOrders, createTerminalTicketAsync, changeEntityOfTerminalTicketAsync, registerTerminalAsync, debugTicketQueries, findTicketByTableAlternative } from '../queries';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../actions/auth';
@@ -63,11 +63,38 @@ const TableView = () => {
             const terminalId = await registerTerminalAsync();
             debug('✅ Terminal registered:', terminalId);
             
+            // DEBUG: If this is Mesa 3, run debug queries
+            if (table.name === 'Mesa 3') {
+                debug('🔍 Running debug queries for Mesa 3...');
+                await debugTicketQueries(terminalId);
+            }
+            
             // Check if table is occupied (has existing ticket)
             if (tableStatus === 'OCUPADO') {
                 debug('🎫 Table is occupied, looking for existing tickets...');
                 try {
-                    // Use native SambaPOS function to get terminal tickets
+                    // Try the alternative ticket finding method first
+                    debug('🔍 Using alternative ticket search...');
+                    const existingTicket = await findTicketByTableAlternative(table.name);
+                    
+                    if (existingTicket) {
+                        debug('✅ Found existing ticket using alternative method:', existingTicket);
+                        // Use the terminalId from the ticket if available, otherwise use current
+                        const ticketTerminalId = existingTicket.terminalId || terminalId;
+                        existingTicket.terminalId = ticketTerminalId;
+                        
+                        navigate('/pos', { 
+                            state: { 
+                                ticket: existingTicket,
+                                tableId: table.name,
+                                isNew: false
+                            }
+                        });
+                        return;
+                    }
+                    
+                    // Fallback to original method
+                    debug('🔄 Fallback to original terminal tickets method...');
                     const existingTickets = await getTerminalTicketsForTable(terminalId, table.name);
                     if (existingTickets && existingTickets.length > 0) {
                         // Load the most recent ticket for this table
