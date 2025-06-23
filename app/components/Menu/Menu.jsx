@@ -88,7 +88,7 @@ class Menu extends React.Component {
 Menu.propTypes = {
     menu: PropTypes.shape({
         categories: PropTypes.arrayOf(PropTypes.shape({
-            name: PropTypes.string.required,
+            name: PropTypes.string.isRequired,
             color: PropTypes.string,
             foreground: PropTypes.string
         }))
