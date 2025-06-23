@@ -38,19 +38,19 @@ const POSView = () => {
         
         let menuData = null;
         if (appState && typeof appState.get === 'function') {
-            // Immutable.js format
+            // Immutable.js format - use the same method as Menu.jsx
             menuData = appState.get('menu');
-            if (menuData && typeof menuData.toJS === 'function') {
-                menuData = menuData.toJS();
-            }
-            debug('🔍 Menu from Immutable:', menuData);
+            debug('🔍 Raw menu from Immutable.get:', menuData);
+            
+            // Don't convert to JS yet - keep it as Immutable for consistency with Menu.jsx
+            debug('🔍 Menu from Immutable (keeping as Immutable):', menuData);
         } else if (appState && typeof appState === 'object') {
             // Plain object format
             menuData = appState.menu;
             debug('🔍 Menu from plain object:', menuData);
         }
         
-        debug('🔍 Final menu data:', menuData);
+        debug('🔍 Final menu data for POSView:', menuData);
         return menuData;
     });
     
@@ -184,7 +184,7 @@ const POSView = () => {
                     {loading ? (
                         <Typography>Cargando menú...</Typography>
                     ) : (
-                        <Menu menu={menu} onMenuItemClick={handleMenuItemClick} />
+                        <Menu onMenuItemClick={handleMenuItemClick} />
                     )}
                 </Box>
 
