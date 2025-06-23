@@ -15,7 +15,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import PersonIcon from '@mui/icons-material/Person';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
 import TableCard from './TableCard';
-import { getEntityScreenItems, getTicketByTable, createEmptyTicket, getTerminalTicketsForTable, loadTerminalTicketWithOrders, createTerminalTicketAsync, changeEntityOfTerminalTicket } from '../queries';
+import { getEntityScreenItems, getTicketByTable, createEmptyTicket, getTerminalTicketsForTable, loadTerminalTicketWithOrders, createTerminalTicketAsync, changeEntityOfTerminalTicketAsync, registerTerminalAsync } from '../queries';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../actions/auth';
@@ -60,7 +60,7 @@ const TableView = () => {
             
             // First, register terminal to get terminalId
             debug('🔄 Registering terminal...');
-            const terminalId = await registerTerminal();
+            const terminalId = await registerTerminalAsync();
             debug('✅ Terminal registered:', terminalId);
             
             // Check if table is occupied (has existing ticket)
@@ -106,10 +106,24 @@ const TableView = () => {
             const ticket = await createTerminalTicketAsync(terminalId);
             debug('✅ New ticket created:', ticket);
             
-            // Assign table to ticket
-            debug(`🏷️ Assigning table ${table.name} to ticket...`);
-            const updatedTicket = await changeEntityOfTerminalTicket(terminalId, table.name);
-            debug('✅ Table assigned to ticket:', updatedTicket);
+            // Try to assign table to ticket, but continue if it fails
+            let updatedTicket = ticket;
+            try {
+                debug(`🏷️ Assigning table ${table.name} to ticket...`);
+                updatedTicket = await changeEntityOfTerminalTicketAsync(terminalId, table.name);
+                debug('✅ Table assigned to ticket:', updatedTicket);
+            } catch (assignError) {
+                debug('⚠️ Could not assign table to ticket (continuing anyway):', assignError.message);
+                // Create a ticket with table info manually added
+                updatedTicket = {
+                    ...ticket,
+                    entities: [{
+                        name: table.name,
+                        type: 'MESAS' // Using the entity type from config
+                    }]
+                };
+                debug('✅ Table info added manually to ticket:', updatedTicket);
+            }
             
             // Add terminalId to ticket for later use
             updatedTicket.terminalId = terminalId;

@@ -637,6 +637,7 @@ function getAddOrderToTerminalTicketScript(terminalId, productId, orderTags) {
 
 // Update the mutation function with correct parameters
 function getChangeEntityOfTerminalTicketScript(terminalId, entityName) {
+    const config = appconfig();
     return `mutation {
         changeEntityOfTerminalTicket(
             terminalId: "${terminalId}",
@@ -1005,75 +1006,155 @@ export async function createEmptyTicket(tableId) {
 
 // Add missing functions for existing ticket handling
 export const getTerminalTicketsForTable = async (terminalId, tableName) => {
-    return new Promise((resolve, reject) => {
-        getTerminalTickets(terminalId, (tickets) => {
-            if (tickets) {
-                debug('✅ Got terminal tickets:', tickets);
-                // Filter tickets for this specific table
-                const tableTickets = tickets.filter(ticket => 
-                    ticket.entities && ticket.entities.some(entity => entity.name === tableName)
-                );
-                debug(`📋 Found ${tableTickets.length} tickets for table ${tableName}:`, tableTickets);
-                resolve(tableTickets);
-            } else {
-                debug('❌ No tickets returned from getTerminalTickets');
-                resolve([]);
-            }
+    try {
+        const token = await ensureAuthenticated();
+        const query = getGetTerminalTicketsScript(terminalId);
+        
+        const response = await fetch(appconfig().GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ query })
         });
-    });
+        
+        const data = await response.json();
+        if (data.errors) {
+            debug('❌ Error getting terminal tickets:', data.errors);
+            return [];
+        }
+        
+        const tickets = data.data.tickets || [];
+        debug('✅ Got terminal tickets:', tickets);
+        
+        // Filter tickets for this specific table
+        const tableTickets = tickets.filter(ticket => 
+            ticket.entities && ticket.entities.some(entity => entity.name === tableName)
+        );
+        debug(`📋 Found ${tableTickets.length} tickets for table ${tableName}:`, tableTickets);
+        return tableTickets;
+    } catch (error) {
+        debug('❌ Error in getTerminalTicketsForTable:', error);
+        return [];
+    }
 };
 
 export const loadTerminalTicketWithOrders = async (terminalId, ticketId) => {
-    return new Promise((resolve, reject) => {
-        loadTerminalTicket(terminalId, ticketId, (ticket) => {
-            if (ticket) {
-                debug('✅ Loaded terminal ticket with orders:', ticket);
-                resolve(ticket);
-            } else {
-                debug('❌ Failed to load terminal ticket');
-                reject(new Error('Failed to load ticket'));
-            }
+    try {
+        const token = await ensureAuthenticated();
+        const query = getLoadTerminalTicketScript(terminalId, ticketId);
+        
+        const response = await fetch(appconfig().GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ query })
         });
-    });
+        
+        const data = await response.json();
+        if (data.errors) {
+            debug('❌ Failed to load terminal ticket:', data.errors);
+            throw new Error(data.errors[0].message);
+        }
+        
+        const ticket = data.data.ticket;
+        if (!ticket) {
+            throw new Error('Ticket not found');
+        }
+        
+        debug('✅ Loaded terminal ticket with orders:', ticket);
+        return ticket;
+    } catch (error) {
+        debug('❌ Error in loadTerminalTicketWithOrders:', error);
+        throw error;
+    }
 };
 
 export const createTerminalTicketAsync = async (terminalId) => {
-    return new Promise((resolve, reject) => {
-        createTerminalTicket(terminalId, (ticket) => {
-            if (ticket) {
-                debug('✅ Created terminal ticket:', ticket);
-                resolve(ticket);
-            } else {
-                debug('❌ Failed to create terminal ticket');
-                reject(new Error('Failed to create ticket'));
-            }
+    try {
+        const token = await ensureAuthenticated();
+        const query = getCreateTerminalTicketScript(terminalId);
+        
+        const response = await fetch(appconfig().GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ query })
         });
-    });
+        
+        const data = await response.json();
+        if (data.errors) {
+            throw new Error(data.errors[0].message);
+        }
+        
+        debug('✅ Created terminal ticket:', data.data.ticket);
+        return data.data.ticket;
+    } catch (error) {
+        debug('❌ Failed to create terminal ticket:', error);
+        throw error;
+    }
 };
 
 export const changeEntityOfTerminalTicketAsync = async (terminalId, tableName) => {
-    const config = appconfig();
-    const query = `mutation {
-        ticket:changeEntityOfTerminalTicket(
-            terminalId:"${terminalId}",
-            entityType:"${config.entityTypeName}",
-            entityName:"${tableName}"
-        )
-        ${getTicketResult()}
-    }`;
+    try {
+        const token = await ensureAuthenticated();
+        const query = getChangeEntityOfTerminalTicketScript(terminalId, tableName);
 
-    return new Promise((resolve, reject) => {
-        $.postJSON(query, function (response) {
-            if (response.errors) {
-                debug('❌ Error assigning table to ticket:', response.errors);
-                reject(new Error(response.errors[0].message));
-            } else {
-                debug('✅ Table assigned to ticket:', response.data.ticket);
-                resolve(response.data.ticket);
-            }
+        const response = await fetch(appconfig().GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ query })
         });
-    });
+        
+        const data = await response.json();
+        if (data.errors) {
+            debug('❌ Error assigning table to ticket:', data.errors);
+            throw new Error(data.errors[0].message);
+        }
+        
+        debug('✅ Table assigned to ticket:', data.data.changeEntityOfTerminalTicket);
+        return data.data.changeEntityOfTerminalTicket;
+    } catch (error) {
+        debug('❌ Error in changeEntityOfTerminalTicketAsync:', error);
+        throw error;
+    }
 };
 
-// Export aliases for easier use (only for functions that don't already exist)
-export { changeEntityOfTerminalTicketAsync as changeEntityOfTerminalTicket };
+// Note: Using existing function names to avoid duplicates
+// changeEntityOfTerminalTicket already exists at line 363
+// createTerminalTicket already exists at line 278
+
+// Modern version of registerTerminal using fetch instead of $.postJSON
+export const registerTerminalAsync = async () => {
+    try {
+        const token = await ensureAuthenticated();
+        const query = getRegisterTerminalScript();
+        
+        const response = await fetch(appconfig().GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ query })
+        });
+        
+        const data = await response.json();
+        if (data.errors) {
+            throw new Error(data.errors[0].message);
+        }
+        
+        return data.data.terminalId;
+    } catch (error) {
+        console.error('❌ Error registering terminal:', error);
+        throw error;
+    }
+};
