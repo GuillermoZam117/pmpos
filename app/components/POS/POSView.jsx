@@ -52,10 +52,19 @@ const POSView = () => {
     const [orderEditDialogOpen, setOrderEditDialogOpen] = useState(false);
     const [orderToEdit, setOrderToEdit] = useState(null);
 
-    // Redux state for menu
+    // Redux state for menu and terminal
     const appState = useSelector(state => state.app);
+    const terminalState = useSelector(state => state.terminal);
+    
+    // Get terminalId from terminal state with ticket fallback
+    const globalTerminalId = terminalState?.get ? terminalState.get('id') : terminalState?.id;
+    const effectiveTerminalId = globalTerminalId || ticket?.terminalId;
+    
     debug('🔍 Redux app state type:', typeof appState);
     debug('🔍 App state methods:', Object.getOwnPropertyNames(appState));
+    debug('🔍 Global terminal ID from state:', globalTerminalId);
+    debug('🔍 Ticket terminal ID:', ticket?.terminalId);
+    debug('🔍 Effective terminal ID:', effectiveTerminalId);
     
     // Handle both Immutable and plain object states
     let menu;
@@ -342,7 +351,7 @@ const POSView = () => {
         }
         
         // Store terminal ID for payment dialog
-        setCurrentTerminalId(ticket.terminalId);
+        setCurrentTerminalId(effectiveTerminalId);
         setPaymentDialogOpen(true);
     };
 
@@ -352,7 +361,7 @@ const POSView = () => {
         try {
             // Execute payment workflow for automation
             const { automationService } = await import('../../services/automationService');
-            await automationService.executeWorkflow(ticket.terminalId, 'PROCESS_PAYMENT', {
+            await automationService.executeWorkflow(effectiveTerminalId, 'PROCESS_PAYMENT', {
                 amount: paymentInfo.amount,
                 paymentType: paymentInfo.paymentType,
                 tableName: tableId,
@@ -415,7 +424,7 @@ const POSView = () => {
         try {
             debug('🗑️ Clearing all orders...');
             const { orderService } = await import('../../services/orderService');
-            const result = await orderService.clearAllOrders(ticket.terminalId);
+            const result = await orderService.clearAllOrders(effectiveTerminalId);
             
             if (result.success) {
                 setOrders([]);
@@ -440,7 +449,7 @@ const POSView = () => {
             debug('📋 Orders to process:', orders);
 
             // Get terminal ID from the ticket (set during ticket creation)
-            const terminalId = ticket.terminalId;
+            const terminalId = effectiveTerminalId;
             if (!terminalId) {
                 throw new Error('No terminal ID found in ticket');
             }
@@ -486,7 +495,7 @@ const POSView = () => {
                     }
                     debug('🏷️ Processed order tags:', orderTagsString);
                     
-                    await addOrderToTicketModern(ticket.uid, order.productId, order.quantity, orderTagsString);
+                    await addOrderToTicketModern(effectiveTerminalId, order.productId, order.quantity, orderTagsString);
                     debug('✅ Order added successfully');
                 }
             } else {
@@ -543,11 +552,11 @@ const POSView = () => {
     };
 
     // Modern version of addOrderToTerminalTicket using fetch
-    const addOrderToTicketModern = async (ticketId, productId, quantity = 1, orderTags = '') => {
+    const addOrderToTicketModern = async (terminalId, productId, quantity = 1, orderTags = '') => {
         const token = await ensureAuthenticated();
         const config = appconfig();
         
-        debug('➕ Adding order to ticket:', { ticketId, productId, quantity, orderTags });
+        debug('➕ Adding order to ticket:', { terminalId, productId, quantity, orderTags });
         debug('🏷️ Processed order tags:', orderTags);
         
         // Use the existing getAddOrderToTerminalTicketScript function from queries.js
@@ -582,7 +591,7 @@ const POSView = () => {
             }}`;
         };
         
-        const mutation = getAddOrderToTerminalTicketScript(ticket.terminalId, productId, orderTags);
+        const mutation = getAddOrderToTerminalTicketScript(terminalId, productId, orderTags);
 
         const response = await fetch(config.GQLurl, {
             method: 'POST',
@@ -884,7 +893,7 @@ const POSView = () => {
                     setOrderToEdit(null);
                 }}
                 order={orderToEdit}
-                terminalId={ticket?.terminalId}
+                terminalId={effectiveTerminalId}
                 onOrderUpdated={handleOrderUpdated}
                 onOrderDeleted={handleOrderDeleted}
                 onError={(error) => alert('Error: ' + error.message)}
