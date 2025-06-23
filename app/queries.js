@@ -1296,9 +1296,15 @@ export const findTicketByTableAlternative = async (tableName) => {
                         uid
                         productId
                         name
+                        caption
                         quantity
                         price
                         portion
+                        product {
+                            id
+                            name
+                            caption
+                        }
                         tags {
                             tagName
                             tag
@@ -1393,9 +1399,15 @@ export const findTicketByTableAlternative = async (tableName) => {
                             uid
                             productId
                             name
+                            caption
                             quantity
                             price
                             portion
+                            product {
+                                id
+                                name
+                                caption
+                            }
                             tags {
                                 tagName
                                 tag

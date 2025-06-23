@@ -68,17 +68,33 @@ const POSView = () => {
                 debug('📋 Loading existing orders from ticket:', ticket.orders);
                 
                 // Convert ticket orders to local order format
-                const convertedOrders = ticket.orders.map(order => ({
-                    id: Date.now() + Math.random(), // Generate local ID
-                    uid: order.uid,
-                    productId: order.productId,
-                    name: order.productName || `Product ${order.productId}`, // Will be updated when menu loads
-                    caption: order.productName || `Product ${order.productId}`,
-                    quantity: order.quantity,
-                    price: order.price,
-                    portion: order.portion || 'Normal',
-                    orderTags: order.orderTags ? order.orderTags.split(',').filter(tag => tag.trim()) : []
-                }));
+                const convertedOrders = ticket.orders.map(order => {
+                    // Try different fields for product name
+                    let productName = order.name || order.caption || 
+                                    (order.product && (order.product.name || order.product.caption)) ||
+                                    `Product ${order.productId}`;
+                    
+                    debug('🔍 Processing order:', {
+                        orderId: order.uid,
+                        productId: order.productId,
+                        orderName: order.name,
+                        orderCaption: order.caption,
+                        productData: order.product,
+                        finalName: productName
+                    });
+                    
+                    return {
+                        id: Date.now() + Math.random(), // Generate local ID
+                        uid: order.uid,
+                        productId: order.productId,
+                        name: productName,
+                        caption: order.caption || productName,
+                        quantity: order.quantity,
+                        price: order.price,
+                        portion: order.portion || 'Normal',
+                        orderTags: order.orderTags ? order.orderTags.split(',').filter(tag => tag.trim()) : []
+                    };
+                });
                 
                 setOrders(convertedOrders);
                 debug('✅ Loaded existing orders:', convertedOrders);
@@ -92,15 +108,22 @@ const POSView = () => {
     useEffect(() => {
         if (menu && orders.length > 0) {
             debug('🔄 Updating order names with menu data...');
+            debug('🔍 Current orders before update:', orders);
+            debug('🔍 Menu structure:', menu);
             
             setOrders(prevOrders => prevOrders.map(order => {
+                debug(`🔍 Looking for menu item for product ID: ${order.productId}`);
                 const menuItem = findMenuItemByProductId(order.productId);
                 if (menuItem) {
-                    return {
+                    const updatedOrder = {
                         ...order,
                         name: menuItem.name || menuItem.caption,
                         caption: menuItem.caption || menuItem.name
                     };
+                    debug(`✅ Updated order name from "${order.name}" to "${updatedOrder.name}"`);
+                    return updatedOrder;
+                } else {
+                    debug(`⚠️ No menu item found for product ID: ${order.productId}`);
                 }
                 return order;
             }));
