@@ -194,9 +194,9 @@ const OrderEditDialog = ({
     };
 
     const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('es-ES', {
+        return new Intl.NumberFormat('es-MX', {
             style: 'currency',
-            currency: 'USD'
+            currency: 'MXN'
         }).format(amount);
     };
 

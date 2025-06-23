@@ -27,6 +27,7 @@ import { appconfig } from '../../config';
 import * as Actions from '../../actions';
 import * as paymentService from '../../services/paymentService';
 import * as automationService from '../../services/automationService';
+import { formatMXN } from '../../utils/currencyFormatter';
 import Debug from 'debug';
 
 const debug = Debug('pmpos:pos');
@@ -364,7 +365,7 @@ const POSView = () => {
         }
         
         // Show success message
-        alert(`Pago de $${paymentInfo.amount} procesado exitosamente. ${paymentInfo.change > 0 ? `Cambio: $${paymentInfo.change.toFixed(2)}` : ''}`);
+        alert(`Pago de ${formatMXN(paymentInfo.amount)} procesado exitosamente. ${paymentInfo.change > 0 ? `Cambio: ${formatMXN(paymentInfo.change)}` : ''}`);
         
         // Navigate back to tables after successful payment
         setTimeout(() => {
@@ -652,7 +653,7 @@ const POSView = () => {
                     
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                         <Typography variant="body2">
-                            Total: ${calculateTotal().toFixed(2)}
+                            Total: {formatMXN(calculateTotal())}
                         </Typography>
                         <Button 
                             color="inherit" 
@@ -828,9 +829,9 @@ const POSView = () => {
                                                         </Box>
                                                     )}
                                                 </Box>
-                                                <Typography variant="body1" fontWeight="bold">
-                                                    ${(order.price * order.quantity).toFixed(2)}
-                                                </Typography>
+                                                                                <Typography variant="body1" fontWeight="bold">
+                                    {formatMXN(order.price * order.quantity)}
+                                </Typography>
                                             </Box>
                                         </CardContent>
                                     </Card>
@@ -841,7 +842,7 @@ const POSView = () => {
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <Typography variant="h6">Total:</Typography>
                                     <Typography variant="h6" color="primary.main">
-                                        ${calculateTotal().toFixed(2)}
+                                        {formatMXN(calculateTotal())}
                                     </Typography>
                                 </Box>
                             </Box>

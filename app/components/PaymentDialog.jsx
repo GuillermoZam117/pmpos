@@ -30,6 +30,7 @@ import {
     Remove as RemoveIcon
 } from '@mui/icons-material';
 import { paymentService } from '../services/paymentService';
+import { formatMXN, isValidAmount, calculateChange } from '../utils/currencyFormatter';
 import Debug from 'debug';
 
 const debug = Debug('pmpos:payment-dialog');
@@ -72,7 +73,7 @@ const PaymentDialog = ({
 
     // Actualizar cálculos cuando cambia el monto de pago
     useEffect(() => {
-        if (paymentAmount && remainingAmount) {
+        if (paymentAmount && remainingAmount && isValidAmount(paymentAmount)) {
             try {
                 const validation = paymentService.validatePayment(paymentAmount, remainingAmount);
                 setChange(validation.change);
@@ -190,12 +191,29 @@ const PaymentDialog = ({
     };
 
     const handlePayment = async () => {
-        if (!selectedPaymentType || !paymentAmount || !terminalId) {
-            setError('Por favor complete todos los campos');
+        // Validación detallada
+        if (!terminalId) {
+            setError('❌ Terminal no encontrado');
+            return;
+        }
+        
+        if (!selectedPaymentType) {
+            setError('❌ Por favor seleccione un tipo de pago');
+            return;
+        }
+        
+        if (!paymentAmount || paymentAmount <= 0) {
+            setError('❌ Por favor ingrese un monto válido mayor a $0');
+            return;
+        }
+        
+        if (!isValidAmount(paymentAmount)) {
+            setError('❌ El monto ingresado no es válido');
             return;
         }
 
         setLoading(true);
+        setError(''); // Limpiar errores previos
         try {
             const result = await paymentService.payTicket(
                 terminalId,
@@ -251,10 +269,7 @@ const PaymentDialog = ({
     };
 
     const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('es-ES', {
-            style: 'currency',
-            currency: 'USD'
-        }).format(amount);
+        return formatMXN(amount);
     };
 
     return (

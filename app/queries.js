@@ -11,8 +11,8 @@ const debug = Debug('pmpos:queries');
 // Helper para obtener token
 const getToken = async () => {
     debug('🔑 Getting token...');
-    const { tokenService } = await import('./services/tokenService');
-    return await tokenService.getValidAccessToken();
+        const { tokenService } = await import('./services/tokenService');
+        return await tokenService.getValidAccessToken();
 };
 
 // Helper para hacer requests JSON
@@ -87,19 +87,19 @@ export const registerTerminalAsync = async () => {
         user: config.user,
         ticketType: config.ticketType
     };
-    
-    const response = await fetch(appconfig().GQLurl, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
+        
+        const response = await fetch(appconfig().GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
         body: JSON.stringify({ query, variables })
-    });
-    
-    const data = await response.json();
-    
-    if (data.errors) {
+        });
+        
+        const data = await response.json();
+        
+        if (data.errors) {
         console.error('🚨 GraphQL Errors in registerTerminal:', data.errors);
         console.error('📝 Query:', query);
         console.error('📋 Variables:', variables);
@@ -114,29 +114,29 @@ export const registerTerminalAsync = async () => {
 // ============================================
 export const getMenu = async (callback, forceRefresh = false) => {
     debug('📋 Getting menu...');
-    const { default: cacheService } = await import('./services/cacheService');
+            const { default: cacheService } = await import('./services/cacheService');
     
     if (!forceRefresh) {
-        const cachedMenu = cacheService.getMenu();
-        if (cachedMenu) {
+            const cachedMenu = cacheService.getMenu();
+            if (cachedMenu) {
             debug('✅ Using cached menu');
-            if (callback) callback(cachedMenu);
+                if (callback) callback(cachedMenu);
             return cachedMenu;
         }
     }
 
-    const token = await ensureAuthenticated();
+        const token = await ensureAuthenticated();
     const query = getMenuScript();
     
-    const response = await fetch(appconfig().GQLurl, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ query })
-    });
-    
+        const response = await fetch(appconfig().GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ query })
+        });
+
     const data = await response.json();
     
     if (data.data && data.data.menu) {
@@ -174,62 +174,62 @@ export const createTerminalTicketAsync = async (terminalId) => {
     const variables = { terminalId };
     
     const response = await fetch(appconfig().GQLurl, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
         body: JSON.stringify({ query, variables })
     });
+
+        const data = await response.json();
     
-    const data = await response.json();
-    
-    if (data.errors) {
+        if (data.errors) {
         console.error('🚨 GraphQL Errors in createTerminalTicket:', data.errors);
         console.error('📝 Query:', query);
         console.error('📋 Variables:', variables);
-        return null;
+                return null;
     }
     
     return data.data?.createTerminalTicket;
 };
 
 export const getTerminalTicketsForTable = async (terminalId, tableName) => {
-    const token = await ensureAuthenticated();
-    const query = getGetTerminalTicketsScript(terminalId);
-    
-    const response = await fetch(appconfig().GQLurl, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ query })
-    });
-    
-    const data = await response.json();
+        const token = await ensureAuthenticated();
+        const query = getGetTerminalTicketsScript(terminalId);
+        
+        const response = await fetch(appconfig().GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ query })
+        });
+        
+        const data = await response.json();
     return data.data?.getTerminalTickets || [];
 };
 
 export const loadTerminalTicketWithOrders = async (terminalId, ticketId) => {
-    const token = await ensureAuthenticated();
-    const query = getLoadTerminalTicketScript(terminalId, ticketId);
-    
-    const response = await fetch(appconfig().GQLurl, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ query })
-    });
-    
-    const data = await response.json();
+        const token = await ensureAuthenticated();
+        const query = getLoadTerminalTicketScript(terminalId, ticketId);
+        
+        const response = await fetch(appconfig().GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ query })
+        });
+        
+        const data = await response.json();
     return data.data?.loadTerminalTicket;
 };
 
 export const changeEntityOfTerminalTicketAsync = async (terminalId, tableName) => {
-    const token = await ensureAuthenticated();
+        const token = await ensureAuthenticated();
     const config = appconfig();
     
     const query = `mutation ChangeEntityOfTerminalTicket($terminalId: String!, $type: String!, $name: String!) {
@@ -247,19 +247,19 @@ export const changeEntityOfTerminalTicketAsync = async (terminalId, tableName) =
         type: config.entityType,
         name: tableName
     };
-    
-    const response = await fetch(appconfig().GQLurl, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
+
+        const response = await fetch(appconfig().GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
         body: JSON.stringify({ query, variables })
-    });
+        });
+        
+        const data = await response.json();
     
-    const data = await response.json();
-    
-    if (data.errors) {
+        if (data.errors) {
         console.error('🚨 GraphQL Errors in changeEntityOfTerminalTicket:', data.errors);
         console.error('📝 Query:', query);
         console.error('📋 Variables:', variables);
@@ -292,22 +292,22 @@ export function clearTerminalTicketOrders(terminalId, callback) {
 // ============================================
 export const getEntityScreenItems = async (screenName) => {
     debug('🖥️ Getting entity screen items for:', screenName);
-    const config = appconfig();
+        const config = appconfig();
     const token = await ensureAuthenticated();
-    
+        
     if (!screenName) {
         debug('❌ No screen name provided');
         return [];
     }
-    
+        
     const query = getGetEntityScreenItemsScript(screenName);
-    
+        
     const response = await fetch(config.GQLurl, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
         body: JSON.stringify({ query })
     });
     
@@ -331,25 +331,25 @@ export const getEntityScreenItems = async (screenName) => {
 // PAYMENT FUNCTIONS
 // ============================================
 export const payTerminalTicket = async (terminalId, paymentTypeName, amount, callback) => {
-    const token = await ensureAuthenticated();
-    const config = appconfig();
-    
+        const token = await ensureAuthenticated();
+        const config = appconfig();
+        
     const query = `
         mutation PayTerminalTicket($terminalId: String!, $paymentTypeName: String!, $amount: Decimal!) {
             payTerminalTicket(terminalId: $terminalId, paymentTypeName: $paymentTypeName, amount: $amount) {
                 id
-                remainingAmount
+                    remainingAmount
                 totalAmount
             }
         }
     `;
     
     const response = await fetch(config.GQLurl, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
         body: JSON.stringify({
             query,
             variables: { terminalId, paymentTypeName, amount: parseFloat(amount) }
@@ -410,12 +410,12 @@ function getChangeEntityOfTerminalTicketScript(terminalId, entityName) {
             name: "${entityName}"
         ) { 
             id 
-            entities { 
+                        entities {
                 name 
                 type 
-            } 
-        } 
-    }`;
+                        }
+                    }
+                }`;
 }
 
 function getGetEntityScreenItemsScript(name) {
@@ -427,33 +427,33 @@ function getGetEntityScreenItemsScript(name) {
 // ============================================
 export const exploreOrderStatesAndMutations = async () => {
     debug('🔍 Exploring order states and mutations...');
-    const config = appconfig();
+        const config = appconfig();
     const token = await ensureAuthenticated();
     
     const query = `query {
-        __schema {
-            mutationType {
-                fields {
-                    name
-                    description
-                    args {
+            __schema {
+                mutationType {
+                    fields {
                         name
-                        type {
+                        description
+                        args {
                             name
-                            kind
+                            type {
+                                    name
+                                    kind
+                            }
                         }
                     }
                 }
             }
-        }
-    }`;
-    
+        }`;
+        
     const response = await fetch(config.GQLurl, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
         body: JSON.stringify({ query })
     });
     
@@ -494,25 +494,25 @@ export const findTicketByTableAlternative = async (tableName) => {
                 name
                 type
             }
-            orders {
-                id
-                uid
+                orders {
+                    id
+                    uid
                 menuItemName
-                quantity
-                price
+                    quantity
+                    price
                 productId
                 portion
                 orderTags
+                }
             }
-        }
-    }`;
-    
+        }`;
+        
     const response = await fetch(config.GQLurl, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
         body: JSON.stringify({ query })
     });
     
@@ -532,4 +532,4 @@ export const findTicketByTableAlternative = async (tableName) => {
     
     debug('⚠️ No ticket found for table:', tableName);
     return null;
-}; 
+};
