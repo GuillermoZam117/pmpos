@@ -864,7 +864,10 @@ const POSView = () => {
                     {loading ? (
                         <Typography>Cargando menú...</Typography>
                     ) : (
-                        <MenuComponent onMenuItemClick={handleMenuItemClick} />
+                        <MenuComponent 
+                            menu={menu} 
+                            onMenuItemClick={handleMenuItemClick} 
+                        />
                     )}
                 </Box>
 
