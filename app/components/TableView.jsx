@@ -63,10 +63,13 @@ const TableView = () => {
             const terminalId = await registerTerminalAsync();
             debug('✅ Terminal registered:', terminalId);
             
+            // Generate fallback terminal ID if registration fails
+            const effectiveTerminalId = terminalId || `fallback_${Date.now()}`;
+            
             // DEBUG: If this is Mesa 3, run debug queries
             if (table.name === 'Mesa 3') {
                 debug('🔍 Running debug queries for Mesa 3...');
-                await debugTicketQueries(terminalId);
+                await debugTicketQueries(effectiveTerminalId);
             }
             
             // Check if table is occupied (has existing ticket)
@@ -80,7 +83,7 @@ const TableView = () => {
                     if (existingTicket) {
                         debug('✅ Found existing ticket using alternative method:', existingTicket);
                         // Use the terminalId from the ticket if available, otherwise use current
-                        const ticketTerminalId = existingTicket.terminalId || terminalId;
+                        const ticketTerminalId = existingTicket.terminalId || effectiveTerminalId;
                         existingTicket.terminalId = ticketTerminalId;
                         
                         navigate('/pos', { 
@@ -95,7 +98,7 @@ const TableView = () => {
                     
                     // Fallback to original method
                     debug('🔄 Fallback to original terminal tickets method...');
-                    const existingTickets = await getTerminalTicketsForTable(terminalId, table.name);
+                    const existingTickets = await getTerminalTicketsForTable(effectiveTerminalId, table.name);
                     if (existingTickets && existingTickets.length > 0) {
                         // Load the most recent ticket for this table
                         const ticketForTable = existingTickets.find(ticket => 
@@ -105,11 +108,11 @@ const TableView = () => {
                         if (ticketForTable) {
                             debug('✅ Found existing ticket for table:', ticketForTable);
                             // Load the complete ticket with orders
-                            const fullTicket = await loadTerminalTicketWithOrders(terminalId, ticketForTable.id);
+                            const fullTicket = await loadTerminalTicketWithOrders(effectiveTerminalId, ticketForTable.id);
                             if (fullTicket) {
                                 debug('✅ Loaded complete ticket with orders:', fullTicket);
                                 // Add terminalId to ticket for later use
-                                fullTicket.terminalId = terminalId;
+                                fullTicket.terminalId = effectiveTerminalId;
                                 navigate('/pos', { 
                                     state: { 
                                         ticket: fullTicket,
@@ -130,20 +133,40 @@ const TableView = () => {
             
             // Create new ticket (either for LIBRE table or as fallback)
             debug(`🆕 Creating new ticket for table:`, table.name);
-            const ticket = await createTerminalTicketAsync(terminalId);
+            const ticket = await createTerminalTicketAsync(effectiveTerminalId);
             debug('✅ New ticket created:', ticket);
             
+            // Create a fallback ticket if GraphQL operations fail
+            let updatedTicket = ticket || {
+                id: `fallback_${Date.now()}`,
+                uid: `fallback_${Date.now()}`,
+                number: `TEMP-${Date.now()}`,
+                date: new Date().toISOString(),
+                totalAmount: 0,
+                remainingAmount: 0,
+                orders: [],
+                entities: []
+            };
+            
             // Try to assign table to ticket, but continue if it fails
-            let updatedTicket = ticket;
             try {
-                debug(`🏷️ Assigning table ${table.name} to ticket...`);
-                updatedTicket = await changeEntityOfTerminalTicketAsync(terminalId, table.name);
-                debug('✅ Table assigned to ticket:', updatedTicket);
+                if (ticket) {
+                    debug(`🏷️ Assigning table ${table.name} to ticket...`);
+                    const assignedTicket = await changeEntityOfTerminalTicketAsync(effectiveTerminalId, table.name);
+                    if (assignedTicket) {
+                        updatedTicket = assignedTicket;
+                        debug('✅ Table assigned to ticket:', updatedTicket);
+                    } else {
+                        throw new Error('Assignment returned null');
+                    }
+                } else {
+                    throw new Error('No ticket to assign table to');
+                }
             } catch (assignError) {
                 debug('⚠️ Could not assign table to ticket (continuing anyway):', assignError.message);
                 // Create a ticket with table info manually added
                 updatedTicket = {
-                    ...ticket,
+                    ...updatedTicket,
                     entities: [{
                         name: table.name,
                         type: 'MESAS' // Using the entity type from config
@@ -152,8 +175,10 @@ const TableView = () => {
                 debug('✅ Table info added manually to ticket:', updatedTicket);
             }
             
-            // Add terminalId to ticket for later use
-            updatedTicket.terminalId = terminalId;
+            // Add terminalId to ticket for later use (ensure updatedTicket exists)
+            if (updatedTicket) {
+                updatedTicket.terminalId = effectiveTerminalId;
+            }
             
             navigate('/pos', { 
                 state: { 
