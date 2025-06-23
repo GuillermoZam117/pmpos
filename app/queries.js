@@ -75,7 +75,18 @@ export function Authenticate(userName, password, callback, failCallback) {
 // ============================================
 export const registerTerminalAsync = async () => {
     const token = await ensureAuthenticated();
-    const query = getRegisterTerminalScript();
+    const config = appconfig();
+    
+    const query = `mutation RegisterTerminal($terminal: String!, $department: String!, $user: String!, $ticketType: String!) {
+        registerTerminal(terminal: $terminal, department: $department, user: $user, ticketType: $ticketType)
+    }`;
+    
+    const variables = {
+        terminal: config.terminalName,
+        department: config.department,
+        user: config.user,
+        ticketType: config.ticketType
+    };
     
     const response = await fetch(appconfig().GQLurl, {
         method: 'POST',
@@ -83,10 +94,18 @@ export const registerTerminalAsync = async () => {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ query })
+        body: JSON.stringify({ query, variables })
     });
     
     const data = await response.json();
+    
+    if (data.errors) {
+        console.error('🚨 GraphQL Errors in registerTerminal:', data.errors);
+        console.error('📝 Query:', query);
+        console.error('📋 Variables:', variables);
+        return null;
+    }
+    
     return data.data?.registerTerminal;
 };
 
@@ -141,7 +160,18 @@ export const getMenu = async (callback, forceRefresh = false) => {
 // ============================================
 export const createTerminalTicketAsync = async (terminalId) => {
     const token = await ensureAuthenticated();
-    const query = getCreateTerminalTicketScript(terminalId);
+    
+    const query = `mutation CreateTerminalTicket($terminalId: String!) {
+        createTerminalTicket(terminalId: $terminalId) {
+            id
+            uid
+            type
+            remainingAmount
+            totalAmount
+        }
+    }`;
+    
+    const variables = { terminalId };
     
     const response = await fetch(appconfig().GQLurl, {
         method: 'POST',
@@ -149,10 +179,18 @@ export const createTerminalTicketAsync = async (terminalId) => {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ query })
+        body: JSON.stringify({ query, variables })
     });
     
     const data = await response.json();
+    
+    if (data.errors) {
+        console.error('🚨 GraphQL Errors in createTerminalTicket:', data.errors);
+        console.error('📝 Query:', query);
+        console.error('📋 Variables:', variables);
+        return null;
+    }
+    
     return data.data?.createTerminalTicket;
 };
 
@@ -192,7 +230,23 @@ export const loadTerminalTicketWithOrders = async (terminalId, ticketId) => {
 
 export const changeEntityOfTerminalTicketAsync = async (terminalId, tableName) => {
     const token = await ensureAuthenticated();
-    const query = getChangeEntityOfTerminalTicketScript(terminalId, tableName);
+    const config = appconfig();
+    
+    const query = `mutation ChangeEntityOfTerminalTicket($terminalId: String!, $type: String!, $name: String!) {
+        changeEntityOfTerminalTicket(terminalId: $terminalId, type: $type, name: $name) {
+            id
+            entities {
+                name
+                type
+            }
+        }
+    }`;
+    
+    const variables = {
+        terminalId,
+        type: config.entityType,
+        name: tableName
+    };
     
     const response = await fetch(appconfig().GQLurl, {
         method: 'POST',
@@ -200,10 +254,18 @@ export const changeEntityOfTerminalTicketAsync = async (terminalId, tableName) =
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ query })
+        body: JSON.stringify({ query, variables })
     });
     
     const data = await response.json();
+    
+    if (data.errors) {
+        console.error('🚨 GraphQL Errors in changeEntityOfTerminalTicket:', data.errors);
+        console.error('📝 Query:', query);
+        console.error('📋 Variables:', variables);
+        return null;
+    }
+    
     return data.data?.changeEntityOfTerminalTicket;
 };
 
