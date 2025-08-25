@@ -601,7 +601,14 @@ const POSView = () => {
                     }
                     debug('🏷️ Processed order tags:', orderTagsString);
                     
-                    await addOrderToTicketModern(effectiveTerminalId, order.productId, order.quantity, orderTagsString);
+                    await addOrderToTicketModern(
+                        effectiveTerminalId,
+                        order.productId,
+                        order.quantity,
+                        orderTagsString,
+                        order.portion || 'Normal',
+                        order.name
+                    );
                     debug('✅ Order added successfully');
                 }
             } else {
@@ -658,18 +665,20 @@ const POSView = () => {
     };
 
     // Modern version of addOrderToTerminalTicket using fetch
-    const addOrderToTicketModern = async (terminalId, productId, quantity = 1, orderTags = '') => {
+    const addOrderToTicketModern = async (terminalId, productId, quantity = 1, orderTags = '', portion = 'Normal', productName = null) => {
         const token = await ensureAuthenticated();
         const config = appconfig();
         
-        debug('➕ Adding order to ticket:', { terminalId, productId, quantity, orderTags });
+        debug('➕ Adding order to ticket:', { terminalId, productId, quantity, portion, orderTags });
         debug('🏷️ Processed order tags:', orderTags);
         
         // Use the existing getAddOrderToTerminalTicketScript function from queries.js
-        const getAddOrderToTerminalTicketScript = (terminalId, productId, orderTags) => {
+        const getAddOrderToTerminalTicketScript = (terminalId, productId, orderTags, quantity, portion) => {
             return `mutation m{
                 ticket:addOrderToTerminalTicket(terminalId:"${terminalId}",
                 productId:${productId}
+                quantity:${Number(quantity) || 1}
+                portion:"${portion || 'Normal'}"
                 orderTags:"${orderTags}")
             {id,uid,type,number,date,totalAmount,remainingAmount,
               entities{name,type},      
@@ -697,9 +706,9 @@ const POSView = () => {
             }}`;
         };
         
-        const mutation = getAddOrderToTerminalTicketScript(terminalId, productId, orderTags);
-
-        const response = await fetch(config.GQLurl, {
+        // Attempt 1: productId variant
+        let mutation = getAddOrderToTerminalTicketScript(terminalId, productId, orderTags, quantity, portion);
+        let response = await fetch(config.GQLurl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -707,10 +716,31 @@ const POSView = () => {
             },
             body: JSON.stringify({ query: mutation })
         });
+        let data = await response.json();
 
-        const data = await response.json();
         if (data.errors) {
-            throw new Error(data.errors[0].message);
+            debug('⚠️ addOrderToTerminalTicket with productId failed, trying productName...', data.errors[0]?.message);
+            // Attempt 2: productName variant (compatible schema)
+            const safeName = (productName || '').replace(/"/g, '\\"');
+            mutation = `mutation m{
+                ticket:addOrderToTerminalTicket(terminalId:"${terminalId}",
+                    productName:"${safeName}",
+                    quantity:${Number(quantity) || 1},
+                    portion:"${portion || 'Normal'}",
+                    orderTags:"${orderTags}") { id }
+            }`;
+            response = await fetch(config.GQLurl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ query: mutation })
+            });
+            data = await response.json();
+            if (data.errors) {
+                throw new Error(data.errors[0].message);
+            }
         }
 
         debug('✅ Order added successfully:', data);

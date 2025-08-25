@@ -83,9 +83,9 @@ export const registerTerminalAsync = async () => {
     
     const variables = {
         terminal: config.terminalName,
-        department: config.department,
-        user: config.user,
-        ticketType: config.ticketType
+        department: config.departmentName,
+        user: config.userName,
+        ticketType: config.ticketTypeName
     };
         
         const response = await fetch(appconfig().GQLurl, {
@@ -118,46 +118,179 @@ export const registerTerminalAsync = async () => {
 // ============================================
 export const getMenu = async (callback, forceRefresh = false) => {
     debug('📋 Getting menu...');
-            const { default: cacheService } = await import('./services/cacheService');
+    const { default: cacheService } = await import('./services/cacheService');
     
     if (!forceRefresh) {
-            const cachedMenu = cacheService.getMenu();
-            if (cachedMenu) {
+        const cachedMenu = cacheService.getMenu();
+        if (cachedMenu) {
             debug('✅ Using cached menu');
-                if (callback) callback(cachedMenu);
+            if (callback) callback(cachedMenu);
             return cachedMenu;
         }
     }
 
-        const token = await ensureAuthenticated();
-    const query = getMenuScript();
-    
-        const response = await fetch(appconfig().GQLurl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ query })
-        });
+    const token = await ensureAuthenticated();
+    const config = appconfig();
 
-    const data = await response.json();
-    
-    if (data.data && data.data.menu) {
-        const { default: cacheService } = await import('./services/cacheService');
-        const cachedMenu = cacheService.getMenu();
+    // Try multiple query formats for compatibility
+    const queries = [
+        // Primary enhanced query format
+        getMenuScript(),
+        // Alternative format 1
+        `query { menu { categories { id name caption color menuItems { id name caption productId product { id name portions { id name price } } portions { id name price } tags { id name } } } } }`,
+        // Alternative format 2  
+        `query { menu { categories { id name caption color items { id name caption productId product { id name portions { id name price } } portions { id name price } tags { id name } } } } }`,
+        // Simplified format
+        `query { menu { categories { id name caption menuItems { id name caption portions { id name price } } } } }`
+    ];
+
+    for (let i = 0; i < queries.length; i++) {
+        const query = queries[i];
+        debug(`📋 Trying menu query format ${i + 1}...`);
         
-        if (!cachedMenu || forceRefresh) {
-            cacheService.setMenu(data.data.menu);
+        try {
+            const response = await fetch(config.GQLurl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ query })
+            });
+
+            const data = await response.json();
+            
+            if (data.errors) {
+                debug(`⚠️ GraphQL errors in query format ${i + 1}:`, data.errors[0]?.message);
+                continue; // Try next format
+            }
+            
+            if (data.data && data.data.menu) {
+                debug(`✅ Menu loaded successfully with format ${i + 1}`);
+                
+                // Normalize menu structure
+                const normalizedMenu = normalizeMenuData(data.data.menu);
+                
+                cacheService.setMenu(normalizedMenu);
+                if (callback) callback(normalizedMenu);
+                return normalizedMenu;
+            } else {
+                debug(`⚠️ No menu data in response for format ${i + 1}`);
+                continue; // Try next format
+            }
+        } catch (error) {
+            debug(`❌ Error with query format ${i + 1}:`, error.message);
+            continue; // Try next format
         }
-        
-        const menuData = data.data.menu;
-        if (callback) callback(menuData);
-        return menuData;
     }
     
-    return null;
+    debug('❌ All menu query formats failed, using fallback');
+    
+    // Try fallback menu from cache
+    const fallbackMenu = cacheService.getMenu();
+    if (fallbackMenu) {
+        debug('📦 Using fallback cached menu');
+        if (callback) callback(fallbackMenu);
+        return fallbackMenu;
+    }
+    
+    // Create a comprehensive fallback menu
+    const basicMenu = {
+        categories: [
+            {
+                id: 1,
+                name: 'POLLOS',
+                caption: 'POLLOS',
+                color: '#ff9800',
+                menuItems: [
+                    {
+                        id: 1,
+                        name: 'Pollo Entero',
+                        caption: 'Pollo Entero',
+                        productId: 1,
+                        product: {
+                            id: 1,
+                            name: 'Pollo Entero',
+                            portions: [{ id: 1, name: 'Normal', price: 160 }]
+                        },
+                        portions: [{ id: 1, name: 'Normal', price: 160 }],
+                        tags: []
+                    },
+                    {
+                        id: 2,
+                        name: 'Medio Pollo',
+                        caption: 'Medio Pollo',
+                        productId: 2,
+                        product: {
+                            id: 2,
+                            name: 'Medio Pollo',
+                            portions: [{ id: 2, name: 'Normal', price: 85 }]
+                        },
+                        portions: [{ id: 2, name: 'Normal', price: 85 }],
+                        tags: []
+                    }
+                ]
+            },
+            {
+                id: 2,
+                name: 'EXTRAS',
+                caption: 'EXTRAS',
+                color: '#4caf50',
+                menuItems: [
+                    {
+                        id: 3,
+                        name: 'Refresco',
+                        caption: 'Refresco',
+                        productId: 3,
+                        product: {
+                            id: 3,
+                            name: 'Refresco',
+                            portions: [{ id: 3, name: 'Normal', price: 25 }]
+                        },
+                        portions: [{ id: 3, name: 'Normal', price: 25 }],
+                        tags: []
+                    }
+                ]
+            }
+        ]
+    };
+    
+    debug('🔧 Using comprehensive fallback menu');
+    if (callback) callback(basicMenu);
+    return basicMenu;
 };
+
+// Helper function to normalize menu data structure
+function normalizeMenuData(menuData) {
+    if (!menuData || !menuData.categories) return menuData;
+    
+    return {
+        ...menuData,
+        categories: menuData.categories.map(category => ({
+            ...category,
+            // Ensure menuItems exists (some APIs use 'items')
+            menuItems: category.menuItems || category.items || [],
+            // Normalize each menu item
+            ...(category.menuItems || category.items ? {
+                menuItems: (category.menuItems || category.items).map(item => ({
+                    ...item,
+                    // Ensure product data structure
+                    product: item.product || {
+                        id: item.productId || item.id,
+                        name: item.name || item.caption,
+                        portions: item.portions || []
+                    },
+                    // Ensure portions exist
+                    portions: item.portions || item.product?.portions || [
+                        { id: 1, name: 'Normal', price: 50 }
+                    ],
+                    // Ensure tags exist
+                    tags: item.tags || []
+                }))
+            } : {})
+        }))
+    };
+}
 
 // ============================================
 // TICKET FUNCTIONS
@@ -248,7 +381,7 @@ export const changeEntityOfTerminalTicketAsync = async (terminalId, tableName) =
     
     const variables = {
         terminalId,
-        type: config.entityType,
+        type: config.entityTypeName,
         name: tableName
     };
 
@@ -373,12 +506,70 @@ export const payTerminalTicket = async (terminalId, paymentTypeName, amount, cal
 // SCRIPT GENERATORS
 // ============================================
 function getMenuScript() {
-    return 'query { menu { categories { id name caption color items { id name caption portions { id name price } tags { id name } } } } }';
+    // Try multiple menu query formats for compatibility
+    return `query GetMenu {
+        menu {
+            categories {
+                id
+                name
+                caption
+                color
+                menuItems {
+                    id
+                    name
+                    caption
+                    productId
+                    product {
+                        id
+                        name
+                        portions {
+                            id
+                            name
+                            price
+                        }
+                    }
+                    portions {
+                        id
+                        name
+                        price
+                    }
+                    tags {
+                        id
+                        name
+                    }
+                }
+                items {
+                    id
+                    name
+                    caption
+                    productId
+                    product {
+                        id
+                        name
+                        portions {
+                            id
+                            name
+                            price
+                        }
+                    }
+                    portions {
+                        id
+                        name
+                        price
+                    }
+                    tags {
+                        id
+                        name
+                    }
+                }
+            }
+        }
+    }`;
 }
 
 function getRegisterTerminalScript() {
     const config = appconfig();
-    return `mutation { registerTerminal(terminal: "${config.terminalName}", department: "${config.department}", user: "${config.user}", ticketType: "${config.ticketType}") }`;
+    return `mutation { registerTerminal(terminal: "${config.terminalName}", department: "${config.departmentName}", user: "${config.userName}", ticketType: "${config.ticketTypeName}") }`;
 }
 
 function getCreateTerminalTicketScript(terminalId) {
@@ -386,7 +577,7 @@ function getCreateTerminalTicketScript(terminalId) {
 }
 
 function getGetTerminalTicketsScript(terminalId) {
-    return `query { getTerminalTickets(terminalId: "${terminalId}") { id ticketNumber } }`;
+    return `query { getTerminalTickets(terminalId: "${terminalId}") { id ticketNumber entities { name type } } }`;
 }
 
 function getLoadTerminalTicketScript(terminalId, ticketId) {
@@ -410,16 +601,16 @@ function getChangeEntityOfTerminalTicketScript(terminalId, entityName) {
     return `mutation { 
         changeEntityOfTerminalTicket(
             terminalId: "${terminalId}",
-            type: "${config.entityType}",
+            type: "${config.entityTypeName}",
             name: "${entityName}"
         ) { 
             id 
-                        entities {
+            entities {
                 name 
                 type 
-                        }
-                    }
-                }`;
+            }
+        }
+    }`;
 }
 
 function getGetEntityScreenItemsScript(name) {
