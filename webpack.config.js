@@ -39,6 +39,26 @@ module.exports = (env, argv) => {
             hot: true,
             port: 8081,
             historyApiFallback: true,
+            setupMiddlewares: (middlewares, devServer) => {
+                if (!devServer) {
+                    throw new Error('webpack-dev-server is not defined');
+                }
+                // Lightweight client→server logging endpoint (GET only, no body parser needed)
+                devServer.app.get('/__log', (req, res) => {
+                    const q = req.query || {};
+                    const level = (q.level || 'log').toString();
+                    const tag = (q.tag || '').toString();
+                    const msg = (q.msg || '').toString();
+                    const line = `[client:${level}] ${tag ? tag + ' - ' : ''}${msg}`;
+                    // Print to terminal
+                    if (level === 'error') console.error(line);
+                    else if (level === 'warn') console.warn(line);
+                    else if (level === 'info') console.info(line);
+                    else console.log(line);
+                    res.status(204).end();
+                });
+                return middlewares;
+            },
             proxy: {
                 '/api': {
                     target: 'http://localhost:9000',

@@ -1,11 +1,13 @@
 import React, { useState, useEffect, Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { ThemeProvider } from '@mui/material';
 import CssBaseline from '@mui/material/CssBaseline';
 import CircularProgress from '@mui/material/CircularProgress';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
 import { initializeAuth } from '../actions/auth';
-import { darkTheme } from '../theme';
+import { ThemeProvider } from '../contexts/ThemeContext';
+import { tokenService } from '../services/tokenService';
 import Debug from 'debug';
 
 const debug = Debug('pmpos:app');
@@ -20,7 +22,7 @@ const ROUTES = {
 // Lazy load components
 const PinPad = React.lazy(() => import('./PinPad'));
 const TableView = React.lazy(() => import('./TableView'));
-const POSView = React.lazy(() => import('./POS/POSView'));
+const POSViewUnified = React.lazy(() => import('./POS/POSViewUnified'));
 
 // Loading component with better styling
 const LoadingComponent = () => (
@@ -41,17 +43,51 @@ const PrivateRoute = ({ children }) => {
     return isAuthenticated ? children : <Navigate to={ROUTES.PINPAD} replace />;
 };
 
-const App = () => {
+const AppContent = () => {
     const dispatch = useDispatch();
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
     useEffect(() => {
         const initApp = async () => {
             debug('🚀 Initializing application...');
             try {
+                // Start token preload immediately (background operation)
+                console.log('🔄 Starting token preload for instant login...');
+                tokenService.preloadTokenIfNeeded(); // No await - background operation
+                
+                // Initialize auth system
                 await dispatch(initializeAuth());
                 debug('✅ Authentication initialized');
+                
+                // Add debug helpers to window for testing
+                if (typeof window !== 'undefined') {
+                    window.debugTerminal = () => {
+                        console.log('🔧 Terminal Debug Info:');
+                        console.log('  - Terminal ID:', terminalService.getTerminalId());
+                        console.log('  - Is Registered:', terminalService.isRegistered());
+                        console.log('  - localStorage terminalId:', localStorage.getItem('currentTerminalId'));
+                        console.log('  - window.currentTerminalId:', window.currentTerminalId);
+                    };
+                    
+                    window.registerTerminalManual = async (user = 'graphiql') => {
+                        console.log('🔧 Manual terminal registration for:', user);
+                        try {
+                            const id = await terminalService.ensureTerminalRegistered(user);
+                            console.log('✅ Manual registration successful:', id);
+                            return id;
+                        } catch (error) {
+                            console.error('❌ Manual registration failed:', error);
+                            throw error;
+                        }
+                    };
+                    
+                    console.log('🔧 Debug commands available:');
+                    console.log('  - window.debugTerminal() - Show terminal status');
+                    console.log('  - window.registerTerminalManual(user) - Manual registration');
+                }
             } catch (err) {
                 debug('❌ Initialization error:', err);
                 setError(err.message);
@@ -84,7 +120,7 @@ const App = () => {
     }
 
     return (
-        <ThemeProvider theme={darkTheme}>
+        <>
             <CssBaseline />
             <div className="app-container">
                 <Suspense fallback={<LoadingComponent />}>
@@ -107,7 +143,7 @@ const App = () => {
                             path={ROUTES.POS}
                             element={
                                 <PrivateRoute>
-                                    <POSView />
+                                    <POSViewUnified />
                                 </PrivateRoute>
                             } 
                         />
@@ -119,6 +155,14 @@ const App = () => {
                     </Routes>
                 </Suspense>
             </div>
+        </>
+    );
+};
+
+const App = () => {
+    return (
+        <ThemeProvider>
+            <AppContent />
         </ThemeProvider>
     );
 };

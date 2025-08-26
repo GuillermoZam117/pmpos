@@ -9,6 +9,8 @@ const CACHE_KEYS = {
     TABLES_TIMESTAMP: 'pmpos_tables_timestamp',
     MENU: 'pmpos_cached_menu',
     MENU_TIMESTAMP: 'pmpos_menu_timestamp'
+    ,
+    PENDING_TICKETS: 'pmpos_pending_tickets'
 };
 
 const CACHE_DURATION = {
@@ -161,11 +163,50 @@ class CacheService {
      */
     clearTerminal() {
         // Clear any terminal-related cache keys
-        const terminalKeys = Object.keys(localStorage).filter(key => 
+        const terminalKeys = Object.keys(localStorage).filter(key =>
             key.includes('terminal') || key.includes('ticket')
         );
         terminalKeys.forEach(key => localStorage.removeItem(key));
         console.log('🗑️ Cleared terminal cache keys:', terminalKeys);
+    }
+
+    /**
+     * Pending local-only tickets support
+     */
+    _getPendingTicketsRaw() {
+        try {
+            const raw = localStorage.getItem(CACHE_KEYS.PENDING_TICKETS);
+            return raw ? JSON.parse(raw) : [];
+        } catch (e) {
+            console.warn('Failed to read pending tickets:', e);
+            return [];
+        }
+    }
+
+    getPendingTickets() {
+        return this._getPendingTicketsRaw();
+    }
+
+    addPendingTicket(ticket) {
+        try {
+            const list = this._getPendingTicketsRaw();
+            list.push(ticket);
+            localStorage.setItem(CACHE_KEYS.PENDING_TICKETS, JSON.stringify(list));
+            console.log('📥 Pending ticket added:', ticket.uid);
+        } catch (e) {
+            console.warn('Failed to add pending ticket:', e);
+        }
+    }
+
+    removePendingTicket(uid) {
+        try {
+            const list = this._getPendingTicketsRaw();
+            const filtered = list.filter(t => t.uid !== uid);
+            localStorage.setItem(CACHE_KEYS.PENDING_TICKETS, JSON.stringify(filtered));
+            console.log('🗑️ Pending ticket removed:', uid);
+        } catch (e) {
+            console.warn('Failed to remove pending ticket:', e);
+        }
     }
 
     /**

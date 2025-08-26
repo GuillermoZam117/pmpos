@@ -8,9 +8,9 @@ const debug = Debug('pmpos:route');
 
 const PrivateRoute = ({ children }) => {
     const location = useLocation();
-    const auth = useSelector(state => state.auth);
-    const isAuthenticated = auth.get('isAuthenticated');
-    const loading = auth.get('loading');
+    const authState = useSelector(state => state.auth);
+    const isAuthenticated = authState.get('isAuthenticated');
+    const loading = authState.get('isLoading');
 
     if (loading) {
         return (

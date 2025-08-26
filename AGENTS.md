@@ -55,6 +55,13 @@
 - Logs: abre consola y filtra `pmpos:queries` y `pmpos:tables` para ver errores GraphQL/HTTP.
 - Si falla `registerTerminal`: suele ser por nombres no coincidentes o cliente no registrado. Corrige y reintenta; no depender del `fallback_*` salvo pruebas.
 
+## Configuración Dinámica (IP cambiante)
+- Auto-host: si no hay `SAMBAPOS_API_URL`, la app usa `http://<hostname>:9000` del navegador (móvil o PC), de forma dinámica.
+- Query params: `?api=http://<host>:<port>` o `?port=<port>` guardan el valor en `localStorage` y tienen prioridad. Útil desde móvil.
+- Credenciales y cliente: puedes pasar `?user=<usuario>&pass=<password>&client=<client_id>` (se guardan en `localStorage`).
+- Variables `.env`: define `SAMBAPOS_API_URL` o `SAMBAPOS_API_PORT` para entornos fijos; reinicia `npm start` tras cambios.
+- Credenciales: ajusta `SAMBAPOS_USERNAME`, `SAMBAPOS_PASSWORD` y `SAMBAPOS_CLIENT_ID` para que coincidan con SambaPOS.
+
 ## Conocimiento y Reglas del Proyecto
 - Configuración GraphQL (SambaPOS): habilitar API en Message Server poniendo `+` al final del puerto (ej. `9000+`). Endpoint: `http://<server>:<port>/api/graphql`. Registrar clientes `pmpos` y `graphiql` en `Users > Applications`.
 - Autenticación: obtener token en `http://<server>:<port>/Token` (form-data: `grant_type=password`, `username`, `password`, `client_id=pmpos`). Usar `Authorization: Bearer <access_token>`. Renovar con `grant_type=refresh_token`.

@@ -11,33 +11,49 @@ const TableCard = ({ table, onClick }) => {
             case 'CUENTA':
                 return (
                     <Chip
-                        icon={<AttachMoneyIcon />}
+                        icon={<AttachMoneyIcon sx={{ color: 'red !important' }} />}
                         label="CUENTA"
-                        color="error"
-                        size="small"
-                        sx={{ color: 'white' }}
+                        sx={{ 
+                            color: 'red !important',
+                            backgroundColor: 'transparent',
+                            border: '2px solid red',
+                            fontWeight: 'bold',
+                            fontSize: '1rem'
+                        }}
                     />
                 );
             case 'OCUPADO':
                 return (
                     <Chip
-                        icon={<GroupIcon />}
+                        icon={<GroupIcon sx={{ color: 'black !important' }} />}
                         label="OCUPADO"
-                        color="warning"
-                        size="small"
+                        sx={{ 
+                            color: 'black !important',
+                            backgroundColor: 'transparent',
+                            border: '2px solid black',
+                            fontWeight: 'bold',
+                            fontSize: '1rem'
+                        }}
                     />
                 );
             default:
                 return (
                     <Chip
-                        icon={<TableRestaurantIcon />}
+                        icon={<TableRestaurantIcon sx={{ 
+                            color: 'black !important',
+                            fontSize: '2rem' // 2x más grande
+                        }} />}
                         label="LIBRE"
-                        color="default"
-                        size="small"
-                        variant="outlined"
                         sx={{ 
-                            color: 'black',
-                            borderColor: 'rgba(0, 0, 0, 0.23)' 
+                            color: 'black !important',
+                            backgroundColor: 'transparent',
+                            border: '2px solid black',
+                            fontWeight: 'bold',
+                            fontSize: '1.5rem', // 2x más grande
+                            '& .MuiChip-label': {
+                                fontSize: '1.5rem', // 2x más grande para el texto
+                                fontWeight: 'bold'
+                            }
                         }}
                     />
                 );
@@ -52,8 +68,7 @@ const TableCard = ({ table, onClick }) => {
                 p: 2,
                 height: '100%',
                 cursor: 'pointer',
-                bgcolor: table.color || '#E5E3D8',
-                color: table.status === 'LIBRE' ? 'black' : 'white',
+                bgcolor: table.color || '#F5F1E6', // Color crema por defecto
                 transition: 'all 0.2s',
                 '&:hover': {
                     transform: 'scale(1.02)',
@@ -69,24 +84,49 @@ const TableCard = ({ table, onClick }) => {
                 align="center"
                 sx={{ 
                     fontWeight: 'bold',
-                    mb: 1
+                    mb: 1,
+                    color: 'black !important' // Siempre texto negro
                 }}
             >
                 {table.name}
             </Typography>
 
             <Stack spacing={1} alignItems="center">
-                {table.timeElapsed && (
+                {/* Status-based time info (priority) */}
+                {table.timeInfo && (
                     <Chip
-                        icon={<AccessTimeIcon />}
-                        label={`${Math.floor(table.timeElapsed / 60000)} min`}
-                        color={table.status === 'CUENTA' ? 'error' : 'warning'}
-                        size="small"
+                        icon={<AccessTimeIcon sx={{ 
+                            color: table.timeInfo.status === 'cuenta' ? 'red !important' : 'black !important'
+                        }} />}
+                        label={table.timeInfo.text}
                         sx={{ 
-                            color: table.status === 'LIBRE' ? 'black' : 'white' 
+                            color: table.timeInfo.status === 'cuenta' ? 'red !important' : 'black !important',
+                            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                            fontWeight: 'bold',
+                            fontSize: '0.9rem',
+                            maxWidth: '100%',
+                            '& .MuiChip-label': {
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis'
+                            }
                         }}
                     />
                 )}
+                
+                {/* Fallback to SambaPOS time (if no timeInfo available) */}
+                {!table.timeInfo && table.timeElapsed && (
+                    <Chip
+                        icon={<AccessTimeIcon sx={{ color: 'black !important' }} />}
+                        label={`${Math.floor(table.timeElapsed / 60000)} min`}
+                        sx={{ 
+                            color: 'black !important',
+                            backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                            fontWeight: 'bold'
+                        }}
+                    />
+                )}
+                
                 {getStatusChip(table.status)}
             </Stack>
         </Paper>

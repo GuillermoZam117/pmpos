@@ -1,0 +1,100 @@
+# Archivo .graphql con todas las operaciones del flujo (usa tu GraphiQL / GraphQL Playground)
+
+# 0) Obtener Menú
+query GetMenu {
+  getMenu(name: "MENU") {
+    categories {
+      name
+      menuItems {
+        name
+        product {
+          id
+          name
+          portions { name price }
+        }
+      }
+    }
+  }
+}
+
+# 1) Registrar Terminal
+mutation RegisterTerminal {
+  registerTerminal(
+    ticketType: "COMEDOR"
+    terminal: "SERVIDOR"
+    department: "MESAS"
+    user: "graphiql"
+  )
+}
+
+# 2) Crear Ticket del Terminal (sin mesa)
+mutation CreateTerminalTicket {
+  createTerminalTicket(terminalId: "grXZzqACJ0izZ3eLqo5ByQ") {
+    uid
+    totalAmount
+  }
+}
+
+# 3) Añadir Órdenes (4 ejemplos reales)
+mutation AddPOLLO {
+  addOrderToTerminalTicket(
+    terminalId: "grXZzqACJ0izZ3eLqo5ByQ"
+    productName: "POLLO"
+    portion: "Normal"
+    quantity: 1
+  ) { totalAmount }
+}
+
+mutation AddPAPAS {
+  addOrderToTerminalTicket(
+    terminalId: "grXZzqACJ0izZ3eLqo5ByQ"
+    productName: "PAPAS AL AJILLO"
+    portion: "ORD"
+    quantity: 1
+  ) { totalAmount }
+}
+
+mutation AddTORTILLAS {
+  addOrderToTerminalTicket(
+    terminalId: "grXZzqACJ0izZ3eLqo5ByQ"
+    productName: "TORTILLAS"
+    portion: "MEDIO KG"
+    quantity: 1
+  ) { totalAmount }
+}
+
+mutation AddCUARTO_POLLO {
+  addOrderToTerminalTicket(
+    terminalId: "grXZzqACJ0izZ3eLqo5ByQ"
+    productName: "CUARTO POLLO"
+    portion: "Normal"
+    quantity: 1
+  ) { totalAmount }
+}
+
+# 4) Verificar Ticket del Terminal
+query GetTerminalTicket {
+  getTerminalTicket(terminalId: "grXZzqACJ0izZ3eLqo5ByQ") {
+    uid
+    number
+    totalAmount
+    remainingAmount
+    orders {
+      uid
+      productId
+      quantity
+      price
+      portion
+    }
+  }
+}
+
+# 5) Cerrar Ticket
+mutation CloseTerminalTicket {
+  closeTerminalTicket(terminalId: "grXZzqACJ0izZ3eLqo5ByQ")
+}
+
+# 6) (Opcional) Desregistrar Terminal
+mutation UnregisterTerminal {
+  unregisterTerminal(terminalId: "grXZzqACJ0izZ3eLqo5ByQ")
+}

@@ -1,54 +1,44 @@
 import React from 'react';
 import { connect } from 'react-redux';
+import { useTheme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import Categories from './Categories';
 import MenuItems from './MenuItems';
+import MobileMenu from './MobileMenu';
 import Paper from '@mui/material/Paper'; // Updated import for MUI
 import * as Actions from '../../actions';
 import PropTypes from 'prop-types';
 
-class Menu extends React.Component {
-  componentDidMount() {
-    console.log('🔍 Menu mounting, current menu:', this.props.menu);
+const Menu = (props) => {
+  const {
+    menu,
+    menuItems,
+    onMenuItemClick = () => {},
+    mobileOptimized = false,
+    compact = false,
+    changeSelectedCategory,
+    closeMessage,
+    setMenuItems,
+  } = props;
+
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const shouldUseMobileMenu = mobileOptimized || (isMobile && compact);
+
+  React.useEffect(() => {
+    console.log('🔍 Menu mounting, current menu:', menu);
     // Don't auto-load menu here - let POSView handle it
     // The menu should be passed as props from the parent component
-  }
+  }, [menu]);
 
-  render() {
-    const {
-      menu,
-      menuItems,
-      onMenuItemClick = () => {},
-    } = this.props;
-    
-    // Show loading if no menu yet
-    if (!menu) {
-      return (
-        <Paper className="menu" sx={{ p: 2, textAlign: 'center' }}>
-          <div>Cargando menú...</div>
-        </Paper>
-      );
-    }
-    
-    return (
-      <Paper className="menu">
-        <Categories
-          categories={menu.categories || []}
-          onCategoryClick={this.onCategoryClick}
-        />
-        <MenuItems menuItems={menuItems} onClick={onMenuItemClick} />
-      </Paper>
-    );
-  }
-
-  onCategoryClick = (category) => {
+  const onCategoryClick = (category) => {
     console.log('👆 Category clicked:', category);
-    this.props.changeSelectedCategory(category);
-    this.props.closeMessage();
-    this.refreshMenuItems(category);
+    changeSelectedCategory(category);
+    closeMessage();
+    refreshMenuItems(category);
   };
 
-  refreshMenuItems(categoryName) {
-    const { menu } = this.props;
+  const refreshMenuItems = (categoryName) => {
     if (!menu || !menu.categories) {
       // Se muestra una notificación o se llama a una acción para reportar el error
       console.warn('El menú o las categorías no están cargados');
@@ -76,14 +66,45 @@ class Menu extends React.Component {
     
     // Update menu items for the selected category
     console.log('🔍 Selected category:', selectedCategory);
-    if (this.props.setMenuItems && selectedCategory.menuItems) {
+    if (setMenuItems && selectedCategory.menuItems) {
       console.log('✅ Setting menu items:', selectedCategory.menuItems);
-      this.props.setMenuItems(selectedCategory.menuItems);
+      setMenuItems(selectedCategory.menuItems);
     } else {
       console.warn('❌ No menuItems found in category:', selectedCategory);
     }
+  };
+
+  // Show loading if no menu yet
+  if (!menu) {
+    return (
+      <Paper className="menu" sx={{ p: 2, textAlign: 'center' }}>
+        <div>Cargando menú...</div>
+      </Paper>
+    );
   }
-}
+
+  // Use mobile-optimized menu for mobile devices or when explicitly requested
+  if (shouldUseMobileMenu) {
+    return (
+      <MobileMenu
+        menu={menu}
+        onMenuItemClick={onMenuItemClick}
+        compact={compact}
+      />
+    );
+  }
+  
+  // Use traditional desktop menu
+  return (
+    <Paper className="menu">
+      <Categories
+        categories={menu.categories || []}
+        onCategoryClick={onCategoryClick}
+      />
+      <MenuItems menuItems={menuItems} onClick={onMenuItemClick} />
+    </Paper>
+  );
+};
 
 Menu.propTypes = {
     menu: PropTypes.shape({
@@ -94,7 +115,12 @@ Menu.propTypes = {
         }))
     }),
     menuItems: PropTypes.array,
-    onMenuItemClick: PropTypes.func
+    onMenuItemClick: PropTypes.func,
+    mobileOptimized: PropTypes.bool,
+    compact: PropTypes.bool,
+    changeSelectedCategory: PropTypes.func,
+    closeMessage: PropTypes.func,
+    setMenuItems: PropTypes.func
 };
 
 const mapStateToProps = (state) => {

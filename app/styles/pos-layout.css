@@ -30,3 +30,20 @@
     display: flex;
     flex-direction: column;
 }
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+    .pos-content {
+        grid-template-columns: 1fr 1fr;
+        grid-auto-rows: minmax(0, 1fr);
+    }
+    .pos-right {
+        grid-column: 1 / -1; /* span full width */
+    }
+}
+
+@media (max-width: 900px) {
+    .pos-content {
+        grid-template-columns: 1fr; /* stack vertically */
+    }
+}

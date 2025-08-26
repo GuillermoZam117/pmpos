@@ -41,7 +41,12 @@ class TokenService {
         this.refreshToken = null;
         this.tokenExpiry = null;
         this.pendingRefresh = null;
+        this.isPreloading = false;
+        this.preloadPromise = null;
         this.loadTokens();
+        
+        // Start preloading token immediately if none exists
+        this.preloadTokenIfNeeded();
     }
 
     loadTokens() {
@@ -73,7 +78,7 @@ class TokenService {
     async getValidAccessToken() {
         // Si tenemos un token válido, lo retornamos
         if (this.accessToken && this.tokenExpiry && this.tokenExpiry > new Date()) {
-            console.log('✅ Using valid cached access token');
+            console.log('✅ Using valid cached access token (preloaded)');
             return this.accessToken;
         }
 
@@ -102,7 +107,8 @@ class TokenService {
             try {
                 console.log('🔄 Refreshing access token with refresh token...');
                 
-                const response = await fetch(appconfig().authUrl, {
+                const cfg = appconfig();
+                const response = await fetch(cfg.authUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded'
@@ -110,8 +116,7 @@ class TokenService {
                     body: new URLSearchParams({
                         grant_type: 'refresh_token',
                         refresh_token: this.refreshToken,
-                        client_id: AUTH_CONSTANTS.DEFAULTS.CLIENT_ID,
-                        client_secret: AUTH_CONSTANTS.DEFAULTS.CLIENT_SECRET
+                        client_id: cfg.auth.clientId
                     })
                 });
 
@@ -146,17 +151,17 @@ class TokenService {
         try {
             console.log('🔐 Requesting new token set...');
             
-            const response = await fetch(appconfig().authUrl, {
+            const cfg = appconfig();
+            const response = await fetch(cfg.authUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded'
                 },
                 body: new URLSearchParams({
-                    grant_type: AUTH_CONSTANTS.DEFAULTS.GRANT_TYPE,
-                    client_id: AUTH_CONSTANTS.DEFAULTS.CLIENT_ID,
-                    client_secret: AUTH_CONSTANTS.DEFAULTS.CLIENT_SECRET,
-                    username: AUTH_CONSTANTS.DEFAULTS.USERNAME,
-                    password: AUTH_CONSTANTS.DEFAULTS.PASSWORD
+                    grant_type: cfg.auth.grantType,
+                    client_id: cfg.auth.clientId,
+                    username: cfg.userName,
+                    password: cfg.password
                 })
             });
 
@@ -206,8 +211,9 @@ class TokenService {
 
     async authenticate(pin) {
         try {
-            const token = await this.getValidAccessToken();
-            console.log('📡 Sending PIN validation...');
+            // Use preloaded token for instant authentication
+            const token = await this.getPreloadedToken();
+            console.log('📡 Sending PIN validation with preloaded token...');
 
             let response = await fetch(appconfig().graphqlUrl, {
                 method: 'POST',
@@ -341,6 +347,119 @@ class TokenService {
             isExpired: this.tokenExpiry ? this.tokenExpiry <= new Date() : true,
             timeToExpiry: this.tokenExpiry ? this.tokenExpiry - new Date() : 0
         };
+    }
+
+    /**
+     * Pre-load token if needed (background initialization)
+     */
+    async preloadTokenIfNeeded() {
+        // Don't preload if we already have valid tokens
+        if (this.hasValidTokens()) {
+            console.log('✅ Valid tokens already exist, no preload needed');
+            return;
+        }
+
+        // Don't start multiple preload operations
+        if (this.isPreloading) {
+            console.log('⏳ Token preload already in progress...');
+            return this.preloadPromise;
+        }
+
+        console.log('🚀 Starting token preload in background...');
+        this.isPreloading = true;
+        
+        this.preloadPromise = this.performTokenPreload();
+        
+        try {
+            await this.preloadPromise;
+            console.log('✅ Token preload completed successfully');
+        } catch (error) {
+            console.warn('⚠️ Token preload failed:', error.message);
+            // Don't throw - this is background operation
+        } finally {
+            this.isPreloading = false;
+            this.preloadPromise = null;
+        }
+    }
+
+    /**
+     * Perform actual token preload
+     */
+    async performTokenPreload() {
+        try {
+            console.log('📡 Preloading token from SambaPOS...');
+            const token = await this.requestNewTokens();
+            
+            if (token) {
+                console.log('✅ Token preloaded successfully, ready for instant login');
+                return token;
+            } else {
+                throw new Error('No token received from server');
+            }
+        } catch (error) {
+            console.error('❌ Token preload failed:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Get preloaded token or wait for preload to complete
+     */
+    async getPreloadedToken() {
+        // If we have valid tokens, return immediately
+        if (this.hasValidTokens()) {
+            return this.accessToken;
+        }
+
+        // If preload is in progress, wait for it
+        if (this.isPreloading && this.preloadPromise) {
+            console.log('⏳ Waiting for token preload to complete...');
+            try {
+                await this.preloadPromise;
+                return this.accessToken;
+            } catch (error) {
+                console.warn('⚠️ Preload failed, falling back to normal token request');
+                return await this.getValidAccessToken();
+            }
+        }
+
+        // Otherwise get token normally
+        return await this.getValidAccessToken();
+    }
+
+    /**
+     * Clear authentication data (but keep tokens for performance)
+     * Only clears user data, NOT tokens
+     */
+    clearAuthentication() {
+        console.log('🧹 Clearing user authentication data (keeping tokens)');
+        try {
+            localStorage.removeItem('user');
+            console.log('✅ User data cleared, tokens preserved for performance');
+        } catch (error) {
+            console.error('❌ Error clearing authentication data:', error);
+        }
+    }
+
+    /**
+     * Clear ALL tokens (use only when absolutely necessary)
+     */
+    clearTokens() {
+        console.log('🧹 Clearing ALL token data');
+        this.accessToken = null;
+        this.refreshToken = null;
+        this.tokenExpiry = null;
+        this.pendingRefresh = null;
+        
+        try {
+            localStorage.removeItem(AUTH_CONSTANTS.STORAGE_KEYS.ACCESS_TOKEN);
+            localStorage.removeItem(AUTH_CONSTANTS.STORAGE_KEYS.REFRESH_TOKEN);
+            localStorage.removeItem(AUTH_CONSTANTS.STORAGE_KEYS.TOKEN_EXPIRY);
+            localStorage.removeItem('user');
+            console.log('✅ All tokens and user data cleared');
+        } catch (error) {
+            console.error('❌ Error clearing tokens:', error);
+        }
     }
 }
 

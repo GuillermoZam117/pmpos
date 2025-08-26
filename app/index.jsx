@@ -10,6 +10,7 @@ import { darkTheme } from './theme';
 import Loading from './components/Loading';
 import ErrorBoundary from './components/ErrorBoundary';
 import Debug from 'debug';
+import './utils/consoleProxy';
 import CircularProgress from '@mui/material/CircularProgress';
 
 // Lazy load components

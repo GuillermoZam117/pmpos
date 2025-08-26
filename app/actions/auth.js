@@ -5,6 +5,7 @@ import { authenticate } from '../queries';
 import Debug from 'debug';
 import { createAction } from 'redux-actions';
 import { tokenService } from '../services/tokenService';
+import terminalService from '../services/terminalService';
 import { navigate } from '../utils/navigation';
 
 const debug = Debug('pmpos:auth');
@@ -86,6 +87,13 @@ export const login = (pin) => async (dispatch) => {
             });
             
             console.log('✅ Login successful:', result.user.name);
+            
+            // Set current user and register terminal (non-blocking)
+            terminalService.setCurrentUser(result.user.name);
+            terminalService.ensureTerminalRegistered(result.user.name).catch(e => {
+                console.warn("Terminal auto-registration failed (non-blocking):", e?.message || e);
+            });
+            
             console.timeEnd('Login Duration');
             console.groupEnd();
 
@@ -142,6 +150,13 @@ export const authenticateWithPin = (pin) => async (dispatch) => {
         }
       });
       console.log('✅ Login successful:', result.user?.name);
+      
+      // Set current user and register terminal (non-blocking)
+      terminalService.setCurrentUser(result.user.name);
+      terminalService.ensureTerminalRegistered(result.user.name).catch(e => {
+        console.warn("Terminal auto-registration failed (non-blocking):", e?.message || e);
+      });
+      
       console.timeEnd('Login Duration');
       console.groupEnd();
       return true;
@@ -215,11 +230,21 @@ export const loginWithPin = (pin) => async (dispatch) => {
             throw new Error('Invalid PIN');
         }
 
-        dispatch(authActions.loginSuccess({
-            user: data.getUser,
-            token: token,
-            authenticated: true
-        }));
+        // Normalize to the 'login' reducer API
+        dispatch({
+            type: 'LOGIN_SUCCESS',
+            payload: {
+                user: data.getUser,
+                token: token,
+                authenticated: true
+            }
+        });
+
+        // Set current user and register terminal (non-blocking)
+        terminalService.setCurrentUser(data.getUser.name);
+        terminalService.ensureTerminalRegistered(data.getUser.name).catch(e => {
+            console.warn("Terminal auto-registration failed (non-blocking):", e?.message || e);
+        });
 
         return data.getUser;
     } catch (error) {
@@ -313,11 +338,15 @@ export const logout = () => async (dispatch) => {
     debug('🔓 Iniciando logout...');
     
     try {
-        // Clear auth state
+        // Clear auth state (both legacy and current reducers)
+        dispatch({ type: 'LOGOUT' });
         dispatch({ type: AUTH_ACTIONS.LOGOUT });
         
-        // Clear user data but keep token
-        tokenService.clearAuthentication();
+        // Clear user data but KEEP token for performance
+        // tokenService.clearAuthentication(); // Removed to maintain token
+        
+        // Clear terminal registration
+        terminalService.clearTerminal();
         
         // Navigation will be handled by component
         debug('✅ Logout exitoso');

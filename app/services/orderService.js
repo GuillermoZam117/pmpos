@@ -6,17 +6,14 @@ const debug = Debug('pmpos:order');
 
 // GraphQL Mutations para gestión avanzada de órdenes
 const ADD_ORDER_TO_TERMINAL_TICKET = gql`
-  mutation AddOrderToTerminalTicket($terminalId: String!, $productName: String!, $quantity: Decimal!, $portion: String) {
+  mutation AddOrderToTerminalTicket($terminalId: String!, $productName: String!, $quantity: Int!, $portion: String) {
     addOrderToTerminalTicket(
       terminalId: $terminalId,
       productName: $productName,
       quantity: $quantity,
       portion: $portion
     ) {
-      id
-      menuItemName
-      quantity
-      price
+      totalAmount
     }
   }
 `;
@@ -107,7 +104,7 @@ export const orderService = {
                 variables: {
                     terminalId,
                     productName,
-                    quantity: parseFloat(quantity),
+                    quantity: parseInt(quantity),
                     ...(portion && { portion })
                 }
             });

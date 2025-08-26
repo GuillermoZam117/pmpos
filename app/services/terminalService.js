@@ -1,61 +1,196 @@
-import { gql } from '@apollo/client';
-import { client } from '../apollo';
+/**
+ * Terminal Service - cleaned
+ * No local fabricated terminal IDs. On failure, registration returns null.
+ */
+
+import { registerTerminalAsync } from '../queries';
 import Debug from 'debug';
 
 const debug = Debug('pmpos:terminal');
 
-const REGISTER_TERMINAL = gql`
-  mutation RegisterTerminal($ticketType: String!, $terminal: String!, $department: String!, $user: String!) {
-    registerTerminal(
-      ticketType: $ticketType
-      terminal: $terminal
-      department: $department
-      user: $user
-    )
-  }
-`;
-
-const CREATE_TICKET = gql`
-  mutation CreateTerminalTicket($terminalId: String!) {
-    createTerminalTicket(terminalId: $terminalId) {
-      uid
+class TerminalService {
+    constructor() {
+        this._terminalsByUser = new Map();
+        this._serverRegisteredUsers = new Set();
+        this._currentUser = null;
+        this._onRegisteredCallbacks = new Set();
+        this._registrationInFlight = false;
+        this._registrationPromise = null;
+        this.loadTerminals();
     }
-  }
-`;
 
-export const terminalService = {
-    async register(user) {
-        debug('📱 Registering terminal for user:', user.name);
+    loadTerminals() {
+        if (typeof window === 'undefined') return;
         try {
-            const { data } = await client.mutate({
-                mutation: REGISTER_TERMINAL,
-                variables: {
-                    ticketType: "Ticket",
-                    terminal: "WebClient",
-                    department: "Restaurant",
-                    user: user.name
+            const stored = localStorage.getItem('pmpos_terminals_by_user');
+            if (stored) {
+                const terminals = JSON.parse(stored);
+                this._terminalsByUser = new Map(Object.entries(terminals));
+                Object.keys(terminals).forEach(u => this._serverRegisteredUsers.add(u));
+                debug('✅ Loaded terminals from storage:', terminals);
+            }
+        } catch (error) {
+            debug('❌ Error loading terminals from storage:', error);
+        }
+    }
+
+    saveTerminals() {
+        if (typeof window === 'undefined') return;
+        try {
+            const terminals = Object.fromEntries(this._terminalsByUser);
+            localStorage.setItem('pmpos_terminals_by_user', JSON.stringify(terminals));
+            debug('✅ Saved terminals to storage:', terminals);
+        } catch (error) {
+            debug('❌ Error saving terminals to storage:', error);
+        }
+    }
+
+    setCurrentUser(userName) {
+        this._currentUser = userName;
+        debug('👤 Current user set to:', userName);
+    }
+
+    getTerminalId(userName = null) {
+        const user = userName || this._currentUser;
+        if (!user) return null;
+
+        const terminalId = this._terminalsByUser.get(user);
+        if (terminalId) return terminalId;
+
+        if (typeof window !== 'undefined') {
+            try {
+                if (window.currentTerminalId) return window.currentTerminalId;
+                const legacy = localStorage.getItem('currentTerminalId') || localStorage.getItem('pmpos_terminal_id');
+                if (legacy) return legacy;
+            } catch (e) {
+                debug('❌ Error reading legacy terminalId from storage:', e);
+            }
+        }
+
+        return null;
+    }
+
+    setTerminalId(id, userName = null) {
+        if (!id) return;
+        const user = userName || this._currentUser;
+        if (!user) return;
+
+        this._terminalsByUser.set(user, id);
+        this.saveTerminals();
+
+        try {
+            if (typeof window !== 'undefined') {
+                window.currentTerminalId = id;
+                localStorage.setItem('currentTerminalId', id);
+                localStorage.setItem('pmpos_terminal_id', id);
+            }
+        } catch (e) {
+            debug('❌ Error saving legacy terminalId keys:', e);
+        }
+
+        this._serverRegisteredUsers.add(user);
+        debug('✅ Terminal ID set for user', user + ':', id);
+    }
+
+    async ensureTerminalRegistered(user = null) {
+        const userName = user || this._currentUser;
+        if (!userName) return null;
+        if (!this._currentUser) this.setCurrentUser(userName);
+
+        const existingId = this.getTerminalId(userName);
+        if (existingId) return existingId;
+
+        if (process.env.REACT_APP_SKIP_TERMINAL_REGISTER === 'true') return null;
+
+        if (this._registrationInFlight && this._registrationPromise) {
+            return await this._registrationPromise;
+        }
+
+        this._registrationInFlight = true;
+        this._registrationPromise = this._performRegistration(userName);
+
+        try {
+            const terminalId = await this._registrationPromise;
+            if (terminalId) {
+                this.setTerminalId(terminalId, userName);
+                // Notify listeners about successful registration
+                try {
+                    this._onRegisteredCallbacks.forEach(cb => {
+                        try { cb(userName, terminalId); } catch (e) { debug('Callback error:', e); }
+                    });
+                } catch (e) {
+                    debug('❌ Error invoking onRegistered callbacks:', e);
                 }
-            });
-            debug('✅ Terminal registered:', data.registerTerminal);
-            return data.registerTerminal;
+                return terminalId;
+            }
+            debug('⚠️ Terminal registration returned no id for user', userName);
+            return null;
         } catch (error) {
-            debug('❌ Terminal registration failed:', error);
-            throw error;
-        }
-    },
-
-    async createTicket(terminalId) {
-        debug('🎫 Creating ticket with terminal:', terminalId);
-        try {
-            const { data } = await client.mutate({
-                mutation: CREATE_TICKET,
-                variables: { terminalId }
-            });
-            debug('✅ Ticket created:', data.createTerminalTicket);
-            return data.createTerminalTicket;
-        } catch (error) {
-            debug('❌ Ticket creation failed:', error);
-            throw error;
+            debug('❌ Terminal registration failed for user', userName + ':', error);
+            return null;
+        } finally {
+            this._registrationInFlight = false;
+            this._registrationPromise = null;
         }
     }
-};
+
+    // Allow external modules to register a callback when a user gets a server terminalId
+    onRegistered(callback) {
+        if (typeof callback === 'function') this._onRegisteredCallbacks.add(callback);
+        return () => this._onRegisteredCallbacks.delete(callback);
+    }
+
+    async _performRegistration(user) {
+        try {
+            return await registerTerminalAsync(user);
+        } catch (error) {
+            debug('⚠️ _performRegistration error:', error?.message || error);
+            return null;
+        }
+    }
+
+    isServerRegistered(userName = null) {
+        const user = userName || this._currentUser;
+        if (!user) return false;
+        return this._serverRegisteredUsers.has(user);
+    }
+
+    clearTerminal(userName = null) {
+        const user = userName || this._currentUser;
+        if (!user) return;
+        this._terminalsByUser.delete(user);
+        this.saveTerminals();
+        this._registrationPromise = null;
+        this._registrationInFlight = false;
+        if (typeof window !== 'undefined') {
+            localStorage.removeItem('pmpos_terminal_id');
+            localStorage.removeItem('currentTerminalId');
+            delete window.currentTerminalId;
+        }
+    }
+
+    clearAllTerminals() {
+        this._terminalsByUser.clear();
+        this.saveTerminals();
+        this._currentUser = null;
+        this._serverRegisteredUsers.clear();
+    }
+
+    isRegistered() {
+        return !!this.getTerminalId();
+    }
+
+    async forceReRegister(user = null) {
+        this.clearTerminal(user);
+        return await this.ensureTerminalRegistered(user);
+    }
+
+    async register(user) {
+        const userName = typeof user === 'string' ? user : user?.name || user?.userName;
+        return await this.ensureTerminalRegistered(userName);
+    }
+}
+
+const terminalService = new TerminalService();
+export default terminalService;
+export { terminalService };

@@ -30,7 +30,8 @@ const authInitialState = Map({
     isLoading: false,
     error: null,
     accessToken: null,
-    refreshToken: null
+    refreshToken: null,
+    user: null
 });
 
 const authReducer = (state = authInitialState, action) => {
@@ -43,12 +44,13 @@ const authReducer = (state = authInitialState, action) => {
         case AUTH_ACTIONS.LOGIN_SUCCESS:
             return state.merge({
                 token: action.payload.token,
-                expiryDate: action.payload.expiryDate,
+                expiryDate: action.payload.tokenExpiry || action.payload.expiryDate,
                 isAuthenticated: true,
                 isLoading: false,
                 error: null,
                 accessToken: action.payload.accessToken,
-                refreshToken: action.payload.refreshToken
+                refreshToken: action.payload.refreshToken,
+                user: action.payload.user || state.get('user')
             });
         case AUTH_ACTIONS.LOGIN_FAILURE:
             return state.merge({
@@ -72,12 +74,26 @@ const authReducer = (state = authInitialState, action) => {
                 token: null,
                 expiryDate: null,
                 isAuthenticated: false,
-                error: null
+                error: null,
+                user: null
+            });
+        case AUTH_ACTIONS.LOGOUT:
+        case 'LOGOUT':
+            return state.merge({
+                isAuthenticated: false,
+                user: null,
+                token: null,
+                accessToken: null,
+                refreshToken: null,
+                expiryDate: null,
+                error: null,
+                isLoading: false
             });
         case AUTH_ACTIONS.AUTH_ERROR:
             return state.merge({
                 error: action.payload,
-                isAuthenticated: false
+                isAuthenticated: false,
+                user: null
             });
         default:
             return state;
