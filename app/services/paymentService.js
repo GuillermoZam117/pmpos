@@ -1,13 +1,17 @@
 import { gql } from '@apollo/client';
 import { client } from '../apollo';
+import { appconfig } from '../config';
+import { tokenService } from './tokenService';
 import Debug from 'debug';
 
 const debug = Debug('pmpos:payment');
 
 // GraphQL Queries
-const GET_PAYMENT_TYPES = gql`
-  query GetPaymentTypes($userRoleId: Int) {
-    getPaymentTypes(userRoleId: $userRoleId) {
+// Note: Some SambaPOS installs throw 500 when optional args/variables are present.
+// Use query without variables for better compatibility.
+const GET_PAYMENT_TYPES_NOARG = gql`
+  query GetPaymentTypes {
+    getPaymentTypes {
       id
       name
     }
@@ -61,19 +65,52 @@ export const paymentService = {
      * Obtiene los tipos de pago disponibles
      */
     async getPaymentTypes(userRoleId = null) {
-        debug('💳 Fetching payment types for user role:', userRoleId);
+        debug('💳 Fetching payment types (no-arg query). Ignoring userRoleId for compatibility');
         try {
-            const { data } = await client.query({
-                query: GET_PAYMENT_TYPES,
-                variables: userRoleId ? { userRoleId } : {},
-                fetchPolicy: 'cache-first'
+            // Prefer Apollo cache if present and valid
+            try {
+                const { data } = await client.query({
+                    query: GET_PAYMENT_TYPES_NOARG,
+                    fetchPolicy: 'cache-first'
+                });
+                if (data?.getPaymentTypes?.length) {
+                    debug('✅ Payment types from cache/network:', data.getPaymentTypes);
+                    return data.getPaymentTypes;
+                }
+            } catch (apolloErr) {
+                debug('ℹ️ Apollo path failed, falling back to direct fetch:', apolloErr.message);
+            }
+
+            // Direct fetch with inline query to avoid variable issues
+            const token = await tokenService.getValidAccessToken();
+            const cfg = appconfig();
+            const inline = 'query { getPaymentTypes { id name } }';
+            const resp = await fetch(cfg.GQLurl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ query: inline })
             });
-            debug('✅ Payment types fetched:', data.getPaymentTypes);
-            return data.getPaymentTypes;
+
+            if (!resp.ok) {
+                const body = await resp.text();
+                throw new Error(`HTTP ${resp.status} ${resp.statusText}: ${body}`);
+            }
+
+            const json = await resp.json();
+            const list = json?.data?.getPaymentTypes;
+            if (Array.isArray(list) && list.length >= 1) {
+                debug('✅ Payment types fetched via direct fetch:', list);
+                // Prime Apollo cache optionally
+                try { client.writeQuery({ query: GET_PAYMENT_TYPES_NOARG, data: { getPaymentTypes: list } }); } catch {}
+                return list;
+            }
+            throw new Error('Empty payment types response');
         } catch (error) {
-            debug('⚠️ Payment types query failed (using fallback):', error.message);
+            debug('⚠️ Payment types unavailable (using fallback):', error.message);
             // Fallback con tipos de pago por defecto - esto es normal en algunas configuraciones
-            console.info('💳 Using default payment types (SambaPOS configuration may not support custom payment types)');
             return [
                 { id: 1, name: 'Efectivo' },
                 { id: 2, name: 'Tarjeta de Crédito' },

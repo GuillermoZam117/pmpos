@@ -154,18 +154,19 @@ const MobileMenu = ({ menu, onMenuItemClick, compact = false }) => {
                 }}
                 onClick={() => onMenuItemClick(item)}
             >
-                <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                <CardContent sx={{ p: { xs: 2.5, sm: 2 }, '&:last-child': { pb: 2 } }}>
                     <Box display="flex" justifyContent="space-between" alignItems="flex-start">
                         <Box flex={1} mr={2}>
                             <Typography 
-                                variant="subtitle1" 
+                                variant="h6" 
                                 fontWeight="bold" 
                                 gutterBottom
                                 sx={{ 
                                     display: '-webkit-box',
                                     WebkitLineClamp: 2,
                                     WebkitBoxOrient: 'vertical',
-                                    overflow: 'hidden'
+                                    overflow: 'hidden',
+                                    fontSize: { xs: '1.05rem', sm: '1rem' }
                                 }}
                             >
                                 {item.name || item.caption}
@@ -173,14 +174,15 @@ const MobileMenu = ({ menu, onMenuItemClick, compact = false }) => {
                             
                             {item.description && (
                                 <Typography 
-                                    variant="body2" 
+                                    variant="body1" 
                                     color="text.secondary" 
                                     sx={{ 
                                         display: '-webkit-box',
                                         WebkitLineClamp: 2,
                                         WebkitBoxOrient: 'vertical',
                                         overflow: 'hidden',
-                                        mb: 1
+                                        mb: 1,
+                                        fontSize: { xs: '0.95rem', sm: '0.9rem' }
                                     }}
                                 >
                                     {item.description}
@@ -212,10 +214,10 @@ const MobileMenu = ({ menu, onMenuItemClick, compact = false }) => {
                         <Box display="flex" flexDirection="column" alignItems="flex-end">
                             {price > 0 && (
                                 <Typography 
-                                    variant="h6" 
+                                    variant="h5" 
                                     color="primary.main" 
                                     fontWeight="bold"
-                                    sx={{ mb: 0.5 }}
+                                    sx={{ mb: 0.5, fontSize: { xs: '1.4rem', sm: '1.2rem' } }}
                                 >
                                     {formatMXN(price)}
                                 </Typography>
@@ -342,7 +344,7 @@ const MobileMenu = ({ menu, onMenuItemClick, compact = false }) => {
                     // Search/Filter Results
                     filteredItems.length > 0 ? (
                         filteredItems.map(item => (
-                            <MenuItemCard key={item.id || item.productId} item={item} />
+                            <MenuItemCard key={`${item.categoryName || 'cat'}-${item.productId || item.id || item.name}`} item={item} />
                         ))
                     ) : (
                         <Box sx={{ textAlign: 'center', py: 4 }}>
@@ -390,7 +392,7 @@ const MobileMenu = ({ menu, onMenuItemClick, compact = false }) => {
                                 <Collapse in={isExpanded}>
                                     <Box sx={{ p: 2, pt: 1 }}>
                                         {categoryItems.map(item => (
-                                            <MenuItemCard key={item.id || item.productId} item={item} />
+                                            <MenuItemCard key={`${category.name}-${item.productId || item.id || item.name}`} item={item} />
                                         ))}
                                     </Box>
                                 </Collapse>

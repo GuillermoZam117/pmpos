@@ -11,6 +11,10 @@ Reactjs based WebPOS Project for SambaPOS
 
 #Configuration
 - Edit `app > config.js` and set `terminalName`, `userName`, `departmentName`, `ticketTypeName`, `menuName`, `entityScreenName`, etc. to coincide with your SambaPOS configuration.
+- Note on `userName`: the runtime terminal registration uses the PIN-authenticated user from the login flow. `SAMBAPOS_USERNAME` in `.env` is only a fallback for diagnostics and should not be relied upon in production.
+
+#Guides
+- Terminal Ticket Flow (GraphQL, tested payloads and responses): see `docs/Guia_Flujo_Terminal.md`.
 
 #Contributors
 Emre Eren (https://github.com/emreeren)  

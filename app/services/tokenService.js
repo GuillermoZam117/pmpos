@@ -271,14 +271,36 @@ class TokenService {
                 throw new Error('Invalid PIN');
             }
 
-            // Guardar datos del usuario
-            this.setUserData({ name: userName });
+            // Resolve role from server (best-effort)
+            let userRole = 'Mesero';
+            try {
+                const roleResp = await fetch(appconfig().graphqlUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${await this.getValidAccessToken()}`
+                    },
+                    body: JSON.stringify({ query: 'query { getUsers { name roleName isAdmin } }' })
+                });
+                const roleJson = await roleResp.json();
+                const arr = roleJson?.data?.getUsers || [];
+                const match = arr.find(u => u?.name === userName);
+                if (match?.roleName) userRole = match.roleName;
+                else if (match?.isAdmin) userRole = 'Admin';
+            } catch (e) {
+                console.warn('User role lookup failed; defaulting to Mesero');
+            }
+
+            // Guardar datos del usuario + rol
+            this.setUserData({ name: userName, role: userRole });
+            try { localStorage.setItem('pmpos_user_role', userRole); } catch {}
 
             return {
                 success: true,
                 message: 'Authentication successful',
                 user: {
-                    name: userName
+                    name: userName,
+                    role: userRole
                 }
             };
 

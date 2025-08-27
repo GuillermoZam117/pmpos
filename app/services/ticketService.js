@@ -3,7 +3,7 @@ import { debugAuth } from '../utils/debug';
 import { gql } from '@apollo/client';
 import { client } from '../apollo';
 import Debug from 'debug';
-import { getAllOpenTickets, getTicketForMesa, loadTicketToTerminal, getCurrentTerminalId } from '../queries';
+import { getAllOpenTickets, getTicketForMesa, loadTicketToTerminal, getCurrentTerminalId, createTerminalTicketAsync, changeEntityOfTerminalTicketAsync, closeTerminalTicket as closeTerminalTicketInline, registerTerminalAsync, addOrderToTerminalTicketAsync } from '../queries';
 import cacheService from './cacheService';
 import { orderService } from './orderService';
 
@@ -87,6 +87,77 @@ export const createEmptyTicket = async (tableId) => {
 };
 
 export const ticketService = {
+    /**
+     * Flujo completo: crear ticket -> asignar entidad -> agregar orden -> cerrar ticket
+     * Todos los pasos usan mutaciones inline y manejan auto-apertura/reintentos
+     */
+    async createAssignAddClose({ terminalId, tableName, order }) {
+        const debugFlow = Debug('pmpos:ticket:flow');
+        debugFlow('🚀 Starting createAssignAddClose flow', { terminalId, tableName, order });
+
+        if (!terminalId) throw new Error('terminalId requerido');
+        if (!tableName) throw new Error('tableName requerido');
+        if (!order?.productName) throw new Error('order.productName requerido');
+
+        // 1) Crear ticket de terminal (idempotente)
+        const created = await createTerminalTicketAsync(terminalId);
+        debugFlow('✅ Terminal ticket (created/existing):', created);
+
+        // 2) Asignar entidad (mesa)
+        const assigned = await changeEntityOfTerminalTicketAsync(terminalId, tableName);
+        debugFlow('✅ Entity assigned:', assigned?.entities);
+
+        // 3) Agregar orden
+        const added = await addOrderToTerminalTicketAsync(terminalId, {
+            productName: order.productName,
+            portion: order.portion || 'Normal',
+            quantity: order.quantity || 1
+        });
+        debugFlow('✅ Order added:', added);
+
+        // 4) Cerrar ticket del terminal (idempotente)
+        const closed = await closeTerminalTicketInline();
+        debugFlow('✅ Terminal ticket closed:', closed);
+
+        return { created, assigned, added, closed };
+    },
+    /**
+     * Carga un ticket cerrado en el contexto del terminal, agrega órdenes y cierra
+     */
+    async modifyClosedTicket({ terminalId, ticketId, orders }) {
+        const debugFlow = Debug('pmpos:ticket:closed-flow');
+        debugFlow('🚀 Starting closed ticket modify flow', { terminalId, ticketId, ordersCount: orders?.length || 0 });
+
+        if (!terminalId) throw new Error('terminalId requerido');
+        if (!ticketId) throw new Error('ticketId requerido');
+
+        // 1) Cargar ticket en el terminal
+        const { loadTerminalTicketWithOrders } = await import('../queries');
+        const loaded = await loadTerminalTicketWithOrders(terminalId, String(ticketId));
+        debugFlow('✅ Ticket loaded into terminal session:', loaded?.id || ticketId);
+
+        // 2) Agregar órdenes en secuencia
+        if (orders && Array.isArray(orders)) {
+            for (const ord of orders) {
+                try {
+                    const res = await addOrderToTerminalTicketAsync(terminalId, {
+                        productName: ord.productName || ord.name,
+                        portion: ord.portion || 'Normal',
+                        quantity: ord.quantity || 1
+                    });
+                    debugFlow('✅ Order added:', { productName: ord.productName || ord.name, result: res });
+                } catch (e) {
+                    debugFlow('⚠️ Failed to add order, continuing with next', e?.message || e);
+                }
+            }
+        }
+
+        // 3) Cerrar el ticket del terminal (idempotente)
+        const closed = await closeTerminalTicketInline();
+        debugFlow('✅ Terminal ticket closed:', closed);
+
+        return { loadedTicketId: loaded?.id || ticketId, closed };
+    },
     async openTicket(tableName, user) {
         try {
             debug('📝 Opening ticket for table:', tableName);
@@ -140,33 +211,16 @@ export const ticketService = {
                 };
             }
 
-            // Register terminal with config values
-            const config = appconfig();
-            const { data: registerData } = await client.mutate({
-                mutation: REGISTER_TERMINAL,
-                variables: {
-                    user: user.name,
-                    ticketType: config.ticketTypeName,
-                    terminal: config.terminalName,
-                    department: config.departmentName
-                }
-            });
-            const terminalId = registerData.registerTerminal;
+            // Register terminal using inline helper (env-driven payload + retries)
+            const terminalId = await registerTerminalAsync(user.name);
             debug('✅ Terminal registered:', terminalId);
 
             // Create terminal ticket (no table association)
-            const { data: ticketData } = await client.mutate({
-                mutation: CREATE_TERMINAL_TICKET,
-                variables: { terminalId }
-            });
-            const ticket = ticketData.createTerminalTicket;
+            const ticket = await createTerminalTicketAsync(terminalId);
             debug('✅ Terminal ticket created:', ticket.uid);
 
             // Close terminal session
-            await client.mutate({
-                mutation: CLOSE_TERMINAL_TICKET,
-                variables: { terminalId }
-            });
+            await closeTerminalTicketInline();
 
             return {
                 success: true,
@@ -183,15 +237,11 @@ export const ticketService = {
         debug('🎫 Creating ticket:', { terminalId, tableId, userId });
 
         try {
-            const { data } = await client.mutate({
-                mutation: CREATE_TERMINAL_TICKET,
-                variables: { terminalId }
-            });
-
-            debug('✅ Terminal ticket created:', data.createTerminalTicket);
+            const ticket = await createTerminalTicketAsync(terminalId);
+            debug('✅ Terminal ticket created:', ticket);
             return {
                 success: true,
-                ticket: data.createTerminalTicket
+                ticket
             };
         } catch (error) {
             debug('❌ Error creating ticket:', error);
@@ -239,16 +289,7 @@ export const ticketService = {
             // 3) Associate ticket with table if present
             if (localTicket.tableId) {
                 try {
-                    await client.mutate({
-                        mutation: gql`
-                            mutation ChangeEntity($terminalId: String!, $entity: String!) {
-                                changeEntityOfTerminalTicket(terminalId: $terminalId, entity: $entity) {
-                                    uid
-                                }
-                            }
-                        `,
-                        variables: { terminalId, entity: localTicket.tableId }
-                    });
+                    await changeEntityOfTerminalTicketAsync(terminalId, localTicket.tableId);
                     debug('✅ Assigned table to promoted ticket:', localTicket.tableId);
                 } catch (assignErr) {
                     debug('⚠️ Failed to assign table to promoted ticket:', assignErr);

@@ -14,11 +14,26 @@ module.exports = (env, argv) => {
         'process.env': JSON.stringify({
             NODE_ENV: process.env.NODE_ENV,
             API_URL: env.API_URL || 'http://localhost:9000',
-            SAMBAPOS_API_URL: env.SAMBAPOS_API_URL,
-            SAMBAPOS_GRAPHQL_URL: process.env.SAMBAPOS_GRAPHQL_URL || 'http://localhost:9000/api/graphql',
-            SAMBAPOS_TOKEN_URL: process.env.SAMBAPOS_TOKEN_URL || 'http://localhost:9000/Token',
-            USER_NAME: env.USER_NAME,
-            CLIENT_ID: env.CLIENT_ID
+            // Core Samba endpoints
+            SAMBAPOS_API_URL: process.env.SAMBAPOS_API_URL || env.SAMBAPOS_API_URL,
+            SAMBAPOS_GRAPHQL_URL: process.env.SAMBAPOS_GRAPHQL_URL || `${env.API_URL || 'http://localhost:9000'}/api/graphql`,
+            SAMBAPOS_TOKEN_URL: process.env.SAMBAPOS_TOKEN_URL || `${env.API_URL || 'http://localhost:9000'}/Token`,
+            // Auth
+            SAMBAPOS_USERNAME: process.env.SAMBAPOS_USERNAME || env.USER_NAME,
+            SAMBAPOS_PASSWORD: process.env.SAMBAPOS_PASSWORD || env.PASSWORD,
+            SAMBAPOS_CLIENT_ID: process.env.SAMBAPOS_CLIENT_ID || env.CLIENT_ID,
+            // Business names (Discovery)
+            SAMBAPOS_TERMINAL: process.env.SAMBAPOS_TERMINAL,
+            SAMBAPOS_DEPARTMENT: process.env.SAMBAPOS_DEPARTMENT,
+            SAMBAPOS_TICKET_TYPE: process.env.SAMBAPOS_TICKET_TYPE,
+            SAMBAPOS_ENTITY_SCREEN: process.env.SAMBAPOS_ENTITY_SCREEN,
+            SAMBAPOS_ENTITY_TYPE: process.env.SAMBAPOS_ENTITY_TYPE,
+            // Automation and labels
+            SAMBAPOS_SUBMIT_ORDERS_COMMAND: process.env.SAMBAPOS_SUBMIT_ORDERS_COMMAND,
+            SAMBAPOS_PRINT_JOB_NAME: process.env.SAMBAPOS_PRINT_JOB_NAME,
+            SAMBAPOS_LABEL_SUBMIT: process.env.SAMBAPOS_LABEL_SUBMIT,
+            SAMBAPOS_LABEL_PRINT_BILL: process.env.SAMBAPOS_LABEL_PRINT_BILL,
+            SAMBAPOS_LABEL_PAY: process.env.SAMBAPOS_LABEL_PAY
         })
     };
 
@@ -38,6 +53,9 @@ module.exports = (env, argv) => {
             },
             hot: true,
             port: 8081,
+            headers: {
+                'Cache-Control': 'no-store',
+            },
             historyApiFallback: true,
             setupMiddlewares: (middlewares, devServer) => {
                 if (!devServer) {
@@ -174,15 +192,87 @@ module.exports = (env, argv) => {
         optimization: {
             splitChunks: {
                 chunks: 'all',
-                maxInitialRequests: Infinity,
+                maxInitialRequests: 10, // Reduced from Infinity
                 minSize: 20000,
+                maxSize: 200000, // Max chunk size to force splitting
                 cacheGroups: {
+                    // Core React ecosystem
+                    react: {
+                        test: /[\\/]node_modules[\\/](react|react-dom|react-redux|redux)[\\/]/,
+                        name: 'vendor.react',
+                        priority: 50,
+                        chunks: 'all',
+                    },
+                    // MUI Core (split into smaller chunks)
+                    muiCore: {
+                        test: /[\\/]node_modules[\\/]@mui[\\/](material|system|utils)[\\/]/,
+                        name: 'vendor.mui-core',
+                        priority: 40,
+                        chunks: 'all',
+                    },
+                    // MUI Icons & Lab (separate chunk)
+                    muiExtras: {
+                        test: /[\\/]node_modules[\\/]@mui[\\/](icons-material|lab)[\\/]/,
+                        name: 'vendor.mui-extras',
+                        priority: 39,
+                        chunks: 'all',
+                    },
+                    // Emotion (MUI's CSS-in-JS dependency)
+                    emotion: {
+                        test: /[\\/]node_modules[\\/]@emotion[\\/]/,
+                        name: 'vendor.emotion',
+                        priority: 38,
+                        chunks: 'all',
+                    },
+                    // Apollo/GraphQL
+                    apollo: {
+                        test: /[\\/]node_modules[\\/](@apollo|graphql)[\\/]/,
+                        name: 'vendor.apollo',
+                        priority: 37,
+                        chunks: 'all',
+                    },
+                    // SignalR
+                    signalr: {
+                        test: /[\\/]node_modules[\\/]@microsoft[\\/]signalr[\\/]/,
+                        name: 'vendor.signalr',
+                        priority: 36,
+                        chunks: 'all',
+                    },
+                    // Core JS polyfills
+                    corejs: {
+                        test: /[\\/]node_modules[\\/]core-js[\\/]/,
+                        name: 'vendor.core-js',
+                        priority: 35,
+                        chunks: 'all',
+                    },
+                    // Immutable.js
+                    immutable: {
+                        test: /[\\/]node_modules[\\/]immutable[\\/]/,
+                        name: 'vendor.immutable',
+                        priority: 34,
+                        chunks: 'all',
+                    },
+                    // React Router
+                    router: {
+                        test: /[\\/]node_modules[\\/](react-router|@remix-run)[\\/]/,
+                        name: 'vendor.react-router',
+                        priority: 33,
+                        chunks: 'all',
+                    },
+                    // Other common utilities
+                    utils: {
+                        test: /[\\/]node_modules[\\/](debug|lodash|date-fns|axios)[\\/]/,
+                        name: 'vendor.utils',
+                        priority: 32,
+                        chunks: 'all',
+                    },
+                    // Default vendor chunk for everything else
                     vendor: {
                         test: /[\\/]node_modules[\\/]/,
-                        name(module) {
-                            const packageName = module.context.match(/[\\/]node_modules[\\/](.*?)([\\/]|$)/)[1];
-                            return `vendor.${packageName.replace('@', '')}`;
-                        },
+                        name: 'vendor.others',
+                        priority: 10,
+                        chunks: 'all',
+                        minChunks: 1,
                     },
                 },
             },
@@ -190,8 +280,11 @@ module.exports = (env, argv) => {
         },
         performance: {
             hints: isProduction ? 'warning' : false,
-            maxEntrypointSize: 512000,
-            maxAssetSize: 512000
+            maxEntrypointSize: 600000, // Increased to accommodate current bundle
+            maxAssetSize: 300000, // Reduced per-asset limit to encourage splitting
+            assetFilter: function(assetFilename) {
+                return !/(\.map$)|(assets\/)/.test(assetFilename); // Ignore maps and assets
+            }
         },
         stats: {
             errorDetails: true,

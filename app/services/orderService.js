@@ -1,5 +1,7 @@
 import { gql } from '@apollo/client';
 import { client } from '../apollo';
+import { appconfig } from '../config';
+import { tokenService } from './tokenService';
 import Debug from 'debug';
 
 const debug = Debug('pmpos:order');
@@ -97,25 +99,37 @@ export const orderService = {
      * Añade una nueva orden al ticket del terminal
      */
     async addOrder(terminalId, productName, quantity = 1, portion = null) {
-        debug('➕ Adding order:', { terminalId, productName, quantity, portion });
+        debug('➕ Adding order (inline-first):', { terminalId, productName, quantity, portion });
+        const { addOrderToTerminalTicketAsync } = await import('../queries');
+
+        // Prefer inline helper which avoids sending variables
         try {
-            const { data } = await client.mutate({
-                mutation: ADD_ORDER_TO_TERMINAL_TICKET,
-                variables: {
-                    terminalId,
-                    productName,
-                    quantity: parseInt(quantity),
-                    ...(portion && { portion })
+            const orderPayload = { productName, portion, quantity };
+            const result = await addOrderToTerminalTicketAsync(terminalId, orderPayload);
+            debug('✅ Order added via inline helper:', result);
+            return { success: true, order: result };
+        } catch (inlineError) {
+            debug('⚠️ Inline addOrder failed, falling back to Apollo mutation:', inlineError.message);
+            // Fallback to existing Apollo mutation for compatibility
+            try {
+                const { data } = await client.mutate({
+                    mutation: ADD_ORDER_TO_TERMINAL_TICKET,
+                    variables: {
+                        terminalId,
+                        productName,
+                        quantity: parseInt(quantity),
+                        ...(portion && { portion })
+                    }
+                });
+                if (data?.addOrderToTerminalTicket) {
+                    debug('✅ Order added via Apollo fallback:', data.addOrderToTerminalTicket);
+                    return { success: true, order: data.addOrderToTerminalTicket };
                 }
-            });
-            debug('✅ Order added:', data.addOrderToTerminalTicket);
-            return {
-                success: true,
-                order: data.addOrderToTerminalTicket
-            };
-        } catch (error) {
-            debug('❌ Failed to add order:', error);
-            throw new Error(`Error al agregar orden: ${error.message}`);
+                throw new Error('Empty response from addOrderToTerminalTicket');
+            } catch (apolloError) {
+                debug('❌ Failed to add order (both inline and Apollo):', apolloError.message);
+                throw new Error(`Error al agregar orden: ${apolloError.message}`);
+            }
         }
     },
 
@@ -232,19 +246,19 @@ export const orderService = {
      */
     validateOrderData(orderData) {
         const { quantity, price, productName } = orderData;
-        
+
         if (!productName || productName.trim() === '') {
             throw new Error('El nombre del producto es requerido');
         }
-        
+
         if (quantity !== undefined && (isNaN(quantity) || quantity <= 0)) {
             throw new Error('La cantidad debe ser mayor a 0');
         }
-        
+
         if (price !== undefined && (isNaN(price) || price < 0)) {
             throw new Error('El precio no puede ser negativo');
         }
-        
+
         return true;
     },
 
@@ -277,7 +291,7 @@ export const orderService = {
         try {
             // Primero limpiar todas las órdenes
             await this.clearAllOrders(terminalId);
-            
+
             // Luego intentar cancelar el ticket (si la mutación existe)
             try {
                 const { data } = await client.mutate({
@@ -312,7 +326,7 @@ export const orderService = {
         debug('🔄 Transferring orders:', { sourceTerminalId, targetTerminalId, orderUids });
         try {
             const results = [];
-            
+
             for (const orderUid of orderUids) {
                 // Aquí iría la lógica de transferencia
                 // Por ahora, simulamos que se puede hacer copiando y eliminando
@@ -320,7 +334,7 @@ export const orderService = {
                 // TODO: Implementar transferencia real cuando esté disponible en SambaPOS
                 results.push({ orderUid, transferred: true });
             }
-            
+
             return {
                 success: true,
                 transferredOrders: results

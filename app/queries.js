@@ -118,12 +118,12 @@ export const registerTerminalAsync = async (userOverride = null) => {
     const token = await ensureAuthenticated();
     const config = appconfig();
 
-    // Complete registration with all required parameters
+    // Payload fijo desde .env; user = autenticado
     const variables = {
-        ticketType: "COMEDOR",
-        terminal: "SERVIDOR",
-        department: "MESAS",
-        user: userOverride || config.userName || 'graphiql'
+        ticketType: process.env.SAMBAPOS_TICKET_TYPE || config.ticketTypeName || 'COMEDOR',
+        terminal: process.env.SAMBAPOS_TERMINAL || config.terminalName || 'SERVIDOR',
+        department: process.env.SAMBAPOS_DEPARTMENT || config.departmentName || 'MESAS',
+        user: userOverride || process.env.SAMBAPOS_USERNAME || config.userName || 'graphiql'
     };
 
     debug('📋 Complete terminal registration:', {
@@ -131,20 +131,15 @@ export const registerTerminalAsync = async (userOverride = null) => {
         endpoint: config.GQLurl
     });
 
-    const query = `mutation RegisterTerminal($ticketType: String!, $terminal: String!, $department: String!, $user: String!) {
-        registerTerminal(
-            ticketType: $ticketType
-            terminal: $terminal
-            department: $department
-            user: $user
-        )
-    }`;
+    // SambaPOS GraphQL is more reliable with inline args (no variables)
+    const safe = (s) => String(s).replace(/"/g, '\\"');
+    const inlineMutation = `mutation { registerTerminal(ticketType: "${safe(variables.ticketType)}", terminal: "${safe(variables.terminal)}", department: "${safe(variables.department)}", user: "${safe(variables.user)}") }`;
 
-    debug('📝 Sending terminal registration query:', { query: query.substring(0, 100) + '...', variables });
+    debug('📝 Sending terminal registration mutation (inline):', inlineMutation);
 
     // retry/backoff helper
     const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-    const maxAttempts = 3;
+    const maxAttempts = 3; // Reintentos SOLO ante 5xx
     let attempt = 0;
     let data = null;
 
@@ -158,7 +153,7 @@ export const registerTerminalAsync = async (userOverride = null) => {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ query, variables })
+                body: JSON.stringify({ query: inlineMutation })
             });
 
             debug(`📡 Terminal registration response: ${response.status} ${response.statusText}`);
@@ -173,8 +168,8 @@ export const registerTerminalAsync = async (userOverride = null) => {
                     attempt
                 });
 
-                // For server errors (5xx) try again with backoff, otherwise fail fast
-                if (response.status >= 500 && attempt < maxAttempts) {
+                // Solo reintentar en 5xx
+                if (response.status >= 500 && response.status <= 599 && attempt < maxAttempts) {
                     const backoff = 500 * Math.pow(2, attempt - 1); // 500ms, 1000ms, ...
                     debug(`⏳ Waiting ${backoff}ms before retrying registerTerminal`);
                     await sleep(backoff);
@@ -187,13 +182,8 @@ export const registerTerminalAsync = async (userOverride = null) => {
             data = await response.json();
             break; // success
         } catch (err) {
-            console.error('❌ Exception during registerTerminal attempt', { err: err.message, attempt });
-            if (attempt < maxAttempts) {
-                const backoff = 500 * Math.pow(2, attempt - 1);
-                debug(`⏳ Exception backoff ${backoff}ms before next attempt`);
-                await sleep(backoff);
-                continue;
-            }
+            // No reintentos para errores no HTTP (p. ej. red) según política 5xx-only
+            console.error('❌ Exception during registerTerminal (no retry)', { err: err.message, attempt });
             throw err;
         }
     }
@@ -202,7 +192,7 @@ export const registerTerminalAsync = async (userOverride = null) => {
     if (data && data.errors) {
         const errorMsg = data.errors.map(e => e.message).join(', ');
         console.error('🚨 GraphQL errors during terminal registration:', errorMsg);
-        console.error('Test in GraphiQL:', `mutation {registerTerminal(user:"${variables.user}")}`);
+        console.error('Test in GraphiQL:', inlineMutation);
 
         throw new Error(`Terminal registration failed: ${errorMsg}. Check user "${variables.user}" exists in SambaPOS`);
     }
@@ -242,10 +232,6 @@ export const createTerminalTicket = async () => {
         throw new Error('No terminal ID found. Register terminal first.');
     }
 
-    // Prevent sending local fallback terminal IDs to the server
-    if (!terminalId) {
-        throw new Error('No terminal registered. Please register terminal before creating a server ticket.');
-    }
 
     const token = await ensureAuthenticated();
     const config = appconfig();
@@ -287,31 +273,23 @@ export const createTerminalTicket = async () => {
     }
 };
 
-export const addOrderToTerminalTicket = async (productName, portion, quantity = 1) => {
-    debug('➕ Adding order to terminal ticket:', { productName, portion, quantity });
-    const terminalId = getCurrentTerminalId();
+// Enhanced version that supports complex order objects
+export const addOrderToTerminalTicketAsync = async (terminalId, orderPayload) => {
+    debug('➕ Adding enhanced order to terminal ticket (inline, no variables):', { terminalId, orderPayload });
 
     if (!terminalId) {
-        throw new Error('No terminal ID found. Register terminal first.');
-    }
-
-    if (!terminalId) {
-        throw new Error('No terminal registered. Cannot add order to server ticket.');
+        throw new Error('Terminal ID is required');
     }
 
     const token = await ensureAuthenticated();
     const config = appconfig();
 
-    const query = `mutation AddOrder($terminalId: String!, $productName: String!, $portion: String!, $quantity: Int!) {
-        addOrderToTerminalTicket(
-            terminalId: $terminalId,
-            productName: $productName,
-            portion: $portion,
-            quantity: $quantity
-        ) {
-            totalAmount
-        }
-    }`;
+    // Build inline mutation with only safe, required args
+    const safe = (s) => String(s).replace(/"/g, '\\"');
+    const productName = orderPayload.productName || orderPayload.name;
+    const portion = orderPayload.portion || 'Normal';
+    const quantity = parseInt(orderPayload.quantity || 1, 10);
+    const inline = `mutation { addOrderToTerminalTicket(terminalId: "${safe(terminalId)}", productName: "${safe(productName)}", quantity: ${quantity}, portion: "${safe(portion)}") { totalAmount remainingAmount } }`;
 
     try {
         const response = await fetch(config.GQLurl, {
@@ -320,15 +298,74 @@ export const addOrderToTerminalTicket = async (productName, portion, quantity = 
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify({
-                query,
-                variables: {
-                    terminalId,
-                    productName,
-                    portion,
-                    quantity: parseInt(quantity)
+            body: JSON.stringify({ query: inline })
+        });
+
+        const data = await response.json();
+
+        if (data.errors) {
+            const msg = data.errors.map(e => e.message).join(', ');
+            console.error('🚨 GraphQL errors adding order:', data.errors);
+            // Auto-open terminal ticket and retry once on specific error
+            if (/No ticket open on terminal/i.test(msg)) {
+                debug('🟨 No ticket open. Creating terminal ticket and retrying addOrder...');
+                const created = await createTerminalTicketAsync(terminalId);
+                if (created) {
+                    const retryResp = await fetch(config.GQLurl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ query: inline })
+                    });
+                    const retryData = await retryResp.json();
+                    if (!retryData.errors) {
+                        const result = retryData.data?.addOrderToTerminalTicket;
+                        debug('✅ Order added after opening ticket:', result);
+                        return result;
+                    }
+                    const retryMsg = retryData.errors.map(e => e.message).join(', ');
+                    throw new Error(`Add order failed after opening ticket: ${retryMsg}`);
                 }
-            })
+            }
+            throw new Error(`Add order failed: ${msg}`);
+        }
+
+        const result = data.data?.addOrderToTerminalTicket;
+        debug('✅ Order added successfully:', result);
+        return result;
+
+    } catch (error) {
+        debug('❌ Failed to add order:', error);
+        throw error;
+    }
+};
+
+// Legacy version for backward compatibility
+export const addOrderToTerminalTicket = async (productName, portion, quantity = 1) => {
+    debug('➕ Adding order to terminal ticket (inline, no variables):', { productName, portion, quantity });
+    const terminalId = getCurrentTerminalId();
+
+    if (!terminalId) {
+        throw new Error('No terminal ID found. Register terminal first.');
+    }
+
+
+    const token = await ensureAuthenticated();
+    const config = appconfig();
+    const safe = (s) => String(s).replace(/"/g, '\\"');
+    const q = parseInt(quantity, 10);
+    const inline = `mutation { addOrderToTerminalTicket(terminalId: "${safe(terminalId)}", productName: "${safe(productName)}", quantity: ${q}, portion: "${safe(portion)}") { totalAmount } }`;
+
+    try {
+        const response = await fetch(config.GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ query: inline })
         });
 
         const data = await response.json();
@@ -356,9 +393,6 @@ export const getTerminalTicket = async () => {
         throw new Error('No terminal ID found. Register terminal first.');
     }
 
-    if (!terminalId) {
-        throw new Error('No terminal registered. Cannot query server ticket.');
-    }
 
     const token = await ensureAuthenticated();
     const config = appconfig();
@@ -410,23 +444,18 @@ export const getTerminalTicket = async () => {
 };
 
 export const closeTerminalTicket = async () => {
-    debug('🔒 Closing terminal ticket...');
+    debug('🔒 Closing terminal ticket (inline, tolerant if none open)...');
     const terminalId = getCurrentTerminalId();
 
     if (!terminalId) {
         throw new Error('No terminal ID found. Register terminal first.');
     }
 
-    if (!terminalId) {
-        throw new Error('No terminal registered. Cannot close server ticket.');
-    }
 
     const token = await ensureAuthenticated();
     const config = appconfig();
-
-    const query = `mutation CloseTerminalTicket($terminalId: String!) {
-        closeTerminalTicket(terminalId: $terminalId)
-    }`;
+    const safe = (s) => String(s).replace(/\"/g, '\\"');
+    const inline = `mutation { closeTerminalTicket(terminalId: \"${safe(terminalId)}\") }`;
 
     try {
         const response = await fetch(config.GQLurl, {
@@ -435,17 +464,20 @@ export const closeTerminalTicket = async () => {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify({
-                query,
-                variables: { terminalId }
-            })
+            body: JSON.stringify({ query: inline })
         });
 
         const data = await response.json();
 
         if (data.errors) {
+            const msg = data.errors.map(e => e.message).join(', ');
             console.error('🚨 GraphQL errors closing terminal ticket:', data.errors);
-            throw new Error(`Close terminal ticket failed: ${data.errors.map(e => e.message).join(', ')}`);
+            // If no open ticket, treat as success (idempotent close)
+            if (/No ticket open on terminal/i.test(msg)) {
+                debug('🟨 No open ticket on terminal upon close; treating as success.');
+            } else {
+                throw new Error(`Close terminal ticket failed: ${msg}`);
+            }
         }
 
         debug('✅ Terminal ticket closed');
@@ -456,7 +488,7 @@ export const closeTerminalTicket = async () => {
             localStorage.removeItem('currentTerminalId');
         }
 
-        return data.data?.closeTerminalTicket;
+        return data.data?.closeTerminalTicket ?? true;
 
     } catch (error) {
         debug('❌ Failed to close terminal ticket:', error);
@@ -653,34 +685,23 @@ function normalizeMenuData(menuData) {
 // ============================================
 export const createTerminalTicketAsync = async (terminalId) => {
     const token = await ensureAuthenticated();
+    const cfg = appconfig();
+    const safe = (s) => String(s).replace(/"/g, '\\"');
+    const inline = `mutation { createTerminalTicket(terminalId: "${safe(terminalId)}") { id uid type remainingAmount totalAmount } }`;
 
-    const query = `mutation CreateTerminalTicket($terminalId: String!) {
-        createTerminalTicket(terminalId: $terminalId) {
-            id
-            uid
-            type
-            remainingAmount
-            totalAmount
-        }
-    }`;
-
-    const variables = { terminalId };
-
-    const response = await fetch(appconfig().GQLurl, {
+    const response = await fetch(cfg.GQLurl, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ query, variables })
+        body: JSON.stringify({ query: inline })
     });
 
     const data = await response.json();
 
     if (data.errors) {
         console.error('🚨 GraphQL Errors in createTerminalTicket:', data.errors);
-        console.error('📝 Query:', query);
-        console.error('📋 Variables:', variables);
         return null;
     }
 
@@ -723,43 +744,139 @@ export const loadTerminalTicketWithOrders = async (terminalId, ticketId) => {
 
 export const changeEntityOfTerminalTicketAsync = async (terminalId, tableName) => {
     const token = await ensureAuthenticated();
-    const config = appconfig();
+    const cfg = appconfig();
+    const safe = (s) => String(s).replace(/"/g, '\\"');
+    const type = cfg.entityTypeName;
 
-    const query = `mutation ChangeEntityOfTerminalTicket($terminalId: String!, $type: String!, $name: String!) {
-        changeEntityOfTerminalTicket(terminalId: $terminalId, type: $type, name: $name) {
-            id
-            entities {
-                name
-                type
-            }
+    // Input validation: avoid sending malformed GraphQL requests
+    if (!terminalId) {
+        throw new Error('changeEntityOfTerminalTicketAsync requires terminalId');
+    }
+    if (!tableName && tableName !== 0) {
+        throw new Error('changeEntityOfTerminalTicketAsync requires tableName');
+    }
+
+    // Prefer 'entity' argument (simpler) and fall back to type/name
+    const inlineEntity = `mutation { changeEntityOfTerminalTicket(terminalId: \"${safe(terminalId)}\", entity: \"${safe(tableName)}\") { id entities { name type } } }`;
+    const inlineTypeName = `mutation { changeEntityOfTerminalTicket(terminalId: \"${safe(terminalId)}\", type: \"${safe(type)}\", name: \"${safe(tableName)}\") { id entities { name type } } }`;
+
+    const exec = async (query) => {
+        const res = await fetch(cfg.GQLurl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ query })
+        });
+        const text = await res.text();
+        let json;
+        try {
+            json = JSON.parse(text);
+        } catch (e) {
+            json = { errors: [{ message: `HTTP ${res.status}: ${text?.slice(0,200) || 'Invalid JSON'}` }] };
         }
-    }`;
-
-    const variables = {
-        terminalId,
-        type: config.entityTypeName,
-        name: tableName
+        if (!res.ok && (!json || !json.errors)) {
+            json = { errors: [{ message: `HTTP ${res.status}: ${text?.slice(0,200) || res.statusText}` }] };
+        }
+        return json;
     };
 
-    const response = await fetch(appconfig().GQLurl, {
+    // Try entity-only first
+    let data = await exec(inlineEntity);
+
+    // Handle no ticket open: open ticket and retry once with same query
+    const handleNoTicketOpen = async (query) => {
+        const openInline = `mutation { createTerminalTicket(terminalId: \"${safe(terminalId)}\") { id } }`;
+        const openJson = await exec(openInline);
+        if (!openJson.errors) {
+            const retry = await exec(query);
+            if (!retry.errors) return retry;
+            throw new Error(retry.errors.map(e => e.message).join(', '));
+        }
+        throw new Error(openJson.errors.map(e => e.message).join(', '));
+    };
+
+    if (data.errors) {
+        const msg = data.errors.map(e => e.message).join(', ');
+        if (/No ticket open on terminal/i.test(msg)) {
+            data = await handleNoTicketOpen(inlineEntity);
+        } else {
+            // Be liberal: if entity form fails for any reason (400/validation), try type+name
+            let fallback = await exec(inlineTypeName);
+            if (fallback.errors) {
+                const msg2 = fallback.errors.map(e => e.message).join(', ');
+                if (/No ticket open on terminal/i.test(msg2)) {
+                    fallback = await handleNoTicketOpen(inlineTypeName);
+                } else {
+                    throw new Error(msg2 || msg);
+                }
+            }
+            data = fallback;
+        }
+    }
+
+    return data.data?.changeEntityOfTerminalTicket;
+};
+
+// ============================================
+// AUTOMATION COMMANDS
+// ============================================
+export const executeAutomationCommandForTerminalTicketAsync = async (terminalId, name, value = '', orderUid = null) => {
+    const token = await ensureAuthenticated();
+    const cfg = appconfig();
+    const safe = (s) => String(s).replace(/\"/g, '\\"');
+    const args = [
+        `terminalId: \"${safe(terminalId)}\"`,
+        `name: \"${safe(name)}\"`,
+        `value: \"${safe(value)}\"`
+    ];
+    if (orderUid) args.push(`orderUid: \"${safe(orderUid)}\"`);
+    const inline = `mutation { executeAutomationCommandForTerminalTicket(${args.join(', ')}) { id } }`;
+
+    const response = await fetch(cfg.GQLurl, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ query, variables })
+        body: JSON.stringify({ query: inline })
     });
 
     const data = await response.json();
-
     if (data.errors) {
-        console.error('🚨 GraphQL Errors in changeEntityOfTerminalTicket:', data.errors);
-        console.error('📝 Query:', query);
-        console.error('📋 Variables:', variables);
-        return null;
+        const msg = data.errors.map(e => e.message).join(', ');
+        throw new Error(msg);
     }
+    return data.data?.executeAutomationCommandForTerminalTicket;
+};
 
-    return data.data?.changeEntityOfTerminalTicket;
+// List available Automation Command buttons for the active terminal ticket
+export const getAutomationCommandButtonsForTerminalTicketAsync = async (terminalId, orderUids = null) => {
+    const token = await ensureAuthenticated();
+    const cfg = appconfig();
+    const safe = (s) => String(s).replace(/\"/g, '\\"');
+    const args = [`terminalId: \"${safe(terminalId)}\"`];
+    if (orderUids && Array.isArray(orderUids) && orderUids.length > 0) {
+        const ids = orderUids.map(u => `\"${safe(u)}\"`).join(',');
+        args.push(`orderUids: [${ids}]`);
+    }
+    const inline = `query { getAutomationCommandButtonsForTerminalTicket(${args.join(', ')}) { name } }`;
+
+    const response = await fetch(cfg.GQLurl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ query: inline })
+    });
+    const data = await response.json();
+    if (data.errors) {
+        const msg = data.errors.map(e => e.message).join(', ');
+        throw new Error(msg);
+    }
+    return data.data?.getAutomationCommandButtonsForTerminalTicket || [];
 };
 
 // ============================================
@@ -1052,18 +1169,13 @@ export const getAllOpenTickets = async () => {
     const query = `query GetAllOpenTickets {
         getTickets(isClosed: false) {
             id
+            date
+            lastUpdateDate
             totalAmount
             remainingAmount
-            entities {
-                name
-                type
-            }
-            orders {
-                id
-                menuItemName
-                quantity
-                price
-            }
+            entities { name type }
+            states { stateName state }
+            orders { id menuItemName quantity price }
         }
     }`;
 
@@ -1099,52 +1211,23 @@ export const getAllOpenTickets = async () => {
  * Returns: 'LIBRE' | 'OCUPADO' | 'CUENTA'
  */
 export const getMesaStatus = (mesaNumber, allTickets) => {
-    const ticket = allTickets.find(ticket =>
-        ticket.entities && ticket.entities.some(entity =>
-            entity.type === 'Mesas' && entity.name === String(mesaNumber)
-        )
+    const ticket = allTickets.find(t =>
+        t.entities && t.entities.some(e => e.type === 'Mesas' && e.name === String(mesaNumber))
     );
 
     if (!ticket) return 'LIBRE';
 
-    // Debug logging only for key mesas (1, 17) and only occasionally
-    const isKeyMesa = ['1', '17'].includes(String(mesaNumber));
-    const shouldLog = isKeyMesa && Math.random() < 0.1; // 10% of the time
-
-    if (shouldLog) {
-        debug(`🔍 Mesa ${mesaNumber} ticket analysis:`, {
-            ticketId: ticket.id,
-            totalAmount: ticket.totalAmount,
-            remainingAmount: ticket.remainingAmount,
-            ordersCount: ticket.orders?.length || 0
+    // Prefer explicit ticket state for "Cuenta solicitada"
+    const hasCuentaSolicitada = Array.isArray(ticket.states)
+        && ticket.states.some(s => {
+            const name = (s.stateName || '').toLowerCase();
+            const value = (s.state || '').toLowerCase();
+            return (name === 'status' || name === 'estado') && value.includes('cuenta');
         });
-    }
 
-    // Logic for determining CUENTA vs OCUPADO:
-    // CUENTA: Has orders AND remaining amount > 0 (bill requested)
-    // OCUPADO: Has no orders yet OR remaining amount = 0 (paid)
+    if (hasCuentaSolicitada) return 'CUENTA';
 
-    const hasOrders = ticket.orders && ticket.orders.length > 0;
-    const totalAmount = ticket.totalAmount || 0;
-    const remainingAmount = ticket.remainingAmount || 0;
-
-    let status;
-    if (hasOrders && totalAmount > 0 && remainingAmount > 0) {
-        // Has orders with pending payment = cuenta solicitada
-        status = 'CUENTA';
-    } else if (hasOrders && totalAmount > 0 && remainingAmount === 0) {
-        // Has orders but fully paid = should be closed, but if still open treat as occupied
-        status = 'OCUPADO';
-    } else {
-        // No orders yet or no total amount = just occupied (ordering in progress)
-        status = 'OCUPADO';
-    }
-
-    if (shouldLog) {
-        debug(`🎯 Mesa ${mesaNumber} final status: ${status}`);
-    }
-
-    return status;
+    return 'OCUPADO';
 };
 
 /**
@@ -1178,8 +1261,11 @@ export const getMesaTimeInfo = (mesaNumber, allTickets) => {
     const now = new Date();
 
     // Use lastUpdateDate if available, otherwise use creation date
-    const referenceDate = new Date(ticket.lastUpdateDate || ticket.date);
-    const minutesElapsed = Math.floor((now - referenceDate) / 60000);
+    const refRaw = ticket.lastUpdateDate || ticket.date;
+    const referenceDate = refRaw ? new Date(refRaw) : null;
+    const minutesElapsed = referenceDate && !isNaN(referenceDate.getTime())
+        ? Math.floor((now - referenceDate) / 60000)
+        : 0;
 
     switch (status) {
         case 'OCUPADO':
@@ -1219,10 +1305,64 @@ export const getMesaStatusWithTime = (mesaNumber, allTickets) => {
 export const getMesaColor = (status) => {
     switch (status) {
         case 'LIBRE': return '#F5F1E6'; // crema/hueso
-        case 'OCUPADO': return '#FFF8E1'; // ámbar suave (amarillo)
-        case 'CUENTA': return '#FFCDD2'; // rojo más intenso
+        case 'OCUPADO': return '#FFEB3B'; // amarillo sólido
+        case 'CUENTA': return '#F44336'; // rojo sólido
         default: return '#F5F1E6';
     }
+};
+
+// ============================================
+// CLOSED TICKETS HELPERS
+// ============================================
+export const getTicketById = async (ticketId) => {
+    const token = await ensureAuthenticated();
+    const cfg = appconfig();
+    const id = typeof ticketId === 'string' ? ticketId : String(ticketId);
+    const query = `query { getTicket(id: ${id}) { id number date totalAmount remainingAmount entities { name type } orders { uid productId quantity price portion } } }`;
+    const response = await fetch(cfg.GQLurl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ query })
+    });
+    const data = await response.json();
+    if (data.errors) {
+        const msg = data.errors.map(e => e.message).join(', ');
+        throw new Error(msg);
+    }
+    return data.data?.getTicket || null;
+};
+
+export const executePrintJobAsync = async ({ name, ticketId, copies = 1, terminal = null, department = null, user = null }) => {
+    const token = await ensureAuthenticated();
+    const cfg = appconfig();
+    const safe = (s) => String(s).replace(/\"/g, '\\"');
+    const p = {
+        name: name || process.env.SAMBAPOS_PRINT_JOB_NAME || 'Imprimir factura CAJA',
+        ticketId: typeof ticketId === 'string' ? ticketId : String(ticketId),
+        copies: parseInt(copies, 10) || 1,
+        terminal: terminal || process.env.SAMBAPOS_TERMINAL || cfg.terminalName,
+        department: department || process.env.SAMBAPOS_DEPARTMENT || cfg.departmentName,
+        user: user || process.env.SAMBAPOS_USERNAME || cfg.userName
+    };
+
+    const inline = `mutation { executePrintJob(name: \"${safe(p.name)}\", ticketId: ${p.ticketId}, copies: ${p.copies}, terminal: \"${safe(p.terminal)}\", department: \"${safe(p.department)}\", user: \"${safe(p.user)}\") { name } }`;
+    const response = await fetch(cfg.GQLurl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ query: inline })
+    });
+    const data = await response.json();
+    if (data.errors) {
+        const msg = data.errors.map(e => e.message).join(', ');
+        throw new Error(msg);
+    }
+    return data.data?.executePrintJob || { name: p.name };
 };
 
 /**

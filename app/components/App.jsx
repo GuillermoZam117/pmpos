@@ -8,6 +8,8 @@ import { useTheme } from '@mui/material/styles';
 import { initializeAuth } from '../actions/auth';
 import { ThemeProvider } from '../contexts/ThemeContext';
 import { tokenService } from '../services/tokenService';
+import dataManager from '../services/dataManager';
+import ticketPromotionService from '../services/ticketPromotionService';
 import Debug from 'debug';
 
 const debug = Debug('pmpos:app');
@@ -20,33 +22,74 @@ const ROUTES = {
 };
 
 // Lazy load components
-const PinPad = React.lazy(() => import('./PinPad'));
-const TableView = React.lazy(() => import('./TableView'));
-const POSViewUnified = React.lazy(() => import('./POS/POSViewUnified'));
+// Lazy helper with retry to recover from transient chunk load errors in dev
+const lazyWithRetry = (factory) => {
+    return React.lazy(() =>
+        factory().catch(err => {
+            const isChunkError = /Loading chunk/i.test(err?.message || '');
+            if (isChunkError && typeof window !== 'undefined') {
+                // Force a full reload to refresh chunk map
+                console.warn('🔁 Chunk load failed, reloading page...');
+                window.location.reload();
+            }
+            throw err;
+        })
+    );
+};
 
-// Loading component with better styling
-const LoadingComponent = () => (
+const PinPad = lazyWithRetry(() => import('./PinPad'));
+const TableView = lazyWithRetry(() => import('./TableView'));
+const POSViewUnified = lazyWithRetry(() => import('./POS/POSViewUnified'));
+
+// Loading component with progress indication
+const LoadingComponent = ({ progress }) => (
     <div style={{ 
         display: 'flex', 
+        flexDirection: 'column',
         justifyContent: 'center', 
         alignItems: 'center',
         minHeight: '100vh',
-        padding: '2rem' 
+        padding: '2rem',
+        textAlign: 'center'
     }}>
-        <CircularProgress />
+        <CircularProgress size={60} />
+        {progress?.stage && (
+            <div style={{ marginTop: '2rem', color: '#666' }}>
+                <p style={{ margin: '0.5rem 0', fontSize: '1.1rem' }}>{progress.stage}</p>
+                {progress.progress > 0 && (
+                    <div style={{
+                        width: '300px',
+                        height: '6px',
+                        backgroundColor: '#e0e0e0',
+                        borderRadius: '3px',
+                        overflow: 'hidden'
+                    }}>
+                        <div style={{
+                            width: `${progress.progress}%`,
+                            height: '100%',
+                            backgroundColor: '#1976d2',
+                            transition: 'width 0.3s ease'
+                        }} />
+                    </div>
+                )}
+            </div>
+        )}
     </div>
 );
 
-// Private route using auth selector
+// Private route using login slice (persisted via localStorage token)
 const PrivateRoute = ({ children }) => {
-    const isAuthenticated = useSelector(state => state.auth.get('isAuthenticated'));
-    return isAuthenticated ? children : <Navigate to={ROUTES.PINPAD} replace />;
+    const isAuthenticated = useSelector(state => state.auth?.get?.('isAuthenticated'));
+    // Soft auth: if token exists in localStorage, allow access while UI rehydrates
+    const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('access_token');
+    return (isAuthenticated || hasToken) ? children : <Navigate to={ROUTES.PINPAD} replace />;
 };
 
 const AppContent = () => {
     const dispatch = useDispatch();
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [initProgress, setInitProgress] = useState({ stage: '', progress: 0 });
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -54,45 +97,101 @@ const AppContent = () => {
         const initApp = async () => {
             debug('🚀 Initializing application...');
             try {
-                // Start token preload immediately (background operation)
+                // Step 1: Authentication (25%)
+                setInitProgress({ stage: 'Inicializando autenticación...', progress: 25 });
                 console.log('🔄 Starting token preload for instant login...');
                 tokenService.preloadTokenIfNeeded(); // No await - background operation
                 
-                // Initialize auth system
                 await dispatch(initializeAuth());
                 debug('✅ Authentication initialized');
+
+                // Step 2: Initialize DataManager - loads Menu + Tables + SignalR (75%)
+                setInitProgress({ stage: 'Cargando datos iniciales...', progress: 50 });
+                const initResult = await dataManager.initializeApp();
+                
+                if (initResult.success) {
+                    setInitProgress({ stage: 'Configurando interfaz...', progress: 90 });
+                    debug(`✅ DataManager initialized - Menu: ${initResult.menu?.categories?.length || 0} categories, Tables: ${initResult.tables?.length || 0} tables`);
+                    
+                    // Dispatch data to Redux store
+                    if (initResult.menu) {
+                        dispatch({ type: 'SET_MENU', menu: initResult.menu });
+                    }
+                    if (initResult.tables) {
+                        dispatch({ type: 'SET_TABLES', payload: initResult.tables });
+                    }
+                } else {
+                    debug('⚠️ DataManager initialization completed with warnings');
+                }
+                
+                setInitProgress({ stage: 'Completando configuración...', progress: 100 });
                 
                 // Add debug helpers to window for testing
                 if (typeof window !== 'undefined') {
-                    window.debugTerminal = () => {
-                        console.log('🔧 Terminal Debug Info:');
-                        console.log('  - Terminal ID:', terminalService.getTerminalId());
-                        console.log('  - Is Registered:', terminalService.isRegistered());
-                        console.log('  - localStorage terminalId:', localStorage.getItem('currentTerminalId'));
-                        console.log('  - window.currentTerminalId:', window.currentTerminalId);
+                    window.debugDataManager = () => {
+                        console.log('🔧 DataManager Debug Info:');
+                        console.log('  - Initialized:', dataManager.isInitialized());
+                        console.log('  - Status:', dataManager.getInitStatus());
+                        console.log('  - Cached Menu:', !!dataManager.getCachedMenu());
+                        console.log('  - Cached Tables:', dataManager.getCachedTables()?.length || 0);
                     };
                     
-                    window.registerTerminalManual = async (user = 'graphiql') => {
-                        console.log('🔧 Manual terminal registration for:', user);
+                    window.debugTicketPromotion = () => {
+                        console.log('🎫 Ticket Promotion Debug Info:');
+                        console.log(ticketPromotionService.getPromotionStatus());
+                    };
+                    
+                    window.retryTicketPromotion = async (ticketUid) => {
+                        console.log('🔄 Manual ticket promotion retry:', ticketUid);
                         try {
-                            const id = await terminalService.ensureTerminalRegistered(user);
-                            console.log('✅ Manual registration successful:', id);
-                            return id;
+                            const result = await ticketPromotionService.retryTicketPromotion(ticketUid);
+                            console.log('✅ Retry result:', result);
+                            return result;
                         } catch (error) {
-                            console.error('❌ Manual registration failed:', error);
+                            console.error('❌ Retry failed:', error);
+                            throw error;
+                        }
+                    };
+                    
+                    window.clearFailedTickets = () => {
+                        console.log('🗑️ Clearing failed tickets...');
+                        const count = ticketPromotionService.clearFailedTickets();
+                        console.log(`✅ Cleared ${count} failed tickets`);
+                        return count;
+                    };
+                    
+                    window.refreshData = async (type = 'all') => {
+                        console.log('🔄 Refreshing data:', type);
+                        try {
+                            switch (type) {
+                                case 'menu':
+                                    return await dataManager.refreshData('menu');
+                                case 'tables':
+                                    return await dataManager.refreshData('tables');
+                                case 'tickets':
+                                    return await dataManager.refreshData('tickets');
+                                default:
+                                    return await dataManager.initializeApp();
+                            }
+                        } catch (error) {
+                            console.error('❌ Data refresh failed:', error);
                             throw error;
                         }
                     };
                     
                     console.log('🔧 Debug commands available:');
-                    console.log('  - window.debugTerminal() - Show terminal status');
-                    console.log('  - window.registerTerminalManual(user) - Manual registration');
+                    console.log('  - window.debugDataManager() - Show DataManager status');
+                    console.log('  - window.debugTicketPromotion() - Show ticket promotion status');
+                    console.log('  - window.retryTicketPromotion(uid) - Manually retry ticket promotion');
+                    console.log('  - window.clearFailedTickets() - Clear failed tickets from cache');
+                    console.log('  - window.refreshData(type) - Refresh data (menu|tables|tickets|all)');
                 }
             } catch (err) {
                 debug('❌ Initialization error:', err);
                 setError(err.message);
             } finally {
                 setIsLoading(false);
+                setInitProgress({ stage: '', progress: 0 });
             }
         };
         initApp();
@@ -100,7 +199,7 @@ const AppContent = () => {
 
     // Show loading state
     if (isLoading) {
-        return <LoadingComponent />;
+        return <LoadingComponent progress={initProgress} />;
     }
 
     // Show error state if initialization failed

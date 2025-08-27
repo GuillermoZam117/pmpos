@@ -230,11 +230,35 @@ export const loginWithPin = (pin) => async (dispatch) => {
             throw new Error('Invalid PIN');
         }
 
+        // Resolve user role via GraphQL (best-effort)
+        let userRole = 'Mesero';
+        try {
+            const rolesResp = await fetch(settings.GQLurl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    query: `query { getUsers { name roleName isAdmin } }`
+                })
+            });
+            const rolesJson = await rolesResp.json();
+            const allUsers = rolesJson?.data?.getUsers || [];
+            const matched = allUsers.find(u => u?.name === data.getUser.name);
+            if (matched?.roleName) userRole = matched.roleName;
+            else if (matched?.isAdmin) userRole = 'Admin';
+        } catch (e) {
+            console.warn('User role lookup failed; defaulting to Mesero:', e?.message || e);
+        }
+
+        try { localStorage.setItem('pmpos_user_role', userRole); } catch {}
+
         // Normalize to the 'login' reducer API
         dispatch({
             type: 'LOGIN_SUCCESS',
             payload: {
-                user: data.getUser,
+                user: { ...data.getUser, role: userRole },
                 token: token,
                 authenticated: true
             }

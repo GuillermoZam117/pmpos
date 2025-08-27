@@ -68,7 +68,8 @@ const TableCard = ({ table, onClick }) => {
                 p: 2,
                 height: '100%',
                 cursor: 'pointer',
-                bgcolor: table.color || '#F5F1E6', // Color crema por defecto
+                bgcolor: table.color || '#F5F1E6', // Color sólido según estado
+                border: '2px solid black', // margen negro
                 transition: 'all 0.2s',
                 '&:hover': {
                     transform: 'scale(1.02)',

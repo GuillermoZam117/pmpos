@@ -141,12 +141,50 @@ class TerminalService {
     }
 
     async _performRegistration(user) {
+        // Registrar una sola vez; los 3 reintentos con backoff ocurren dentro de registerTerminalAsync
         try {
-            return await registerTerminalAsync(user);
+            const result = await registerTerminalAsync(user);
+            return result || null;
         } catch (error) {
-            debug('⚠️ _performRegistration error:', error?.message || error);
+            debug('❌ Terminal registration error (no outer retries):', error?.message || error);
             return null;
         }
+    }
+    
+    _isRetryableError(error) {
+        if (!error) return false;
+        
+        const errorMsg = error.message || error.toString();
+        const errorCode = error.code || error.status;
+        
+        // Network errors that should be retried
+        const retryablePatterns = [
+            'network',
+            'timeout',
+            'ECONNREFUSED',
+            'ENOTFOUND', 
+            'ETIMEDOUT',
+            'fetch',
+            'Failed to fetch',
+            'NetworkError'
+        ];
+        
+        // HTTP status codes that should be retried
+        const retryableStatusCodes = [408, 429, 500, 502, 503, 504];
+        
+        // Check error message patterns
+        const hasRetryablePattern = retryablePatterns.some(pattern => 
+            errorMsg.toLowerCase().includes(pattern.toLowerCase())
+        );
+        
+        // Check status codes
+        const hasRetryableStatus = retryableStatusCodes.includes(errorCode);
+        
+        const shouldRetry = hasRetryablePattern || hasRetryableStatus;
+        
+        debug(`🔍 Error analysis - Message: "${errorMsg}", Code: ${errorCode}, Retryable: ${shouldRetry}`);
+        
+        return shouldRetry;
     }
 
     isServerRegistered(userName = null) {

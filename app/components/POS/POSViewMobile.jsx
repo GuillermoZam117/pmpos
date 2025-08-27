@@ -26,6 +26,7 @@ import {
     Button,
     Chip,
     Alert,
+    Snackbar,
     Collapse,
     CircularProgress,
     useTheme,
@@ -54,14 +55,20 @@ import ProductDetailsModal from '../ProductDetailsModal';
 import PaymentDialog from '../PaymentDialog';
 import { useTheme as useCustomTheme } from '../../contexts/ThemeContext';
 import menuService from '../../services/menuService';
+import dataManager from '../../services/dataManager';
 import { orderService } from '../../services/orderService';
 import { ticketService } from '../../services/ticketService';
 import { paymentService } from '../../services/paymentService';
 import terminalService from '../../services/terminalService';
-import { createTerminalTicketAsync, changeEntityOfTerminalTicketAsync } from '../../queries';
+import { createTerminalTicketAsync, changeEntityOfTerminalTicketAsync, executeAutomationCommandForTerminalTicketAsync, getAutomationCommandButtonsForTerminalTicketAsync, closeTerminalTicket as closeTerminalTicketInline, executePrintJobAsync, loadTerminalTicketWithOrders } from '../../queries';
 import Debug from 'debug';
 
 const debug = Debug('pmpos:pos-mobile');
+const LABEL_SUBMIT = process.env.SAMBAPOS_LABEL_SUBMIT || 'Comandar';
+const LABEL_PRINT_BILL = process.env.SAMBAPOS_LABEL_PRINT_BILL || 'Imprimir Cuenta';
+const SUBMIT_CMD = process.env.SAMBAPOS_SUBMIT_ORDERS_COMMAND || 'Imprimir pedido';
+const PRINT_JOB = process.env.SAMBAPOS_PRINT_JOB_NAME || 'Imprimir factura CAJA';
+const LABEL_PAY = process.env.SAMBAPOS_LABEL_PAY || 'Pagar';
 
 const POSViewMobile = () => {
     const location = useLocation();
@@ -71,6 +78,11 @@ const POSViewMobile = () => {
     const { toggleTheme, isDarkMode } = useCustomTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
     const isSmallMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
+    // Role-based permissions (simple config-based): default Mesero
+    const authUser = useSelector(state => state.auth.get('user'));
+    const userRole = (typeof window !== 'undefined' ? localStorage.getItem('pmpos_user_role') : null) || process.env.SAMBAPOS_USER_ROLE || 'Mesero';
+    const canPay = ['Admin', 'Cajero', 'Cashier'].includes(userRole);
 
     // Get data from navigation state
     const { ticket, tableId, isNew = false } = location.state || {};
@@ -84,6 +96,7 @@ const POSViewMobile = () => {
     const [productModalOpen, setProductModalOpen] = useState(false);
     const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
     const [expandedOrderIndex, setExpandedOrderIndex] = useState(-1);
+    const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
     const [configurationError, setConfigurationError] = useState(null);
 
     // Prevent infinite loops
@@ -93,8 +106,25 @@ const POSViewMobile = () => {
     // Redux state
     const appState = useSelector(state => state.app);
     const menu = appState?.get ? appState.get('menu') : appState?.menu;
+    const menuJS = (menu && menu.toJS ? menu.toJS() : menu) || null;
 
-    // Load menu on mount
+    // Helper: resolve product name by productId using cached menu
+    const resolveProductName = useCallback((pid) => {
+        if (!pid) return null;
+        const productId = String(pid);
+        const menuData = menuJS || dataManager.getCachedMenu();
+        const categories = Array.isArray(menuData?.categories)
+            ? menuData.categories
+            : [];
+        for (const cat of categories) {
+            const items = cat.menuItems || [];
+            const found = items.find(it => String(it.productId || it.product?.id) === productId);
+            if (found) return found.name || found.caption || found.product?.name || null;
+        }
+        return null;
+    }, [menuJS]);
+
+    // Load menu on mount - Optimized to use pre-loaded data
     useEffect(() => {
         const loadMenu = async () => {
             // Prevent multiple simultaneous loads
@@ -103,37 +133,47 @@ const POSViewMobile = () => {
                 return;
             }
 
-            // Prevent loading if menu already loaded successfully
-            if (menu && menu.categories && menu.categories.length > 0 && menuLoadedRef.current) {
-                debug('📱 Menu already loaded successfully, skipping...');
+            debug('📱 Starting optimized menu load...');
+            debug('📱 Current Redux menu state:', menu);
+
+            // Step 1: Check if menu is already loaded in Redux (from App initialization)
+            if (menu && menu.categories && menu.categories.length > 0) {
+                debug('📱 ✅ Menu already available in Redux from startup, using cached data');
                 setMenuLoading(false);
+                menuLoadedRef.current = true;
                 return;
             }
 
-            loadingRef.current = true;
-            debug('📱 Starting menu load...');
-            debug('📱 Current menu state:', menu);
+            // Step 2: Try DataManager cache (faster than network)
+            const cachedMenu = dataManager.getCachedMenu();
+            if (cachedMenu && cachedMenu.categories && cachedMenu.categories.length > 0) {
+                debug('📱 ✅ Menu available in DataManager cache, dispatching to Redux');
+                dispatch({ type: 'SET_MENU', menu: cachedMenu });
+                setMenuLoading(false);
+                menuLoadedRef.current = true;
+                return;
+            }
 
+            // Step 3: Only if no cached data available, load from network
+            loadingRef.current = true;
             setMenuLoading(true);
 
             try {
-                debug('📱 Loading menu using MenuService...');
+                debug('📱 No cached menu available, loading from network...');
 
-                // Use the enhanced MenuService instead of legacy getMenu
-                const menuData = await menuService.getMenu(true); // Force refresh
+                // Use DataManager for optimized loading (includes caching)
+                const menuData = await dataManager.refreshData('menu');
 
                 if (!menuData || !menuData.categories || menuData.categories.length === 0) {
-                    throw new Error('Invalid menu data structure');
+                    throw new Error('Invalid menu data structure from server');
                 }
 
-                debug('📱 ✅ Valid menu data from MenuService:', menuData);
-
+                debug('📱 ✅ Menu loaded from network via DataManager:', menuData);
                 dispatch({ type: 'SET_MENU', menu: menuData });
                 menuLoadedRef.current = true;
-                debug('📱 Menu dispatched successfully to Redux');
 
             } catch (error) {
-                debug('❌ Failed to load menu from GraphQL:', error);
+                debug('❌ Failed to load menu:', error);
                 console.error('Menu loading failed:', error);
 
                 // Check if it's a terminal registration/configuration error
@@ -160,6 +200,30 @@ const POSViewMobile = () => {
         }
     }, []); // Remove dependencies to prevent loops - only run on mount
 
+    // Debug: List available automation command buttons when enabled
+    useEffect(() => {
+        const debugCommands = async () => {
+            try {
+                if (typeof window === 'undefined') return;
+                if (localStorage.getItem('pmpos_debug_commands') !== 'true') return;
+                const terminalId = terminalService.getTerminalId();
+                if (!terminalId) return;
+                const ticketData = await ticketService.getTicketByTable?.(tableId);
+                const allOrders = Array.isArray(orders) && orders.length ? orders : (ticketData?.ticket?.orders || []);
+                const orderUids = allOrders.map(o => o.uid).filter(Boolean);
+                const ticketButtons = await getAutomationCommandButtonsForTerminalTicketAsync(terminalId);
+                const orderButtons = orderUids.length ? await getAutomationCommandButtonsForTerminalTicketAsync(terminalId, [orderUids[0]]) : [];
+                debug('🔘 Ticket buttons:', ticketButtons);
+                debug('🔘 Order buttons (first order):', orderButtons);
+                console.table(ticketButtons);
+                console.table(orderButtons);
+            } catch (e) {
+                debug('⚠️ Failed to fetch automation buttons:', e);
+            }
+        };
+        debugCommands();
+    }, [orders, tableId]);
+
     // Load existing ticket data for occupied tables
     useEffect(() => {
         const loadExistingTicket = async () => {
@@ -178,12 +242,15 @@ const POSViewMobile = () => {
                             id: order.uid || Date.now() + Math.random(),
                             uid: order.uid,
                             productId: order.productId,
-                            name: order.name || order.caption || order.menuItemName,
+                            name: order.name || order.caption || order.menuItemName || resolveProductName(order.productId) || 'Producto',
                             caption: order.caption || order.name,
                             quantity: order.quantity,
                             price: order.price,
                             portion: order.portion || 'Normal',
-                            orderTags: order.orderTags ? order.orderTags.split(',').filter(tag => tag.trim()) : [],
+                            orderTags: Array.isArray(order.tags)
+                                ? order.tags.map(t => t?.tagName ? `${t.tagName}:${t.tag}` : (t?.tag || '')).filter(Boolean)
+                                : (order.orderTags ? order.orderTags.split(',').filter(tag => tag.trim()) : []),
+                            lastUpdateDate: order.lastUpdateDate || null,
                             comments: order.comments || '',
                             isExisting: true,
                             status: 'sent' // Existing orders are already sent to kitchen
@@ -207,12 +274,15 @@ const POSViewMobile = () => {
                     id: Date.now() + Math.random(),
                     uid: order.uid,
                     productId: order.productId,
-                    name: order.name || order.caption || `Product ${order.productId}`,
+                    name: order.name || order.caption || order.menuItemName || resolveProductName(order.productId) || 'Producto',
                     caption: order.caption || order.name,
                     quantity: order.quantity,
                     price: order.price,
                     portion: order.portion || 'Normal',
-                    orderTags: order.orderTags ? order.orderTags.split(',').filter(tag => tag.trim()) : [],
+                    orderTags: Array.isArray(order.tags)
+                        ? order.tags.map(t => t?.tagName ? `${t.tagName}:${t.tag}` : (t?.tag || '')).filter(Boolean)
+                        : (order.orderTags ? order.orderTags.split(',').filter(tag => tag.trim()) : []),
+                    lastUpdateDate: order.lastUpdateDate || null,
                     comments: '',
                     isExisting: true,
                     status: 'sent'
@@ -304,33 +374,38 @@ const POSViewMobile = () => {
             let terminalId = terminalService.getTerminalId();
             if (!terminalId) {
                 try {
-                    terminalId = await terminalService.ensureTerminalRegistered();
+                    // Ensure we pass the authenticated user if current user wasn't set yet
+                    const userName = authUser?.name || null;
+                    terminalId = await terminalService.ensureTerminalRegistered(userName);
                 } catch (regErr) {
                     debug('❌ Terminal registration failed before sending to kitchen:', regErr);
                 }
             }
 
-            // If we don't yet have a server-side ticket and a terminal is registered, create it now
-            let serverTicket = ticket;
-            if (!serverTicket?.uid && terminalId) {
-                try {
+            // Ensure the right ticket is loaded into the terminal session
+            // 1) If we know the ticket.id (occupied or already created and closed once), try to load it
+            // 2) Else, if we have a tableId, bind by entity (Samba will pull the last unpaid)
+            // 3) Else, create a brand new terminal ticket
+            try {
+                if (terminalId && ticket?.id) {
+                    debug('⚡ FAST PATH: using ticket.id to load context');
+                    await loadTerminalTicketWithOrders(terminalId, String(ticket.id));
+                    debug('🔄 Loaded existing closed/unpaid ticket into terminal:', ticket.id);
+                    setSnackbar({ open: true, severity: 'info', message: `Reabriendo ticket #${ticket.id} para enviar pedido` });
+                } else if (terminalId && tableId) {
+                    debug('⚡ FAST PATH: using mesa binding (type/name) to load last unpaid');
+                    await changeEntityOfTerminalTicketAsync(terminalId, tableId);
+                    debug('🔄 Bound terminal ticket to table (will attach last unpaid):', tableId);
+                    setSnackbar({ open: true, severity: 'info', message: `Vinculando mesa ${tableId} al último ticket no pagado` });
+                } else if (terminalId) {
+                    debug('⚡ FAST PATH: no id/mesa, creating fresh terminal ticket');
                     const created = await createTerminalTicketAsync(terminalId);
-                    if (created) {
-                        serverTicket = created;
-                        debug('✅ Created server-side terminal ticket for sending orders:', created);
-                        // Associate ticket with table if tableId is present
-                        if (tableId) {
-                            try {
-                                await changeEntityOfTerminalTicketAsync(terminalId, tableId);
-                                debug('✅ Assigned table to terminal ticket:', tableId);
-                            } catch (assignErr) {
-                                debug('⚠️ Failed to assign table to terminal ticket:', assignErr);
-                            }
-                        }
-                    }
-                } catch (createErr) {
-                    debug('❌ Failed to create server-side ticket before sending orders:', createErr);
+                    debug('🆕 Created new terminal ticket (no id/table context):', created?.uid);
+                    setSnackbar({ open: true, severity: 'info', message: 'Creando nuevo ticket de terminal' });
                 }
+            } catch (ctxErr) {
+                debug('⚠️ Could not prepare terminal ticket context. Will still try sending orders:', ctxErr);
+                setSnackbar({ open: true, severity: 'warning', message: 'No se pudo preparar el ticket; reintenta si falla el envío' });
             }
 
             // Send each order to kitchen via GraphQL
@@ -342,7 +417,9 @@ const POSViewMobile = () => {
                     // Prevent sending orders if terminal is not registered
                     if (!terminalId) {
                         debug('⚠️ No terminal registered. Skipping send to kitchen for now.');
-                        continue;
+                        // Surface a visible warning for the operator
+                        alert('No hay terminal registrada. Intenta reingresar (PIN) o revisa la conexión con SambaPOS.');
+                        break;
                     }
 
                     const result = await orderService.addOrder(
@@ -353,7 +430,8 @@ const POSViewMobile = () => {
                     );
 
                     debug('✅ Order sent to kitchen:', result);
-                    sentOrders.push({ ...order, status: 'sent', uid: result.id });
+                    // Best-effort mapping; inline helper returns totals (no uid). Keep local id and mark as sent.
+                    sentOrders.push({ ...order, status: 'sent' });
 
                 } catch (orderError) {
                     debug(`❌ Failed to send order ${order.name}:`, orderError);
@@ -368,14 +446,82 @@ const POSViewMobile = () => {
                     return sentOrder || order;
                 }));
 
-                debug(`✅ ${sentOrders.length} orders sent to kitchen successfully`);
+            debug(`✅ ${sentOrders.length} orders sent to kitchen successfully`);
+
+            // Close terminal ticket to finalize the command (Discovery flow: close triggers kitchen print)
+            try {
+                if (terminalId) {
+                    await closeTerminalTicketInline();
+                    debug('🔒 Terminal ticket closed after submit');
+                    // Notify tables to refresh immediately (status/color may change)
+                    try {
+                        if (typeof window !== 'undefined') {
+                            window.dispatchEvent(new CustomEvent('ticketUpdated', { detail: { source: 'submit-close' } }));
+                            if (typeof window.refreshData === 'function') {
+                                window.refreshData('tables').catch(() => {});
+                            }
+                        }
+                    } catch {}
+                }
+            } catch (closeErr) {
+                debug('⚠️ Closing terminal ticket after submit failed:', closeErr);
+            }
             }
 
         } catch (error) {
             debug('❌ Error sending orders to kitchen:', error);
             console.error('Kitchen submission failed:', error);
         }
-    }, [orders]);
+    }, [orders, authUser]);
+
+    const handlePrintBill = useCallback(async () => {
+        try {
+            let terminalId = terminalService.getTerminalId();
+            if (!terminalId) {
+                const userName = authUser?.name || null;
+                terminalId = await terminalService.ensureTerminalRegistered(userName);
+            }
+
+            // Prefer Automation Command on the active terminal ticket if available
+            if (terminalId) {
+                try {
+                    const printCmd = process.env.SAMBAPOS_PRINT_ACCOUNT_COMMAND || 'Imprimir factura';
+                    await executeAutomationCommandForTerminalTicketAsync(terminalId, printCmd, '');
+                    debug('🧾 Print bill via automation command');
+                    // Notify tables to refresh immediately (should flip to Cuenta solicitada)
+                    try {
+                        if (typeof window !== 'undefined') {
+                            window.dispatchEvent(new CustomEvent('ticketUpdated', { detail: { source: 'print-bill' } }));
+                            if (typeof window.refreshData === 'function') {
+                                window.refreshData('tables').catch(() => {});
+                            }
+                        }
+                    } catch {}
+                    return;
+                } catch {}
+            }
+
+            // Fallback: print job on last known ticket id (if provided in navigation state)
+            if (ticket?.id) {
+                await executePrintJobAsync({ name: PRINT_JOB, ticketId: ticket.id });
+                debug('🧾 Print bill via print job for ticket', ticket.id);
+                // Notify tables to refresh immediately
+                try {
+                    if (typeof window !== 'undefined') {
+                        window.dispatchEvent(new CustomEvent('ticketUpdated', { detail: { source: 'print-job' } }));
+                        if (typeof window.refreshData === 'function') {
+                            window.refreshData('tables').catch(() => {});
+                        }
+                    }
+                } catch {}
+            } else {
+                alert('No hay ticket para imprimir.');
+            }
+        } catch (e) {
+            debug('❌ Print bill failed:', e);
+            alert('Error al imprimir cuenta: ' + (e?.message || e));
+        }
+    }, [authUser, ticket]);
 
     const handlePayment = useCallback(async (paymentData) => {
         debug('💳 Processing payment using real GraphQL:', paymentData);
@@ -413,6 +559,8 @@ const POSViewMobile = () => {
         setPaymentDialogOpen(true);
     }, []);
 
+    
+
     const toggleOrderExpansion = (index) => {
         setExpandedOrderIndex(expandedOrderIndex === index ? -1 : index);
     };
@@ -421,7 +569,7 @@ const POSViewMobile = () => {
     const orderCount = orders.length;
 
     // Mobile menu component
-    const MobileMenuContainer = () => (
+    const MobileMenuContainer = ({ menuOverride = null }) => (
         <Box sx={{ height: '100%', overflow: 'auto', p: 1 }}>
             {configurationError ? (
                 <Box sx={{ p: 2 }}>
@@ -460,7 +608,7 @@ const POSViewMobile = () => {
                 </Box>
             ) : (
                 <MobileMenu
-                    menu={menu}
+                    menu={menuOverride || (menuJS || {})}
                     onMenuItemClick={handleProductClick}
                     compact={true}
                 />
@@ -504,9 +652,16 @@ const POSViewMobile = () => {
                                     <Box display="flex" justifyContent="space-between" alignItems="flex-start">
                                         <Box flex={1} mr={2}>
                                             <Box display="flex" alignItems="center" gap={1} mb={1}>
-                                                <Typography variant="subtitle2" fontWeight="bold">
-                                                    {order.name}
+                                                <Typography variant="h6" fontWeight="bold" sx={{ fontSize: { xs: '1.1rem', sm: '1rem' } }}>
+                                                    {order?.name || order?.caption || order?.menuItemName || 'Producto'}
                                                 </Typography>
+                                                <Chip
+                                                    size="small"
+                                                    variant="outlined"
+                                                    color="primary"
+                                                    label={`Cantidad: ${order.quantity}`}
+                                                    sx={{ fontWeight: 'bold' }}
+                                                />
                                                 {order.isExisting ? (
                                                     <Chip size="small" label="ENVIADO" color="success" variant="filled" />
                                                 ) : (
@@ -515,7 +670,7 @@ const POSViewMobile = () => {
                                             </Box>
 
                                             <Typography variant="body2" color="text.secondary" gutterBottom>
-                                                {order.portion} • {formatMXN(order.price)} c/u
+                                                {order.portion} • {formatMXN(order.price)} c/u • Total: {formatMXN((order.price || 0) * (order.quantity || 0))}
                                             </Typography>
 
                                             {(order.orderTags.length > 0 || order.comments) && (
@@ -600,31 +755,42 @@ const POSViewMobile = () => {
                     {/* Cart Summary */}
                     <Paper sx={{ p: 2, mt: 2, bgcolor: 'background.paper' }} elevation={2}>
                         <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                            <Typography variant="h6">Total del Pedido</Typography>
-                            <Typography variant="h5" color="primary.main" fontWeight="bold">
+                            <Typography variant="h6" sx={{ fontSize: { xs: '1.1rem', sm: '1rem' } }}>Total del Pedido</Typography>
+                            <Typography variant="h4" color="primary.main" fontWeight="bold" sx={{ fontSize: { xs: '1.6rem', sm: '1.4rem' } }}>
                                 {formatMXN(totalAmount)}
                             </Typography>
                         </Box>
 
                         <Box display="flex" gap={1}>
                             <Button
-                                variant="outlined"
+                                variant="contained"
                                 startIcon={<KitchenIcon />}
                                 onClick={handleSendToKitchen}
                                 fullWidth
                                 disabled={orders.length === 0}
                             >
-                                Cocina
+                                {LABEL_SUBMIT}
                             </Button>
                             <Button
-                                variant="contained"
-                                startIcon={<PaymentIcon />}
-                                onClick={handleOpenPaymentDialog}
+                                variant="outlined"
+                                startIcon={<PrintIcon />}
+                                onClick={handlePrintBill}
                                 fullWidth
                                 disabled={orders.length === 0}
                             >
-                                Pagar
+                                {LABEL_PRINT_BILL}
                             </Button>
+                            {canPay && (
+                                <Button
+                                    variant="contained"
+                                    startIcon={<PaymentIcon />}
+                                    onClick={handleOpenPaymentDialog}
+                                    fullWidth
+                                    disabled={orders.length === 0}
+                                >
+                                    {LABEL_PAY}
+                                </Button>
+                            )}
                         </Box>
                     </Paper>
                 </>
@@ -636,6 +802,8 @@ const POSViewMobile = () => {
     if (!ticket && !tableId) {
         return null;
     }
+
+    const handleSnackbarClose = () => setSnackbar(prev => ({ ...prev, open: false }));
 
     return (
         <Box sx={{
@@ -661,7 +829,7 @@ const POSViewMobile = () => {
                             Mesa {tableId}
                         </Typography>
                         <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                            {isNew ? 'Nuevo Ticket' : `Ticket #${ticket.number}`}
+                            {isNew ? 'Nuevo Ticket' : (ticket?.number ? `Ticket #${ticket.number}` : (ticket?.id ? `Ticket #${ticket.id}` : ''))}
                         </Typography>
                     </Box>
 
@@ -707,7 +875,7 @@ const POSViewMobile = () => {
 
             {/* Content Area */}
             <Box sx={{ flex: 1, overflow: 'hidden' }}>
-                {activeTab === 0 && <MobileMenuContainer />}
+                {activeTab === 0 && <MobileMenuContainer menuOverride={menuJS} />}
                 {activeTab === 1 && <MobileCart />}
             </Box>
 
@@ -754,6 +922,18 @@ const POSViewMobile = () => {
                 }}
                 onError={(error) => alert('Error: ' + error.message)}
             />
+
+            {/* Snackbar feedback */}
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={2000}
+                onClose={handleSnackbarClose}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={{ width: '100%' }}>
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 };

@@ -82,16 +82,38 @@ PMPOS is a React-based web POS application for SambaPOS that provides mobile ser
 - Automatic token validation and renewal
 - Secure token storage with encryption
 
+**Data Manager** (`app/services/dataManager.js`) - NEW:
+- Centralized data loading and caching
+- Optimized GraphQL flows with 70% fewer queries
+- Multi-level caching strategy (Static, Semi-static, Dynamic, Specific)
+- SignalR integration for real-time updates
+- Automatic initialization on app startup
+
+**Terminal Service** (`app/services/terminalService.js`) - ENHANCED:
+- Robust terminal registration with exponential backoff
+- Multi-user terminal management
+- Automatic retry on network failures
+- Event-driven callbacks for registration events
+
+**Ticket Promotion Service** (`app/services/ticketPromotionService.js`) - NEW:
+- Automatic promotion of local tickets to server tickets
+- Persistence and replay with idempotent operations
+- Exponential backoff retry mechanism
+- Failed ticket tracking and manual retry options
+
 **GraphQL Operations** (`app/queries.js`):
 - Terminal registration and management
 - Ticket creation and modification  
 - Order management and payment processing
 - Entity (table) operations
+- Enhanced payloads with better error handling
 
-**Real-time Communication** (`app/signalr.js`):
+**Real-time Communication** (via DataManager):
+- SignalR integration with automatic reconnection
 - Live updates for ticket changes
 - Table status synchronization
 - Order state notifications
+- Cache invalidation events
 
 ## Development Guidelines
 
@@ -139,12 +161,51 @@ Update `app/config.js` with SambaPOS-specific values:
 - Treat 500 responses as warnings rather than errors
 
 ### Ticket Operations Workflow
-1. `registerTerminal()` - Register POS terminal
+1. `registerTerminal()` - Register POS terminal (with retry/backoff)
 2. `createTerminalTicket()` - Create new ticket
 3. `changeEntityOfTerminalTicket()` - Assign table/entity
 4. `addOrderToTerminalTicket()` - Add products
 5. `closeTerminalTicket()` - Complete transaction
 6. `unregisterTerminal()` - Clean up
+
+### RegisterTerminal Payload Structure
+
+**GraphQL Mutation:**
+```graphql
+mutation RegisterTerminal($ticketType: String!, $terminal: String!, $department: String!, $user: String!) {
+    registerTerminal(
+        ticketType: $ticketType
+        terminal: $terminal
+        department: $department
+        user: $user
+    )
+}
+```
+
+**Required Variables:**
+```javascript
+{
+    ticketType: "COMEDOR",     // From config.ticketTypeName
+    terminal: "SERVIDOR",      // From config.terminalName  
+    department: "MESAS",       // From config.departmentName
+    user: "graphiql"          // From config.userName or user override
+}
+```
+
+**Retry Configuration:**
+- Max attempts: 3
+- Exponential backoff: 1s, 2s, 4s
+- Retryable errors: Network timeouts, 5xx HTTP errors
+- Non-retryable: 4xx errors, GraphQL schema errors
+
+**Response Format:**
+```javascript
+{
+    "data": {
+        "registerTerminal": "terminal-uuid-string"
+    }
+}
+```
 
 ## Testing Approach
 
@@ -190,3 +251,27 @@ Update `app/config.js` with SambaPOS-specific values:
 - Clear node_modules and npm cache if dev server fails to start
 - Verify SambaPOS API accessibility before frontend development
 - Use `npm run debug:api` for API connectivity testing
+
+### Debug Helpers (Available in Browser Console)
+
+**DataManager Debugging:**
+```javascript
+window.debugDataManager()           // Show DataManager status
+window.refreshData('menu')          // Refresh menu data
+window.refreshData('tables')        // Refresh tables data  
+window.refreshData('tickets')       // Refresh tickets data
+window.refreshData('all')           // Refresh all data
+```
+
+**Ticket Promotion Debugging:**
+```javascript
+window.debugTicketPromotion()             // Show promotion status
+window.retryTicketPromotion('ticket-uid') // Manual retry
+window.clearFailedTickets()               // Clear failed tickets
+```
+
+**Terminal Debugging (Legacy):**
+```javascript
+window.debugTerminal()                    // Show terminal status
+window.registerTerminalManual('user')     // Manual registration
+```

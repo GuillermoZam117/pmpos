@@ -105,7 +105,8 @@ export const appconfig = () => {
     const DEPARTMENT = storedDept || process.env.SAMBAPOS_DEPARTMENT || 'MESAS';    // ✅ Matches your working config
     const TICKET_TYPE = storedTT || process.env.SAMBAPOS_TICKET_TYPE || 'COMEDOR';  // ✅ Matches your working config
     const ENTITY_SCREEN = process.env.SAMBAPOS_ENTITY_SCREEN || 'MESAS';
-    const ENTITY_TYPE = process.env.SAMBAPOS_ENTITY_TYPE || 'MESAS';
+    // EntityType in your schema is case-sensitive and should be 'Mesas'
+    const ENTITY_TYPE = process.env.SAMBAPOS_ENTITY_TYPE || 'Mesas';
     const CLIENT_ID = storedClient || process.env.SAMBAPOS_CLIENT_ID || 'pmpos';
     
     return {

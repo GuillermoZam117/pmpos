@@ -56,6 +56,9 @@ const ProductDetailsModal = ({
     showPortions = true,
     showOrderTags = true 
 }) => {
+    // Early return BEFORE hooks to avoid hooks rule violation
+    if (!product) return null;
+
     const [quantity, setQuantity] = useState(1);
     const [selectedPortion, setSelectedPortion] = useState(null);
     const [selectedOrderTags, setSelectedOrderTags] = useState([]);
@@ -79,9 +82,7 @@ const ProductDetailsModal = ({
                 setSelectedPortion(defaultPortion);
             }
         }
-    }, [open, product?.id, product?.productId]); // Only depend on product ID to avoid loops
-
-    if (!product) return null;
+    }, [open, product?.id, product?.productId]); // Removed existingTags - it causes infinite loops
 
     const productName = product.name || product.caption || 'Producto';
     const productDescription = product.description || product.product?.description || '';
@@ -91,9 +92,8 @@ const ProductDetailsModal = ({
     const totalPrice = currentPrice * quantity;
 
     const handleQuantityChange = useCallback((delta) => {
-        const newQuantity = Math.max(1, quantity + delta);
-        setQuantity(newQuantity);
-    }, [quantity]);
+        setQuantity(prev => Math.max(1, prev + delta));
+    }, []); // No dependencies - use functional update
 
     const handlePortionChange = useCallback((event) => {
         const portionId = event.target.value;
@@ -110,7 +110,7 @@ const ProductDetailsModal = ({
                 return [...prev, tag];
             }
         });
-    }, []);
+    }, []); // No dependencies needed for functional updates
 
     const handleAddToOrder = useCallback(() => {
         const orderData = {
@@ -128,12 +128,12 @@ const ProductDetailsModal = ({
     }, [product, quantity, selectedPortion, selectedOrderTags, comments, currentPrice, totalPrice, onAddToOrder, onClose]);
 
     const handleToggleDescription = useCallback(() => {
-        setShowDescription(!showDescription);
-    }, [showDescription]);
+        setShowDescription(prev => !prev);
+    }, []); // Use functional update to avoid dependency
 
     const handleToggleAllTags = useCallback(() => {
-        setShowAllTags(!showAllTags);
-    }, [showAllTags]);
+        setShowAllTags(prev => !prev);
+    }, []); // Use functional update to avoid dependency
 
     const handleIncreaseQuantity = useCallback(() => {
         handleQuantityChange(1);
