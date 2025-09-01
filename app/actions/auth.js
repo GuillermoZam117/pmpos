@@ -98,8 +98,13 @@ export const login = (pin) => async (dispatch) => {
             console.groupEnd();
 
             // Use setTimeout to ensure state is updated before navigation
+            // Only navigate if not already in POS view to prevent interrupting Gift/Void operations
             setTimeout(() => {
-                navigate('/main');
+                const currentPath = window.location.hash?.replace('#', '') || window.location.pathname;
+                const isPOSView = currentPath.startsWith('/pos');
+                if (!isPOSView) {
+                    navigate('/main');
+                }
             }, 0);
 
             return true;

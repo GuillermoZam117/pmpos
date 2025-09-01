@@ -4,7 +4,13 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
-require('dotenv').config();
+// Load env per mode to avoid picking root .env in dev
+const dotenv = require('dotenv');
+
+// Default to development if not explicitly set
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const envFile = NODE_ENV === 'production' ? '.env.production' : '.env.development';
+dotenv.config({ path: path.resolve(__dirname, envFile) });
 
 module.exports = (env, argv) => {
     const isProduction = argv.mode === 'production';
@@ -12,7 +18,7 @@ module.exports = (env, argv) => {
     // Define environment variables for DefinePlugin
     const envKeys = {
         'process.env': JSON.stringify({
-            NODE_ENV: process.env.NODE_ENV,
+            NODE_ENV: NODE_ENV,
             API_URL: env.API_URL || 'http://localhost:9000',
             // Core Samba endpoints
             SAMBAPOS_API_URL: process.env.SAMBAPOS_API_URL || env.SAMBAPOS_API_URL,
@@ -30,10 +36,20 @@ module.exports = (env, argv) => {
             SAMBAPOS_ENTITY_TYPE: process.env.SAMBAPOS_ENTITY_TYPE,
             // Automation and labels
             SAMBAPOS_SUBMIT_ORDERS_COMMAND: process.env.SAMBAPOS_SUBMIT_ORDERS_COMMAND,
+            SAMBAPOS_PRINT_ACCOUNT_COMMAND: process.env.SAMBAPOS_PRINT_ACCOUNT_COMMAND,
             SAMBAPOS_PRINT_JOB_NAME: process.env.SAMBAPOS_PRINT_JOB_NAME,
+            SAMBAPOS_ORDER_COMMENT_COMMAND: process.env.SAMBAPOS_ORDER_COMMENT_COMMAND,
+            SAMBAPOS_AUTOCMD_GIFT: process.env.SAMBAPOS_AUTOCMD_GIFT,
+            SAMBAPOS_AUTOCMD_VOID: process.env.SAMBAPOS_AUTOCMD_VOID,
             SAMBAPOS_LABEL_SUBMIT: process.env.SAMBAPOS_LABEL_SUBMIT,
             SAMBAPOS_LABEL_PRINT_BILL: process.env.SAMBAPOS_LABEL_PRINT_BILL,
-            SAMBAPOS_LABEL_PAY: process.env.SAMBAPOS_LABEL_PAY
+            SAMBAPOS_LABEL_PAY: process.env.SAMBAPOS_LABEL_PAY,
+            // Hybrid read-service feature flag and internal API key (dev only exposure)
+            REACT_APP_USE_SQL_READS: process.env.REACT_APP_USE_SQL_READS || 'false',
+            INTERNAL_API_KEY: process.env.INTERNAL_API_KEY || 'local-test-key',
+            REACT_APP_SEND_INTERNAL_KEY: process.env.REACT_APP_SEND_INTERNAL_KEY || 'false',
+            // Disable GraphQL read fallbacks by default
+            REACT_APP_ALLOW_GQL_READ_FALLBACK: process.env.REACT_APP_ALLOW_GQL_READ_FALLBACK || 'false'
         })
     };
 
@@ -79,7 +95,7 @@ module.exports = (env, argv) => {
             },
             proxy: {
                 '/api': {
-                    target: 'http://localhost:9000',
+                    target: process.env.SAMBAPOS_API_URL || env.API_URL || 'http://localhost:9000',
                     pathRewrite: { '^/api': '/api' },
                     changeOrigin: true,
                     secure: false,
@@ -100,14 +116,33 @@ module.exports = (env, argv) => {
                     }
                 },
                 '/Token': {
-                    target: 'http://localhost:9000',
+                    target: process.env.SAMBAPOS_API_URL || env.API_URL || 'http://localhost:9000',
                     changeOrigin: true,
                     secure: false,
                     onProxyReq: (proxyReq) => {
                         console.log('🔑 Token Request:', proxyReq.path);
                     }
                 },
-                '/signalr': 'http://localhost:9000'
+                '/signalr': {
+                    target: process.env.SAMBAPOS_API_URL || env.API_URL || 'http://localhost:9000',
+                    changeOrigin: true,
+                    secure: false
+                },
+                // Read-service (SQL) proxy for dev with header injection
+                '/internal-api': {
+                    target: process.env.READ_SERVICE_URL || 'http://localhost:4005',
+                    changeOrigin: true,
+                    secure: false,
+                    headers: {
+                        'X-INTERNAL-API-KEY': process.env.INTERNAL_API_KEY || 'local-test-key'
+                    },
+                    onProxyReq: (proxyReq) => {
+                        console.log('🧩 Read-service Request:', proxyReq.path);
+                    },
+                    onProxyRes: (proxyRes) => {
+                        console.log('🧩 Read-service Response:', proxyRes.statusCode);
+                    }
+                }
             }
         },
         module: {

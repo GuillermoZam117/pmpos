@@ -1,0 +1,3276 @@
+{
+    "data": {
+        "__schema": {
+            "types": [
+                {
+                    "name": "String",
+                    "description": null,
+                    "fields": null
+                },
+                {
+                    "name": "Boolean",
+                    "description": null,
+                    "fields": null
+                },
+                {
+                    "name": "Float",
+                    "description": null,
+                    "fields": null
+                },
+                {
+                    "name": "Int",
+                    "description": null,
+                    "fields": null
+                },
+                {
+                    "name": "ID",
+                    "description": null,
+                    "fields": null
+                },
+                {
+                    "name": "Date",
+                    "description": "The `Date` scalar type represents a timestamp provided in UTC. `Date` expects timestamps to be formatted in accordance with the [ISO-8601](https://en.wikipedia.org/wiki/ISO_8601) standard.",
+                    "fields": null
+                },
+                {
+                    "name": "Decimal",
+                    "description": null,
+                    "fields": null
+                },
+                {
+                    "name": "__Schema",
+                    "description": "A GraphQL Schema defines the capabilities of a GraphQL server. It exposes all available types and directives on the server, as well as the entry points for query, mutation, and subscription operations.",
+                    "fields": [
+                        {
+                            "name": "types",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "queryType",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "mutationType",
+                            "type": {
+                                "name": "__Type"
+                            }
+                        },
+                        {
+                            "name": "directives",
+                            "type": {
+                                "name": null
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "__Type",
+                    "description": "The fundamental unit of any GraphQL Schema is the type. There are many kinds of types in GraphQL as represented by the `__TypeKind` enum.\r\n\r\nDepending on the kind of a type, certain fields describe information about that type. Scalar types provide no information beyond a name and description, while Enum types provide their values. Object and Interface types provide the fields they describe. Abstract types, Union and Interface, provide the Object types possible at runtime. List and NonNull types compose other types.",
+                    "fields": [
+                        {
+                            "name": "kind",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "description",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "fields",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "interfaces",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "possibleTypes",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "enumValues",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "inputFields",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "ofType",
+                            "type": {
+                                "name": "__Type"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "__TypeKind",
+                    "description": "An enum describing what kind of type a given __Type is.",
+                    "fields": null
+                },
+                {
+                    "name": "__Field",
+                    "description": "Object and Interface types are described by a list of Fields, each of which has a name, potentially a list of arguments, and a return type.",
+                    "fields": [
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "description",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "args",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "type",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "isDeprecated",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "deprecationReason",
+                            "type": {
+                                "name": "String"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "__InputValue",
+                    "description": "Arguments provided to Fields or Directives and the input fields of an InputObject are represented as Input Values which describe their type and optionally a default value.",
+                    "fields": [
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "description",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "type",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "defaultValue",
+                            "type": {
+                                "name": "String"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "__EnumValue",
+                    "description": "One possible value for a given Enum. Enum values are unique values, not a placeholder for a string or numeric value. However an Enum value is returned in a JSON response as a string.",
+                    "fields": [
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "description",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "isDeprecated",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "deprecationReason",
+                            "type": {
+                                "name": "String"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "__Directive",
+                    "description": "A Directive provides a way to describe alternate runtime execution and type validation behavior in a GraphQL document.\r\n\r\nIn some cases, you need to provide options to alter GraphQL\"s execution behavior in ways field arguments will not suffice, such as conditionally including or skipping a field. Directives provide this by describing additional information to the executor.",
+                    "fields": [
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "description",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "args",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "onOperation",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "onFragment",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "onField",
+                            "type": {
+                                "name": null
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Query",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "getTicket",
+                            "type": {
+                                "name": "Ticket"
+                            }
+                        },
+                        {
+                            "name": "getTerminalExists",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "getTerminalTicket",
+                            "type": {
+                                "name": "Ticket"
+                            }
+                        },
+                        {
+                            "name": "getTicketTagsGroups",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "getPaymentTypes",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "getCalculationSelectors",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "getTerminalTickets",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "getTickets",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "getGlobalSettings",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "getLocalSetting",
+                            "type": {
+                                "name": "ProgramSetting"
+                            }
+                        },
+                        {
+                            "name": "getGlobalSetting",
+                            "type": {
+                                "name": "ProgramSetting"
+                            }
+                        },
+                        {
+                            "name": "isEntityExists",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "getEntity",
+                            "type": {
+                                "name": "Entity"
+                            }
+                        },
+                        {
+                            "name": "getEntityScreenItems",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "getEntityScreens",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "getEntities",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "getCustomReport",
+                            "type": {
+                                "name": "CustomReport"
+                            }
+                        },
+                        {
+                            "name": "getMenu",
+                            "type": {
+                                "name": "Menu"
+                            }
+                        },
+                        {
+                            "name": "getProduct",
+                            "type": {
+                                "name": "Product"
+                            }
+                        },
+                        {
+                            "name": "getProductPriceList",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "getProducts",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "getProductPortions",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "getOrderTagColors",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "getOrderTagGroups",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "getTasks",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "getTask",
+                            "type": {
+                                "name": "Task"
+                            }
+                        },
+                        {
+                            "name": "getTicketType",
+                            "type": {
+                                "name": "TicketTypeGraphType"
+                            }
+                        },
+                        {
+                            "name": "getDepartment",
+                            "type": {
+                                "name": "DepartmentGraphType"
+                            }
+                        },
+                        {
+                            "name": "getTicketPrintContent",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "getUser",
+                            "type": {
+                                "name": "UserGraphType"
+                            }
+                        },
+                        {
+                            "name": "getUsers",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "getUserRoles",
+                            "type": {
+                                "name": null
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Ticket",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "id",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "uid",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "type",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "number",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "note",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "date",
+                            "type": {
+                                "name": "Date"
+                            }
+                        },
+                        {
+                            "name": "entities",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "orders",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "tags",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "states",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "totalAmount",
+                            "type": {
+                                "name": "Decimal"
+                            }
+                        },
+                        {
+                            "name": "remainingAmount",
+                            "type": {
+                                "name": "Decimal"
+                            }
+                        },
+                        {
+                            "name": "calculations",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "payments",
+                            "type": {
+                                "name": null
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "TicketEntity",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "type",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "id",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "typeId",
+                            "type": {
+                                "name": "Int"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Order",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "id",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "uid",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "productId",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "quantity",
+                            "type": {
+                                "name": "Decimal"
+                            }
+                        },
+                        {
+                            "name": "portion",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "price",
+                            "type": {
+                                "name": "Decimal"
+                            }
+                        },
+                        {
+                            "name": "priceTag",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "date",
+                            "type": {
+                                "name": "Date"
+                            }
+                        },
+                        {
+                            "name": "lastUpdateDate",
+                            "type": {
+                                "name": "Date"
+                            }
+                        },
+                        {
+                            "name": "number",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "user",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "calculatePrice",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "decreaseInventory",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "increaseInventory",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "locked",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "disablePortionSelection",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "tags",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "states",
+                            "type": {
+                                "name": null
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "OrderTag",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "tagName",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "tag",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "price",
+                            "type": {
+                                "name": "Decimal"
+                            }
+                        },
+                        {
+                            "name": "quantity",
+                            "type": {
+                                "name": "Decimal"
+                            }
+                        },
+                        {
+                            "name": "rate",
+                            "type": {
+                                "name": "Decimal"
+                            }
+                        },
+                        {
+                            "name": "userId",
+                            "type": {
+                                "name": "Decimal"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "OrderState",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "stateName",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "state",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "stateValue",
+                            "type": {
+                                "name": "String"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "TicketTag",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "tagName",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "tag",
+                            "type": {
+                                "name": "String"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "TicketState",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "stateName",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "state",
+                            "type": {
+                                "name": "String"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "TicketCalculations",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "calculationAmount",
+                            "type": {
+                                "name": "Decimal"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "TicketPayments",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "amount",
+                            "type": {
+                                "name": "Decimal"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "TicketTagGroup",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "id",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "freeTagging",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "isAlphaNUmeric",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "isDate",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "isDecimal",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "isInteger",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "isNumeric",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "saveFreeTags",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "selectionRequired",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "askBeforeCreatingTicket",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "buttonColorWhenTagSelected",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "buttonColorWhenNoTagSelected",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "sortOrder",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "tickettags",
+                            "type": {
+                                "name": null
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "TicketTags",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "id",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "sortOrder",
+                            "type": {
+                                "name": "String"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "PaymentTypes",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "id",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "sortOrder",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "buttonColor",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "buttonHeader",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "processorSettings",
+                            "type": {
+                                "name": "String"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "CalculationSelectors",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "id",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "sortOrder",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "buttonColor",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "buttonHeader",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "calculationTypes",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "fontSize",
+                            "type": {
+                                "name": "String"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Calculationtype",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "id",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "calculationMethod",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "amount",
+                            "type": {
+                                "name": "Decimal"
+                            }
+                        },
+                        {
+                            "name": "maxAmount",
+                            "type": {
+                                "name": "Decimal"
+                            }
+                        },
+                        {
+                            "name": "rounding",
+                            "type": {
+                                "name": "Decimal"
+                            }
+                        },
+                        {
+                            "name": "includeTax",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "decreaseAmount",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "usePlainSum",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "toggleCalculation",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "isRateFromTicketAmount",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "isRateFromPreviousTemplate",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "isFixedAmount",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "isFixedAmountFromTicketTotal",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "isRoundTicketTotal",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "isCustom",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "isRoundTicketTotalExactly",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "isRate",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "isRounding",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "TicketInfo",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "id",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "uid",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "date",
+                            "type": {
+                                "name": "Date"
+                            }
+                        },
+                        {
+                            "name": "lastOrderDate",
+                            "type": {
+                                "name": "Date"
+                            }
+                        },
+                        {
+                            "name": "total",
+                            "type": {
+                                "name": "Decimal"
+                            }
+                        },
+                        {
+                            "name": "remaining",
+                            "type": {
+                                "name": "Decimal"
+                            }
+                        },
+                        {
+                            "name": "entities",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "note",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "number",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "tags",
+                            "type": {
+                                "name": null
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "TicketEntityInputType",
+                    "description": "Ticket Entity Parameters",
+                    "fields": null
+                },
+                {
+                    "name": "TicketSortGraphType",
+                    "description": null,
+                    "fields": null
+                },
+                {
+                    "name": "ProgramSetting",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "value",
+                            "type": {
+                                "name": "String"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Entity",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "id",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "type",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "accountId",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "customData",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "states",
+                            "type": {
+                                "name": null
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "EntityCustomDataValue",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "value",
+                            "type": {
+                                "name": "String"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "EntityStateValueGraphType",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "stateName",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "state",
+                            "type": {
+                                "name": "String"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "EntityScreenItemGraphType",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "caption",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "color",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "labelColor",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "Id",
+                            "type": {
+                                "name": "String"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "EntityScreenGraphType",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "Id",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "TicketTypeId",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "EntityTypeId",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "sortOrder",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "displayMode",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "backgroundColor",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "backgroundImage",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "fontSize",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "buttonFontSize",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "pageCount",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "rowCount",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "buttonHeight",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "displayState",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "stateFilter",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "askTicketType",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "searchValueReplacePattern",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "useStateDisplayFormat",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "detailTemplate",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "layout",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "buttonHeader",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "deferAutoUpdatesDuration",
+                            "type": {
+                                "name": "String"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "CustomReport",
+                    "description": "Custom Report",
+                    "fields": [
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "header",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "startDate",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "endDate",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "tables",
+                            "type": {
+                                "name": null
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "CustomReportTable",
+                    "description": "Custom Report Table",
+                    "fields": [
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "maxHeight",
+                            "type": {
+                                "name": "Decimal"
+                            }
+                        },
+                        {
+                            "name": "columns",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "rows",
+                            "type": {
+                                "name": null
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "CustomReportTableColumn",
+                    "description": "Custom Report Table Column",
+                    "fields": [
+                        {
+                            "name": "header",
+                            "type": {
+                                "name": "String"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "CustomReportTableRow",
+                    "description": "Custom Report Table Row",
+                    "fields": [
+                        {
+                            "name": "cells",
+                            "type": {
+                                "name": null
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "CustomReportParameterInputType",
+                    "description": "Custom report parameter",
+                    "fields": null
+                },
+                {
+                    "name": "Menu",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "categories",
+                            "type": {
+                                "name": null
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "MenuCategory",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "id",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "color",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "foreground",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "image",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "header",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "menuId",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "isFastMenu",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "menuItems",
+                            "type": {
+                                "name": null
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "MenuItem",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "id",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "color",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "foreground",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "image",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "imagebase",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "header",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "caption",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "categoryId",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "productId",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "portion",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "quantity",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "defaultOrderTags",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "groupTags",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "autoSelect",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "automationCommand",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "product",
+                            "type": {
+                                "name": "Product"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Product",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "id",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "barcode",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "groupCode",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "price",
+                            "type": {
+                                "name": "Decimal"
+                            }
+                        },
+                        {
+                            "name": "portions",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "tags",
+                            "type": {
+                                "name": null
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "ProductPortion",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "id",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "productId",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "price",
+                            "type": {
+                                "name": "Decimal"
+                            }
+                        },
+                        {
+                            "name": "prices",
+                            "type": {
+                                "name": null
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "PriceList",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "id",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "portionId",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "priceTag",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "price",
+                            "type": {
+                                "name": "Decimal"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "MenuItemTagValue",
+                    "description": "Menu Item Custom Tag",
+                    "fields": [
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "value",
+                            "type": {
+                                "name": "String"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "MenuItemTagInputType",
+                    "description": "Item Tag parameters",
+                    "fields": null
+                },
+                {
+                    "name": "NameValue",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "value",
+                            "type": {
+                                "name": "String"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "OrderTagGroupDefinition",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "id",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "color",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "max",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "min",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "hidden",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "prefixes",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "tags",
+                            "type": {
+                                "name": null
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Prefixes",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "color",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "fontSize",
+                            "type": {
+                                "name": "Int"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "OrderTagDefinition",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "id",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "color",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "description",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "header",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "price",
+                            "type": {
+                                "name": "Decimal"
+                            }
+                        },
+                        {
+                            "name": "rate",
+                            "type": {
+                                "name": "Decimal"
+                            }
+                        },
+                        {
+                            "name": "filter",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "maxQuantity",
+                            "type": {
+                                "name": "String"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Task",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "id",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "content",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "contentText",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "startDate",
+                            "type": {
+                                "name": "Date"
+                            }
+                        },
+                        {
+                            "name": "endDate",
+                            "type": {
+                                "name": "Date"
+                            }
+                        },
+                        {
+                            "name": "isCompleted",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "userName",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "identifier",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "state",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "customData",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "stateLog",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "stateDuration",
+                            "type": {
+                                "name": null
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "TaskCustomData",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "value",
+                            "type": {
+                                "name": "String"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "TaskStateLog",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "state",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "start",
+                            "type": {
+                                "name": "Date"
+                            }
+                        },
+                        {
+                            "name": "end",
+                            "type": {
+                                "name": "Date"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "TaskStateDuation",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "state",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "duration",
+                            "type": {
+                                "name": "Int"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "TaskCustomDataInputType",
+                    "description": "Task Custom Data parameters",
+                    "fields": null
+                },
+                {
+                    "name": "TicketTypeGraphType",
+                    "description": "TicketType",
+                    "fields": [
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "ticketNumerator",
+                            "type": {
+                                "name": "NumeratorGraphType"
+                            }
+                        },
+                        {
+                            "name": "orderNumerator",
+                            "type": {
+                                "name": "NumeratorGraphType"
+                            }
+                        },
+                        {
+                            "name": "saleTransactionType",
+                            "type": {
+                                "name": "TransactionTypeGraphType"
+                            }
+                        },
+                        {
+                            "name": "taxIncluded",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "preOrder",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "allowZeroPricedProducts",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "sortOrder",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "entityTypeAssignments",
+                            "type": {
+                                "name": null
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "NumeratorGraphType",
+                    "description": "Numerators",
+                    "fields": [
+                        {
+                            "name": "number",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "numberFormat",
+                            "type": {
+                                "name": "String"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "TransactionTypeGraphType",
+                    "description": "Transaction Type",
+                    "fields": [
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "sortOrder",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "sourceAccountTypeId",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "targetAccountTypeId",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "defaultSourceAccountId",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "defaultTargetAccountId",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "foreignCurrencyId",
+                            "type": {
+                                "name": "String"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "EntityTypeAssignmentGraphType",
+                    "description": "EntityTypes",
+                    "fields": [
+                        {
+                            "name": "EntityTypeId",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "EntityTypeName",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "Name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "UserString",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "DisplayName",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "AskBeforeCreatingTicket",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "DepartmentGraphType",
+                    "description": "Department",
+                    "fields": [
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "screenMenuId",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "priceTag",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "ticketCreationMethod",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "ticketTypeId",
+                            "type": {
+                                "name": "String"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "UserGraphType",
+                    "description": "",
+                    "fields": [
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "terminal",
+                            "type": {
+                                "name": "TerminalGraphType"
+                            }
+                        },
+                        {
+                            "name": "userRole",
+                            "type": {
+                                "name": "UserRoleGraphType"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "TerminalGraphType",
+                    "description": "",
+                    "fields": [
+                        {
+                            "name": "id",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "UserRoleGraphType",
+                    "description": "",
+                    "fields": [
+                        {
+                            "name": "id",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "departmentId",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "isAdmin",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "permissions",
+                            "type": {
+                                "name": null
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "PermissionsGraphType",
+                    "description": "User Role Permissions",
+                    "fields": [
+                        {
+                            "name": "id",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "value",
+                            "type": {
+                                "name": "String"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Mutation",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "updateTerminalTicket",
+                            "type": {
+                                "name": "Ticket"
+                            }
+                        },
+                        {
+                            "name": "loadTerminalTicket",
+                            "type": {
+                                "name": "Ticket"
+                            }
+                        },
+                        {
+                            "name": "createTerminalTicket",
+                            "type": {
+                                "name": "Ticket"
+                            }
+                        },
+                        {
+                            "name": "clearTerminalTicketOrders",
+                            "type": {
+                                "name": "Ticket"
+                            }
+                        },
+                        {
+                            "name": "payTerminalTicket",
+                            "type": {
+                                "name": "PaymentResult"
+                            }
+                        },
+                        {
+                            "name": "closeTerminalTicket",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "unregisterTerminal",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "changeEntityOfTerminalTicket",
+                            "type": {
+                                "name": "Ticket"
+                            }
+                        },
+                        {
+                            "name": "addOrderToTerminalTicket",
+                            "type": {
+                                "name": "Ticket"
+                            }
+                        },
+                        {
+                            "name": "addCalculationToTerminalTicket",
+                            "type": {
+                                "name": "Ticket"
+                            }
+                        },
+                        {
+                            "name": "notifyTerminalTicketEvent",
+                            "type": {
+                                "name": "Ticket"
+                            }
+                        },
+                        {
+                            "name": "executeAutomationCommandForTerminalTicket",
+                            "type": {
+                                "name": "Ticket"
+                            }
+                        },
+                        {
+                            "name": "updateOrderOfTerminalTicket",
+                            "type": {
+                                "name": "Ticket"
+                            }
+                        },
+                        {
+                            "name": "getOrderTagsForTerminalTicketOrder",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "getAutomationCommandButtonsForTerminalTicket",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "cancelOrderOnTerminalTicket",
+                            "type": {
+                                "name": "Ticket"
+                            }
+                        },
+                        {
+                            "name": "registerTerminal",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "addTicket",
+                            "type": {
+                                "name": "Ticket"
+                            }
+                        },
+                        {
+                            "name": "addOrderToTicket",
+                            "type": {
+                                "name": "Ticket"
+                            }
+                        },
+                        {
+                            "name": "mergeTickets",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "updateTicket",
+                            "type": {
+                                "name": "Ticket"
+                            }
+                        },
+                        {
+                            "name": "updateLocalSetting",
+                            "type": {
+                                "name": "ProgramSetting"
+                            }
+                        },
+                        {
+                            "name": "updateGlobalSetting",
+                            "type": {
+                                "name": "ProgramSetting"
+                            }
+                        },
+                        {
+                            "name": "deleteSetting",
+                            "type": {
+                                "name": "ProgramSetting"
+                            }
+                        },
+                        {
+                            "name": "postTicketRefreshMessage",
+                            "type": {
+                                "name": "RefreshIdMessage"
+                            }
+                        },
+                        {
+                            "name": "postTaskRefreshMessage",
+                            "type": {
+                                "name": "RefreshIdMessage"
+                            }
+                        },
+                        {
+                            "name": "postBroadcastMessage",
+                            "type": {
+                                "name": "RefreshMessage"
+                            }
+                        },
+                        {
+                            "name": "postResetProductCacheMessage",
+                            "type": {
+                                "name": "RefreshIdMessage"
+                            }
+                        },
+                        {
+                            "name": "postResetEntityCacheMessage",
+                            "type": {
+                                "name": "RefreshIdMessage"
+                            }
+                        },
+                        {
+                            "name": "postResetCacheMessage",
+                            "type": {
+                                "name": "RefreshIdMessage"
+                            }
+                        },
+                        {
+                            "name": "executePrintJob",
+                            "type": {
+                                "name": "PrintJobGraphType"
+                            }
+                        },
+                        {
+                            "name": "updateEntityState",
+                            "type": {
+                                "name": "Entity"
+                            }
+                        },
+                        {
+                            "name": "updateEntityCustomData",
+                            "type": {
+                                "name": "Entity"
+                            }
+                        },
+                        {
+                            "name": "addEntity",
+                            "type": {
+                                "name": "Entity"
+                            }
+                        },
+                        {
+                            "name": "executeAutomationCommand",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "notifyEvent",
+                            "type": {
+                                "name": "State"
+                            }
+                        },
+                        {
+                            "name": "addProduct",
+                            "type": {
+                                "name": "Product"
+                            }
+                        },
+                        {
+                            "name": "updateProductPrice",
+                            "type": {
+                                "name": "Product"
+                            }
+                        },
+                        {
+                            "name": "addUser",
+                            "type": {
+                                "name": "UserGraphType"
+                            }
+                        },
+                        {
+                            "name": "addUserRole",
+                            "type": {
+                                "name": "UserRoleGraphType"
+                            }
+                        },
+                        {
+                            "name": "addTask",
+                            "type": {
+                                "name": "Task"
+                            }
+                        },
+                        {
+                            "name": "updateTask",
+                            "type": {
+                                "name": "Task"
+                            }
+                        },
+                        {
+                            "name": "updateTaskState",
+                            "type": {
+                                "name": "Task"
+                            }
+                        },
+                        {
+                            "name": "deleteTask",
+                            "type": {
+                                "name": "Task"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "TicketTagInputType",
+                    "description": "Ticket Tag Parameters",
+                    "fields": null
+                },
+                {
+                    "name": "TicketStateInputType",
+                    "description": "Ticket State Parameters",
+                    "fields": null
+                },
+                {
+                    "name": "PaymentResult",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "ticketId",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "amount",
+                            "type": {
+                                "name": "Decimal"
+                            }
+                        },
+                        {
+                            "name": "remainingAmount",
+                            "type": {
+                                "name": "Decimal"
+                            }
+                        },
+                        {
+                            "name": "errorMessage",
+                            "type": {
+                                "name": "String"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "EventParameterInputType",
+                    "description": "Event parameter",
+                    "fields": null
+                },
+                {
+                    "name": "OrderTagInputType",
+                    "description": "Order Tag Parameters",
+                    "fields": null
+                },
+                {
+                    "name": "OrderTagGroupView",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "maxSelection",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "requiredSelection",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "tags",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "categories",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "prefixes",
+                            "type": {
+                                "name": null
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "OrderTagButton",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "groupName",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "color",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "labelColor",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "isSelected",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "isVisible",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "fontSize",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "caption",
+                            "type": {
+                                "name": "String"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "CategoryTag",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "value",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "color",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "level",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "sortOrder",
+                            "type": {
+                                "name": "Int"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "PrefixButton",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "color",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "fontSize",
+                            "type": {
+                                "name": "Int"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "AutomationCommandButton",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "caption",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "color",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "values",
+                            "type": {
+                                "name": null
+                            }
+                        },
+                        {
+                            "name": "canExecute",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "displayOnCommandSelector",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "displayOnNavigation",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "displayOnOrders",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "displayOnPayment",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "displayOnTicket",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "displayOnTicketList",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "displayUnderTicket",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "displayUnderTicket2",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "enabledStates",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "visibleStates",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "category",
+                            "type": {
+                                "name": "String"
+                            }
+                        },
+                        {
+                            "name": "clearSelection",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "confirmationType",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "askTextInput",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "askNumericInput",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "executeOnce",
+                            "type": {
+                                "name": "Boolean"
+                            }
+                        },
+                        {
+                            "name": "fontSize",
+                            "type": {
+                                "name": "Int"
+                            }
+                        },
+                        {
+                            "name": "imager",
+                            "type": {
+                                "name": "String"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "TicketInputType",
+                    "description": "Ticket parameters",
+                    "fields": null
+                },
+                {
+                    "name": "OrderInputType",
+                    "description": "Order Parameters",
+                    "fields": null
+                },
+                {
+                    "name": "OrderStateInputType",
+                    "description": "Order State Parameters",
+                    "fields": null
+                },
+                {
+                    "name": "TicketCalculationInputType",
+                    "description": "Ticket Calculation Parameters",
+                    "fields": null
+                },
+                {
+                    "name": "NextOrderStateInputType",
+                    "description": "Next Order State Parameters",
+                    "fields": null
+                },
+                {
+                    "name": "RefreshIdMessage",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "id",
+                            "type": {
+                                "name": "String"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "RefreshMessage",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "message",
+                            "type": {
+                                "name": "String"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "PrintJobGraphType",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "name",
+                            "type": {
+                                "name": "String"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "EntityInputType",
+                    "description": "Entity parameters",
+                    "fields": null
+                },
+                {
+                    "name": "EntityCustomDataInputType",
+                    "description": "Entity Custom Data parameters",
+                    "fields": null
+                },
+                {
+                    "name": "State",
+                    "description": null,
+                    "fields": [
+                        {
+                            "name": "ticket",
+                            "type": {
+                                "name": "Ticket"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "NotificationStateInputType",
+                    "description": "Notification State",
+                    "fields": null
+                },
+                {
+                    "name": "MenuItemPortionInputType",
+                    "description": "Portion parameters",
+                    "fields": null
+                },
+                {
+                    "name": "TaskInputType",
+                    "description": "Task parameters",
+                    "fields": null
+                }
+            ]
+        }
+    },
+    "errors": null
+}

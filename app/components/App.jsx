@@ -165,13 +165,33 @@ const AppContent = () => {
                         try {
                             switch (type) {
                                 case 'menu':
-                                    return await dataManager.refreshData('menu');
+                                    const menu = await dataManager.refreshData('menu');
+                                    if (menu) {
+                                        dispatch({ type: 'SET_MENU', menu });
+                                        console.log('✅ Menu refreshed and dispatched to Redux');
+                                    }
+                                    return menu;
                                 case 'tables':
-                                    return await dataManager.refreshData('tables');
+                                    const tables = await dataManager.refreshData('tables');
+                                    if (tables) {
+                                        dispatch({ type: 'SET_TABLES', payload: tables });
+                                        console.log('✅ Tables refreshed and dispatched to Redux');
+                                    }
+                                    return tables;
                                 case 'tickets':
                                     return await dataManager.refreshData('tickets');
                                 default:
-                                    return await dataManager.initializeApp();
+                                    const result = await dataManager.initializeApp();
+                                    if (result.success) {
+                                        if (result.menu) {
+                                            dispatch({ type: 'SET_MENU', menu: result.menu });
+                                        }
+                                        if (result.tables) {
+                                            dispatch({ type: 'SET_TABLES', payload: result.tables });
+                                        }
+                                        console.log('✅ All data refreshed and dispatched to Redux');
+                                    }
+                                    return result;
                             }
                         } catch (error) {
                             console.error('❌ Data refresh failed:', error);

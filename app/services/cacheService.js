@@ -11,11 +11,17 @@ const CACHE_KEYS = {
     MENU_TIMESTAMP: 'pmpos_menu_timestamp'
     ,
     PENDING_TICKETS: 'pmpos_pending_tickets'
+    ,
+    ACTIVE_TICKETS: 'pmpos_active_tickets'
 };
 
 const CACHE_DURATION = {
     TABLES: 5 * 60 * 1000, // 5 minutes
     MENU: 10 * 60 * 1000   // 10 minutes
+};
+
+const CACHE_DURATION_EXTRA = {
+    ACTIVE_TICKETS: 10 * 1000 // 10 seconds by default for active tickets
 };
 
 class CacheService {
@@ -168,6 +174,21 @@ class CacheService {
         );
         terminalKeys.forEach(key => localStorage.removeItem(key));
         console.log('🗑️ Cleared terminal cache keys:', terminalKeys);
+    }
+
+    /**
+     * Active tickets cache helpers
+     */
+    setActiveTickets(tickets, duration = CACHE_DURATION_EXTRA.ACTIVE_TICKETS) {
+        this.set(CACHE_KEYS.ACTIVE_TICKETS, tickets, duration);
+    }
+
+    getActiveTickets() {
+        return this.get(CACHE_KEYS.ACTIVE_TICKETS) || null;
+    }
+
+    clearActiveTickets() {
+        this.remove(CACHE_KEYS.ACTIVE_TICKETS);
     }
 
     /**

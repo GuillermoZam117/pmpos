@@ -1,4 +1,5 @@
-### Registrar Terminal 
+#### Proceso para CREAR UN NUEVO TICKET 
+### 1. Registrar Terminal 
 mutation {
   registerTerminal(
     ticketType: "COMEDOR",
@@ -8,7 +9,7 @@ mutation {
   )
 }
 
-### Crear Ticket Terminal 
+### 2. Crear Ticket Terminal 
 mutation CreateTerminalTicket {
   createTerminalTicket(terminalId: "lvVWgQcGYUu6f3Lam3BmvA") {
     uid
@@ -17,7 +18,7 @@ mutation CreateTerminalTicket {
 }
 
 
-### Añadir ordenes al ticket terminal 
+### 3.  Añadir ordenes al ticket terminal 
 #pollo
 mutation AddPOLLO {
   addOrderToTerminalTicket(
@@ -38,7 +39,7 @@ mutation AddPAPAS {
   ) { totalAmount }
 }
 
-### Asignar mesa a terminal ticket 
+### 4. Asignar mesa a terminal ticket 
 mutation {
   changeEntityOfTerminalTicket(
     terminalId: "lvVWgQcGYUu6f3Lam3BmvA",
@@ -50,7 +51,7 @@ mutation {
   }
 }
 
-### verificacion de mesa añadida al ticket 
+### 5. verificacion de mesa añadida al ticket 
 query {
   getTerminalTicket(terminalId: "lvVWgQcGYUu6f3Lam3BmvA") {
     id
@@ -59,7 +60,7 @@ query {
 }
 
 
-### Ver ordenes del ticket terminal 
+### 6.  Ver ordenes del ticket terminal 
 
 query { 
 		getTerminalTicket(terminalId: "lvVWgQcGYUu6f3Lam3BmvA")
@@ -70,7 +71,7 @@ query {
 		}  
 		
 		
-### Imprimir factura ( Ejecutar comando de uaotmatizacion con foco en ticket uid) 
+### Imprimir factura (OPCIONAL PARA EL FLUJO DE NUEVO TICKET) ( Ejecutar comando de uaotmatizacion con foco en ticket uid) 
 
 mutation { 
           executeAutomationCommandForTerminalTicket(terminalId: "lvVWgQcGYUu6f3Lam3BmvA",
@@ -78,9 +79,21 @@ mutation {
 													value: "") 
 														{ id }
 		}
+
+
+### 7. Añadir comentarios a pedidos antes de cerrar ticket (OPCIONAL EL USUARIO PUEDE O NO PUEDE INGRESAR COMENTARIOS A UN PEDIDO )
+
+mutation { executeAutomationCommandForTerminalTicket(
+														terminalId: "W6yjzeD8pk28J49lh1MReA",
+														name: "TagOrder",
+														value: "Comentario desde GraphiQL",
+														
+														orderUid: "-DLIb_sKeUyNIPluRCYF5A")
+															{ id }
+															}
 		
 		
-### Cerrar ticket terminal (imprimir comando y enviar pedido a cocina) 
+### 8. Cerrar ticket terminal (imprimir comando y enviar pedido a cocina)  (AQUI FINALIZA EL CICLO DE CREACION DE NUEVO TICKET, DONDE ENVIAMOS LOS PEDIDOS A COCINA, LO CERRAMOS Y SE CAMBIAN DE ESTADO TICKET, ORDENES Y ENTIDAD)
 		mutation {
   closeTerminalTicket(terminalId: "lvVWgQcGYUu6f3Lam3BmvA")
 }

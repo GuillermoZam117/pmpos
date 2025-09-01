@@ -42,6 +42,21 @@ export const userService = {
 
         } catch (error) {
             console.error('Error validando PIN:', error);
+            
+            // Provide more specific error messages
+            if (error.message.includes('Network request failed') || error.message.includes('fetch')) {
+                throw new Error('Error de conexión. Verifique la conexión con el servidor.');
+            }
+            
+            if (error.message.includes('500') || error.message.includes('Internal server error')) {
+                throw new Error('Error del servidor. El sistema de validación de PIN no está disponible.');
+            }
+            
+            if (error.message.includes('Unauthorized') || error.message.includes('401')) {
+                throw new Error('Sesión expirada. Inicie sesión nuevamente.');
+            }
+            
+            // For invalid PIN or other GraphQL errors, preserve original message
             throw error;
         }
     }

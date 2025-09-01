@@ -16,6 +16,11 @@ class DataManager {
         this.loading = false;
         this.initPromise = null;
         this.signalRConnection = null;
+        this._ticketEventTimer = null;
+        this._tableEventTimer = null;
+        this._pollingInterval = null;
+        this._lastSignalRActivity = Date.now();
+        this._signalRConnected = false;
     }
 
     /**
@@ -61,7 +66,20 @@ class DataManager {
             debug('🏠 Step 2: Loading tables...');
             const tablesStartTime = performance.now();
 
-            const tables = await this.loadTables();
+            // Prefer SQL read-service when enabled
+            const useSql = process.env.REACT_APP_USE_SQL_READS === 'true';
+            let tables;
+            if (useSql) {
+                try {
+                    const { fetchTables } = await import('../queries');
+                    tables = await fetchTables();
+                } catch (err) {
+                    debug('\u26a0 fetchTables failed, falling back to previous loadTables()', err.message);
+                    tables = await this.loadTables();
+                }
+            } else {
+                tables = await this.loadTables();
+            }
 
             const tablesLoadTime = performance.now() - tablesStartTime;
             debug(`✅ Tables loaded in ${tablesLoadTime.toFixed(2)}ms - ${tables?.length || 0} tables`);
@@ -75,6 +93,9 @@ class DataManager {
             const totalTime = menuLoadTime + tablesLoadTime;
             debug(`🎉 Application initialized successfully in ${totalTime.toFixed(2)}ms`);
 
+            // Start intelligent polling backup system
+            this.startIntelligentPolling();
+
             return {
                 success: true,
                 menu,
@@ -86,6 +107,13 @@ class DataManager {
             debug('❌ Application initialization failed:', error);
             throw error;
         }
+    }
+
+    /**
+     * Resolve product name by productId via global menu index
+     */
+    getProductName(productId) {
+        return menuService.getProductNameById(productId);
     }
 
     /**
@@ -104,6 +132,45 @@ class DataManager {
         }
 
         try {
+            // Prefer SQL read-service when enabled
+            const useSql = process.env.REACT_APP_USE_SQL_READS === 'true';
+            if (useSql) {
+                try {
+                    const { fetchTables } = await import('../queries');
+                    const tables = await fetchTables();
+                    debug(`✅ Loaded ${tables?.length || 0} tables from read-service`);
+                    
+                    // Process tables with status parsing
+                    const processedTables = tables.map(table => {
+                        const status = this.parseTableStatus(table);
+                        return {
+                            ...table,
+                            status: status,
+                            color: this.mapStatusToColor(status), // Ensure consistent color mapping
+                            timeElapsed: this.parseTimeFromCaption(table.caption)
+                        };
+                    });
+                    
+                    // Cache tables with TTL (30 seconds)
+                    debug('💾 Saving tables to cache:', { count: processedTables.length, sample: processedTables[0] });
+                    cacheService.setTables(processedTables, 30 * 1000);
+                    
+                    // Verify cache was set correctly
+                    const cachedCheck = cacheService.getTables();
+                    debug('✅ Cache verification:', { cachedCount: cachedCheck?.length || 0, success: !!cachedCheck });
+                    
+                    // Emit event for components to update
+                    if (typeof window !== 'undefined') {
+                        window.dispatchEvent(new CustomEvent('dataManagerRefresh', { 
+                            detail: { type: 'tables', count: processedTables.length, source: 'read-service' } 
+                        }));
+                    }
+                    return processedTables;
+                } catch (err) {
+                    debug('\u26a0 fetchTables failed, falling back to GraphQL', err.message);
+                }
+            }
+
             const token = await tokenService.getValidAccessToken();
             const config = appconfig();
 
@@ -145,14 +212,30 @@ class DataManager {
             debug(`✅ Loaded ${tables.length} tables from server`);
 
             // Process tables with status parsing
-            const processedTables = tables.map(table => ({
-                ...table,
-                status: this.parseTableStatus(table),
-                timeElapsed: this.parseTimeFromCaption(table.caption)
-            }));
+            const processedTables = tables.map(table => {
+                const status = this.parseTableStatus(table);
+                return {
+                    ...table,
+                    status: status,
+                    color: this.mapStatusToColor(status), // Ensure consistent color mapping
+                    timeElapsed: this.parseTimeFromCaption(table.caption)
+                };
+            });
 
             // Cache tables with TTL (30 seconds)
+            debug('💾 Saving tables to cache:', { count: processedTables.length, sample: processedTables[0] });
             cacheService.setTables(processedTables, 30 * 1000);
+            
+            // Verify cache was set correctly
+            const cachedCheck = cacheService.getTables();
+            debug('✅ Cache verification:', { cachedCount: cachedCheck?.length || 0, success: !!cachedCheck });
+            
+            // Emit event for components to update
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('dataManagerRefresh', { 
+                    detail: { type: 'tables', count: processedTables.length } 
+                }));
+            }
 
             return processedTables;
 
@@ -243,6 +326,13 @@ class DataManager {
 
             // Cache active tickets with short TTL (10 seconds)
             cacheService.setActiveTickets(tickets, 10 * 1000);
+            
+            // Emit event for components to update
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('dataManagerRefresh', { 
+                    detail: { type: 'tickets', count: tickets.length } 
+                }));
+            }
 
             return tickets;
 
@@ -261,6 +351,18 @@ class DataManager {
         debug('🔍 Loading ticket details...', { ticketId });
 
         try {
+            const useSql = process.env.REACT_APP_USE_SQL_READS === 'true';
+            if (useSql) {
+                try {
+                    const { fetchTicketDetails } = await import('../queries');
+                    const ticket = await fetchTicketDetails(ticketId);
+                    debug('\u2705 Ticket details loaded (read-service):', ticket?.number);
+                    return ticket;
+                } catch (err) {
+                    debug('\u26a0 fetchTicketDetails failed, falling back to GraphQL', err.message);
+                }
+            }
+
             const token = await tokenService.getValidAccessToken();
             const config = appconfig();
 
@@ -374,16 +476,11 @@ class DataManager {
                 throw new Error(`Invalid SignalR URL: ${signalRUrl}`);
             }
 
-            // Dynamic import of SignalR
-            const { HubConnectionBuilder, LogLevel } = await import('@microsoft/signalr');
+            // Use the SignalR adapter that handles Core -> legacy fallback
+            const getAdapter = await import('./signalrAdapter').then(m => m.default || m);
+            this.signalRConnection = getAdapter();
 
-            this.signalRConnection = new HubConnectionBuilder()
-                .withUrl(signalRUrl)
-                .withAutomaticReconnect()
-                .configureLogging(LogLevel.Information)
-                .build();
-
-            // Setup event handlers
+            // Register handlers on adapter
             this.signalRConnection.on('TableStatusChanged', (tableData) => {
                 debug('📡 SignalR: Table status changed', tableData);
                 this.handleTableStatusUpdate(tableData);
@@ -404,9 +501,13 @@ class DataManager {
                 this.handleOrderUpdate(orderData);
             });
 
-            // Start connection
-            await this.signalRConnection.start();
-            debug('✅ SignalR connected successfully');
+            this.signalRConnection.on('ENTITIES_REFRESH', (entityData) => {
+                debug('📡 SignalR: Entities refresh', entityData);
+                this.handleEntitiesRefresh(entityData);
+            });
+
+            await this.signalRConnection.connect(signalRUrl);
+            debug('✅ SignalR connected (adapter)');
 
         } catch (error) {
             debug('⚠️ SignalR initialization failed (non-critical):', error);
@@ -418,30 +519,37 @@ class DataManager {
      * Handle real-time table status updates
      */
     handleTableStatusUpdate(tableData) {
-        // Invalidate tables cache to force refresh
-        cacheService.clearTables();
-
-        // Dispatch event for components to update
-        if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('tableStatusChanged', {
-                detail: tableData
-            }));
-        }
+        // Mark SignalR activity
+        this._lastSignalRActivity = Date.now();
+        this._signalRConnected = true;
+        
+        // Debounce bursts of table events to avoid thrashing
+        if (this._tableEventTimer) clearTimeout(this._tableEventTimer);
+        this._tableEventTimer = setTimeout(() => {
+            // Invalidate tables cache to force refresh
+            cacheService.clearTables();
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('tableStatusChanged', { detail: tableData }));
+            }
+        }, 150);
     }
 
     /**
      * Handle real-time ticket updates
      */
     handleTicketUpdate(ticketData) {
-        // Invalidate active tickets cache
-        cacheService.clearActiveTickets();
-
-        // Dispatch event for components to update
-        if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('ticketUpdated', {
-                detail: ticketData
-            }));
-        }
+        // Mark SignalR activity
+        this._lastSignalRActivity = Date.now();
+        this._signalRConnected = true;
+        
+        // Debounce bursts of ticket events to avoid thrashing
+        if (this._ticketEventTimer) clearTimeout(this._ticketEventTimer);
+        this._ticketEventTimer = setTimeout(() => {
+            cacheService.clearActiveTickets();
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('ticketUpdated', { detail: ticketData }));
+            }
+        }, 120);
     }
 
     /**
@@ -457,22 +565,238 @@ class DataManager {
     }
 
     /**
+     * Handle ENTITIES_REFRESH events from SignalR
+     * This populates the cache with fresh table data instead of just clearing it
+     */
+    handleEntitiesRefresh(entityData) {
+        // Mark SignalR activity
+        this._lastSignalRActivity = Date.now();
+        this._signalRConnected = true;
+        
+        debug('📡 Processing ENTITIES_REFRESH with data:', entityData);
+        
+        // Enhanced debugging for state changes
+        if (Array.isArray(entityData)) {
+            debug('📋 ENTITIES_REFRESH detailed data:', {
+                count: entityData.length,
+                entities: entityData.map(e => ({
+                    id: e.EntityId || e.id,
+                    name: e.EntityName || e.name || e.Name,
+                    state: e.EntityState || e.state,
+                    ticketId: e.TicketId,
+                    ticketNumber: e.TicketNumber
+                }))
+            });
+        }
+        
+        try {
+            // entityData should be an array of table entities from SambaPOS
+            if (Array.isArray(entityData) && entityData.length > 0) {
+                // Transform SambaPOS entities to our table format
+                const tables = entityData.map(entity => {
+                    // Extract status with better fallback handling
+                    let status = entity.EntityState || entity.state || entity.Status;
+                    
+                    // Normalize unknown statuses to prevent gray flickering
+                    if (!status || status === '' || status === null || status === undefined) {
+                        status = 'LIBRE'; // Default to available if status is missing
+                    }
+                    
+                    // Map status to ensure consistency with regular table loading
+                    const mappedStatus = this.normalizeEntityStatus(status);
+                    const color = this.mapStatusToColor(mappedStatus);
+                    
+                    // Get raw entity name and clean HTML tags
+                    const rawEntityName = entity.EntityName || entity.name || entity.Name || entity.EntityCustomData?.name || `Mesa ${entity.EntityId || entity.id}`;
+                    const entityName = this.cleanHtmlFromEntityName(rawEntityName);
+                    
+                    // Enhanced debugging for SignalR color flickering issues
+                    debug(`🔄 SignalR Entity Transform: ${entityName}`, {
+                        originalStatus: entity.EntityState || entity.state || entity.Status,
+                        normalizedStatus: mappedStatus,
+                        color: color,
+                        rawName: rawEntityName,
+                        cleanName: entityName
+                    });
+                    
+                    return {
+                        id: entity.EntityId || entity.id,
+                        name: entityName,
+                        status: mappedStatus,
+                        color: color,
+                        ticketId: entity.TicketId || null,
+                        ticketNumber: entity.TicketNumber || null,
+                        time: entity.Time || null,
+                        data: entity // Keep original data for debugging
+                    };
+                });
+
+                debug(`✅ Transformed ${tables.length} entities to table format`);
+                
+                // Update cache with fresh data instead of clearing it
+                cacheService.setTables(tables, 60 * 1000); // Cache for 1 minute
+                
+                // Emit event for UI components
+                if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('dataManagerRefresh', { 
+                        detail: { type: 'tables', count: tables.length, source: 'signalr' } 
+                    }));
+                }
+            } else {
+                debug('⚠️ ENTITIES_REFRESH with no data, clearing cache');
+                cacheService.clearTables();
+            }
+        } catch (error) {
+            debug('❌ Error processing ENTITIES_REFRESH:', error);
+            // On error, fallback to clearing cache
+            cacheService.clearTables();
+        }
+    }
+
+    /**
+     * Normalize entity status to ensure consistency between SignalR and GraphQL updates
+     */
+    normalizeEntityStatus(status) {
+        if (!status || typeof status !== 'string') {
+            return 'LIBRE';
+        }
+        
+        const upperStatus = status.toUpperCase().trim();
+        
+        // Map various status variations to consistent values
+        const statusMap = {
+            // Available variations
+            'DISPONIBLE': 'LIBRE',
+            'AVAILABLE': 'LIBRE',
+            'FREE': 'LIBRE',
+            'EMPTY': 'LIBRE',
+            
+            // Occupied variations
+            'OCUPADO': 'OCUPADO',
+            'OCCUPIED': 'OCUPADO',
+            'BUSY': 'OCUPADO',
+            'NUEVOS PEDIDOS': 'OCUPADO',
+            'NEW ORDERS': 'OCUPADO',
+            
+            // Bill requested variations
+            'CUENTA': 'CUENTA',
+            'BILL': 'CUENTA',
+            'CHECK': 'CUENTA',
+            'CUENTA SOLICITADA': 'CUENTA',
+            'BILL REQUESTED': 'CUENTA',
+            
+            // Blocked variations
+            'BLOQUEADO': 'BLOQUEADO',
+            'BLOCKED': 'BLOQUEADO',
+            'LOCKED': 'BLOQUEADO'
+        };
+        
+        return statusMap[upperStatus] || upperStatus;
+    }
+
+    /**
+     * Map entity status to color for backwards compatibility
+     */
+    mapStatusToColor(status) {
+        switch (status) {
+            case 'Disponible':
+            case 'LIBRE':
+                return '#f5f5f4'; // Light beige/gray for available tables
+            case 'Ocupado':
+            case 'OCUPADO':
+            case 'Nuevos pedidos':
+                return '#fbbf24'; // Yellow for occupied/new orders
+            case 'Cuenta':
+            case 'CUENTA':
+            case 'Cuenta solicitada':
+            case 'BLOQUEADO':
+                return '#dc2626'; // Professional red for bill/blocked
+            default:
+                return '#9ca3af'; // Gray for unknown status
+        }
+    }
+
+    /**
+     * Clean HTML tags from entity names (e.g., <size 190>1<br/><br/>1 min.</size>)
+     */
+    cleanHtmlFromEntityName(name) {
+        if (!name || typeof name !== 'string') {
+            return name;
+        }
+        
+        // Remove HTML tags like <size 190>...</size>, <br/>, etc.
+        let cleanName = name
+            .replace(/<[^>]*>/g, '') // Remove all HTML tags
+            .replace(/&lt;/g, '<')   // Decode HTML entities
+            .replace(/&gt;/g, '>')
+            .replace(/&amp;/g, '&')
+            .replace(/&nbsp;/g, ' ')
+            .trim();
+            
+        // Handle complex patterns like "112" (where "1" is repeated), "314", etc.
+        // These seem to be duplicated digits or complex entity names
+        
+        // First, try to extract just the first meaningful number
+        const singleNumberMatch = cleanName.match(/^(\d+)/);
+        if (singleNumberMatch) {
+            const number = singleNumberMatch[1];
+            
+            // If it's a repeating pattern like "112" -> "1", "223" -> "2", etc.
+            if (number.length >= 2) {
+                const firstDigit = number[0];
+                const isRepeatingPattern = number.split('').every(digit => digit === firstDigit);
+                if (isRepeatingPattern) {
+                    return firstDigit; // Return just the first digit for repeating patterns
+                }
+                
+                // Check if it's a simple concatenation like "11" -> "1", "22" -> "2"
+                if (number.length === 2 && number[0] === number[1]) {
+                    return number[0];
+                }
+                
+                // For other multi-digit cases, try to find the actual table number
+                // If the string contains time info, it might be like "1 1 min." -> extract first digit
+                if (cleanName.includes('min') || cleanName.includes(':')) {
+                    return firstDigit;
+                }
+            }
+            
+            return number; // Return the full number if it seems legitimate
+        }
+        
+        return cleanName;
+    }
+
+    /**
      * Parse table status from color
      */
     parseTableStatus(table) {
         if (!table) return 'BLOQUEADO';
 
+        // First try to get status from entity state if available
+        if (table.EntityState || table.state) {
+            return this.normalizeEntityStatus(table.EntityState || table.state);
+        }
+
+        // Fallback to color-based parsing for compatibility
+        let statusFromColor;
         switch (table.color) {
             case '#FF0000':
-                return 'CUENTA';
+                statusFromColor = 'CUENTA';
+                break;
             case '#FFFF00':
-                return 'OCUPADO';
+                statusFromColor = 'OCUPADO';
+                break;
             case '#FFFFFF':
             case '#E5E3D8':
-                return 'LIBRE';
+                statusFromColor = 'LIBRE';
+                break;
             default:
-                return 'BLOQUEADO';
+                statusFromColor = 'BLOQUEADO';
+                break;
         }
+
+        return this.normalizeEntityStatus(statusFromColor);
     }
 
     /**
@@ -495,6 +819,15 @@ class DataManager {
                 return await this.loadTables(true); // Force refresh
             case 'tickets':
                 return await this.getActiveTickets(true); // Force refresh
+            case 'all':
+                // Refresh all data types
+                debug('🔄 Refreshing all data...');
+                const results = {};
+                results.menu = await menuService.getMenu(true);
+                results.tables = await this.loadTables(true);
+                results.tickets = await this.getActiveTickets(true);
+                debug('✅ All data refreshed');
+                return results;
             default:
                 throw new Error(`Unknown data type: ${dataType}`);
         }
@@ -511,7 +844,9 @@ class DataManager {
      * Get cached tables (no network call)
      */
     getCachedTables() {
-        return cacheService.getTables();
+        const tables = cacheService.getTables();
+        debug('📦 getCachedTables called:', { tablesCount: tables?.length || 0, hasData: !!tables });
+        return tables;
     }
 
     /**
@@ -542,10 +877,61 @@ class DataManager {
     }
 
     /**
+     * Start intelligent polling system as backup for SignalR
+     * Only polls when SignalR is disconnected or inactive
+     */
+    startIntelligentPolling() {
+        if (this._pollingInterval) return; // Already started
+
+        debug('🔄 Starting intelligent polling backup system...');
+        
+        this._pollingInterval = setInterval(() => {
+            if (!this.initialized) return;
+            
+            const now = Date.now();
+            const timeSinceActivity = now - this._lastSignalRActivity;
+            const signalRIsHealthy = this._signalRConnected && timeSinceActivity < 30000; // 30s threshold
+            
+            if (signalRIsHealthy) {
+                // SignalR is working fine, no need to poll
+                return;
+            }
+            
+            // SignalR is down or inactive, do backup polling
+            debug('📡 SignalR inactive, running backup data refresh...');
+            
+            // Refresh both tickets and tables more frequently since SignalR state changes aren't working
+            this.getActiveTickets(true).catch(err => {
+                debug('⚠️ Backup polling failed:', err.message);
+            });
+            
+            // Refresh tables every cycle (every 15s) to detect state changes like CUENTA
+            this.loadTables(true).catch(err => {
+                debug('⚠️ Backup table refresh failed:', err.message);
+            });
+            
+        }, 15000); // Check every 15 seconds (more responsive for state changes)
+    }
+
+    /**
+     * Stop intelligent polling
+     */
+    stopIntelligentPolling() {
+        if (this._pollingInterval) {
+            debug('⏹️ Stopping intelligent polling...');
+            clearInterval(this._pollingInterval);
+            this._pollingInterval = null;
+        }
+    }
+
+    /**
      * Cleanup resources
      */
     async cleanup() {
         debug('🧹 Cleaning up DataManager...');
+
+        // Stop intelligent polling
+        this.stopIntelligentPolling();
 
         if (this.signalRConnection) {
             await this.signalRConnection.stop();
@@ -555,6 +941,7 @@ class DataManager {
         this.initialized = false;
         this.loading = false;
         this.initPromise = null;
+        this._signalRConnected = false;
 
         debug('✅ DataManager cleanup complete');
     }

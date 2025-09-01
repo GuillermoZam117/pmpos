@@ -6,24 +6,41 @@ const commonComponents = {
         styleOverrides: {
             root: {
                 textTransform: 'none',
-                borderRadius: 8,
+                borderRadius: 12,
                 fontSize: '0.875rem',
-                fontWeight: 500,
+                fontWeight: 600,
+                padding: '8px 20px',
+                boxShadow: 'none',
+                '&:hover': {
+                    boxShadow: '0 4px 16px rgba(37, 99, 235, 0.3)',
+                    transform: 'translateY(-1px)',
+                    transition: 'all 0.2s ease',
+                },
+            },
+            contained: {
+                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                '&:hover': {
+                    background: 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)',
+                },
             },
         },
     },
     MuiCard: {
         styleOverrides: {
             root: {
-                borderRadius: 12,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                borderRadius: 16,
+                boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
+                backdropFilter: 'blur(8px)',
+                border: '1px solid rgba(148, 163, 184, 0.1)',
             },
         },
     },
     MuiPaper: {
         styleOverrides: {
             root: {
-                borderRadius: 8,
+                borderRadius: 12,
+                backgroundImage: 'none',
+                border: '1px solid rgba(148, 163, 184, 0.1)',
             },
         },
     },
@@ -37,53 +54,115 @@ const commonComponents = {
     MuiIconButton: {
         styleOverrides: {
             root: {
+                borderRadius: 12,
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                    backgroundColor: 'rgba(37, 99, 235, 0.08)',
+                    transform: 'scale(1.05)',
+                },
+            },
+        },
+    },
+    MuiAppBar: {
+        styleOverrides: {
+            root: {
+                boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+                backdropFilter: 'blur(12px)',
+                borderBottom: '1px solid rgba(148, 163, 184, 0.1)',
+            },
+        },
+    },
+    MuiDrawer: {
+        styleOverrides: {
+            paper: {
+                backgroundColor: '#1a1a1a',
+                borderRight: '1px solid rgba(148, 163, 184, 0.1)',
+            },
+        },
+    },
+    MuiChip: {
+        styleOverrides: {
+            root: {
                 borderRadius: 8,
+                fontWeight: 500,
+            },
+            filled: {
+                backgroundColor: 'rgba(139, 92, 246, 0.2)',
+                color: '#a78bfa',
+                border: '1px solid rgba(139, 92, 246, 0.3)',
+            },
+        },
+    },
+    MuiTextField: {
+        styleOverrides: {
+            root: {
+                '& .MuiOutlinedInput-root': {
+                    borderRadius: 12,
+                    backgroundColor: 'rgba(26, 26, 26, 0.6)',
+                    '& fieldset': {
+                        borderColor: 'rgba(148, 163, 184, 0.3)',
+                    },
+                    '&:hover fieldset': {
+                        borderColor: 'rgba(139, 92, 246, 0.5)',
+                    },
+                    '&.Mui-focused fieldset': {
+                        borderColor: '#8b5cf6',
+                        boxShadow: '0 0 0 3px rgba(139, 92, 246, 0.1)',
+                    },
+                },
             },
         },
     },
 };
 
-// Dark theme
+// Modern Dark theme inspired by sophisticated interfaces
 export const darkTheme = createTheme({
     palette: {
         mode: 'dark',
         primary: {
-            main: '#2196f3',
-            light: '#64b5f6',
-            dark: '#1976d2',
+            main: '#2563eb',     // Professional blue
+            light: '#3b82f6',    // Light blue
+            dark: '#1d4ed8',     // Deep blue
             contrastText: '#ffffff',
         },
         secondary: {
-            main: '#f50057',
-            light: '#ff5983',
-            dark: '#c51162',
+            main: '#dc2626',     // Professional red
+            light: '#ef4444',    // Light red
+            dark: '#b91c1c',     // Deep red
             contrastText: '#ffffff',
         },
         success: {
-            main: '#4caf50',
-            light: '#81c784',
-            dark: '#388e3c',
+            main: '#059669',     // Professional green
+            light: '#10b981',    
+            dark: '#047857',
         },
         warning: {
-            main: '#ff9800',
-            light: '#ffb74d',
-            dark: '#f57c00',
+            main: '#ea580c',     // Professional orange
+            light: '#f97316',
+            dark: '#c2410c',
         },
         error: {
-            main: '#f44336',
-            light: '#ef5350',
-            dark: '#d32f2f',
+            main: '#dc2626',     // Professional red
+            light: '#ef4444',
+            dark: '#b91c1c',
         },
         background: {
-            default: '#121212',
-            paper: '#1e1e1e',
-            surface: '#2c2c2c',
+            default: '#0f0f0f',  // Deep black background
+            paper: '#1a1a1a',    // Dark gray cards
+            surface: '#262626',  // Elevated surfaces
         },
         text: {
-            primary: '#ffffff',
-            secondary: 'rgba(255, 255, 255, 0.7)',
+            primary: '#f8fafc',         // Near white
+            secondary: '#94a3b8',       // Cool gray
+            disabled: '#64748b',        // Muted gray
         },
-        divider: 'rgba(255, 255, 255, 0.12)',
+        divider: 'rgba(148, 163, 184, 0.12)',  // Subtle gray dividers
+        action: {
+            hover: 'rgba(37, 99, 235, 0.08)',     // Blue hover
+            selected: 'rgba(37, 99, 235, 0.12)',  // Blue selection
+            disabled: 'rgba(100, 116, 139, 0.3)', // Disabled actions
+            focus: 'rgba(37, 99, 235, 0.25)',     // Focus states
+        },
     },
     typography: {
         fontFamily: ['Roboto', 'Arial', 'sans-serif'].join(','),
@@ -116,47 +195,54 @@ export const darkTheme = createTheme({
     components: commonComponents,
 });
 
-// Light theme
+// Professional Light theme
 export const lightTheme = createTheme({
     palette: {
         mode: 'light',
         primary: {
-            main: '#1976d2',
-            light: '#42a5f5',
-            dark: '#1565c0',
+            main: '#2563eb',     // Professional blue - same as dark
+            light: '#3b82f6',    // Light blue
+            dark: '#1d4ed8',     // Deep blue
             contrastText: '#ffffff',
         },
         secondary: {
-            main: '#dc004e',
-            light: '#ff5983',
-            dark: '#9a0036',
+            main: '#dc2626',     // Professional red - same as dark
+            light: '#ef4444',    // Light red
+            dark: '#b91c1c',     // Deep red
             contrastText: '#ffffff',
         },
         success: {
-            main: '#2e7d32',
-            light: '#4caf50',
-            dark: '#1b5e20',
+            main: '#059669',     // Professional green - same as dark
+            light: '#10b981',    
+            dark: '#047857',
         },
         warning: {
-            main: '#ed6c02',
-            light: '#ff9800',
-            dark: '#e65100',
+            main: '#ea580c',     // Professional orange - same as dark
+            light: '#f97316',
+            dark: '#c2410c',
         },
         error: {
-            main: '#d32f2f',
-            light: '#ef5350',
-            dark: '#c62828',
+            main: '#dc2626',     // Professional red - same as dark
+            light: '#ef4444',
+            dark: '#b91c1c',
         },
         background: {
-            default: '#fafafa',
-            paper: '#ffffff',
-            surface: '#f5f5f5',
+            default: '#f8fafc',  // Very light gray instead of white
+            paper: '#ffffff',    // White for cards
+            surface: '#f1f5f9',  // Light gray for elevated surfaces
         },
         text: {
-            primary: 'rgba(0, 0, 0, 0.87)',
-            secondary: 'rgba(0, 0, 0, 0.6)',
+            primary: '#0f172a',        // Very dark gray for excellent contrast
+            secondary: '#475569',      // Medium gray
+            disabled: '#94a3b8',       // Light gray for disabled
         },
-        divider: 'rgba(0, 0, 0, 0.12)',
+        divider: 'rgba(15, 23, 42, 0.12)',  // Dark gray dividers
+        action: {
+            hover: 'rgba(37, 99, 235, 0.08)',     // Blue hover - same as dark
+            selected: 'rgba(37, 99, 235, 0.12)',  // Blue selection - same as dark
+            disabled: 'rgba(148, 163, 184, 0.3)', // Disabled actions
+            focus: 'rgba(37, 99, 235, 0.25)',     // Focus states - same as dark
+        },
     },
     typography: {
         fontFamily: ['Roboto', 'Arial', 'sans-serif'].join(','),

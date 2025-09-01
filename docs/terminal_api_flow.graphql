@@ -98,3 +98,84 @@ mutation CloseTerminalTicket {
 mutation UnregisterTerminal {
   unregisterTerminal(terminalId: "grXZzqACJ0izZ3eLqo5ByQ")
 }
+
+# 7) Añadir Cálculo (descuento/servicio/propina)
+mutation AddCalculation {
+  addCalculationToTerminalTicket(
+    terminalId: "grXZzqACJ0izZ3eLqo5ByQ"
+    calculationName: "Descuento 10%"
+    amount: 10.00
+  ) {
+    id
+    totalAmount
+    remainingAmount
+    calculations { name calculationAmount }
+  }
+}
+
+# 8) Editar una Orden existente (cantidad/porción/tags)
+mutation UpdateOrderQuantity {
+  updateOrderOfTerminalTicket(
+    terminalId: "grXZzqACJ0izZ3eLqo5ByQ"
+    orderUid: "<UID>"
+    quantity: 2
+  ) {
+    id
+    totalAmount
+    orders { uid quantity price portion }
+  }
+}
+
+mutation UpdateOrderPortion {
+  updateOrderOfTerminalTicket(
+    terminalId: "grXZzqACJ0izZ3eLqo5ByQ"
+    orderUid: "<UID>"
+    portion: "Grande"
+  ) {
+    id
+    orders { uid portion price }
+  }
+}
+
+mutation UpdateOrderTags {
+  updateOrderOfTerminalTicket(
+    terminalId: "grXZzqACJ0izZ3eLqo5ByQ"
+    orderUid: "<UID>"
+    orderTags: [{ tagName: "Cocción", tag: "Bien cocido" }]
+  ) {
+    id
+    orders { uid quantity price portion }
+  }
+}
+
+# 9) Tipos de Pago disponibles
+query GetPaymentTypes {
+  getPaymentTypes { id name buttonHeader buttonColor processorSettings }
+}
+
+# 10) Pagar Ticket (total, parcial o mixto)
+mutation PayCashFull {
+  payTerminalTicket(
+    terminalId: "grXZzqACJ0izZ3eLqo5ByQ"
+    paymentTypeName: "Efectivo"
+    amount: 120.00
+  ) {
+    ticketId
+    amount
+    remainingAmount
+    errorMessage
+  }
+}
+
+mutation PayCardPartial {
+  payTerminalTicket(
+    terminalId: "grXZzqACJ0izZ3eLqo5ByQ"
+    paymentTypeName: "Tarjeta"
+    amount: 50.00
+  ) {
+    ticketId
+    amount
+    remainingAmount
+    errorMessage
+  }
+}

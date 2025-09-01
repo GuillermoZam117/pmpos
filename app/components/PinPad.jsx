@@ -34,7 +34,11 @@ const PinPad = () => {
   useEffect(() => {
     if (isAuthenticated) {
       console.log('🔄 Auth state changed - navigating to tables');
-      navigate('/tables', { replace: true });
+      // Only navigate if we're actually in PinPad view, not from other contexts
+      const currentPath = window.location.hash?.replace('#', '') || window.location.pathname;
+      if (currentPath === '/pinpad' || currentPath === '/' || currentPath === '') {
+        navigate('/tables', { replace: true });
+      }
     }
   }, [isAuthenticated, navigate]);
 

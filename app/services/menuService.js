@@ -14,6 +14,7 @@ class MenuService {
         this.currentMenu = null;
         this.loading = false;
         this.error = null;
+        this.productNameById = new Map();
     }
 
     /**
@@ -28,6 +29,7 @@ class MenuService {
             if (cachedMenu) {
                 debug('✅ Using cached menu');
                 this.currentMenu = cachedMenu;
+                this.buildIndex(cachedMenu);
                 return cachedMenu;
             }
         }
@@ -70,6 +72,7 @@ class MenuService {
                         // Cache the successful result
                         cacheService.setMenu(menuData);
                         this.currentMenu = menuData;
+                        this.buildIndex(menuData);
                         
                         return menuData;
                     }
@@ -389,6 +392,39 @@ class MenuService {
             }
         }
         return allItems;
+    }
+
+    /**
+     * Build fast index maps for product resolution
+     */
+    buildIndex(menuData) {
+        try {
+            this.productNameById.clear();
+            const cats = menuData?.categories || [];
+            for (const cat of cats) {
+                const items = cat?.menuItems || [];
+                for (const it of items) {
+                    const id = String(it.productId || it.product?.id || '');
+                    if (!id) continue;
+                    const name = it.name || it.caption || it.product?.name || '';
+                    if (name && !this.productNameById.has(id)) {
+                        this.productNameById.set(id, name);
+                    }
+                }
+            }
+            debug(`🔎 Built product index: ${this.productNameById.size} items`);
+        } catch (e) {
+            debug('⚠️ Failed building menu index:', e?.message || e);
+        }
+    }
+
+    /**
+     * Get product name by productId using index
+     */
+    getProductNameById(productId) {
+        if (!productId) return null;
+        const key = String(productId);
+        return this.productNameById.get(key) || null;
     }
 
     /**

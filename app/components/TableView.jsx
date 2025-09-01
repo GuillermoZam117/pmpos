@@ -20,8 +20,8 @@ import {
     Refresh as RefreshIcon
 } from '@mui/icons-material';
 import TableCard from './TableCard';
-import { getEntityScreenItems, getTicketByTable, createEmptyTicket, getTerminalTicketsForTable, loadTerminalTicketWithOrders, createTerminalTicketAsync, changeEntityOfTerminalTicketAsync, getCurrentTerminalId, debugTicketQueries, findTicketByTableAlternative, getAllOpenTickets, getMesaStatus, getTicketForMesa, getMesaColor, loadTicketToTerminal, getMesaStatusWithTime, getMesaTimeInfo } from '../queries';
-import { useMesasStatus } from '../hooks/useMesasStatus';
+import { getTicketByTable, createEmptyTicket, getTerminalTicketsForTable, loadTerminalTicketWithOrders, createTerminalTicketAsync, changeEntityOfTerminalTicketAsync, getCurrentTerminalId, debugTicketQueries, findTicketByTableAlternative, getMesaStatus, getTicketForMesa, getMesaColor, loadTicketToTerminal, getMesaStatusWithTime, getMesaTimeInfo } from '../queries';
+import { useDataManager } from '../hooks/useDataManager';
 import terminalService from '../services/terminalService';
 import dataManager from '../services/dataManager';
 import TerminalStatus from './TerminalStatus';
@@ -40,7 +40,7 @@ const debug = Debug('pmpos:tables');
 
 const TableView = () => {
     const [error, setError] = useState(null);
-    const [tables, setTables] = useState([]);
+    const [processedTables, setProcessedTables] = useState([]);
     const [loading, setLoading] = useState(true);
     const [autoCols, setAutoCols] = useState(() => {
         const v = localStorage.getItem('pmpos_tables_auto');
@@ -51,21 +51,17 @@ const TableView = () => {
         return [1, 2, 3, 4, 6].includes(v) ? v : 3;
     });
     const gridRef = React.useRef(null);
-    const [, setRefreshing] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
 
-    // Real-time mesa status polling (2 seconds)
-    // This hook fetches active tickets from all users for status updates
+    // UNIFIED data management - NO MORE DUPLICATED REQUESTS
+    // All data comes from dataManager with centralized caching
     const {
-        allTickets,
-        loading: ticketsLoading,
-        error: ticketsError,
-        refresh: refreshTickets,
-        isPolling
-    } = useMesasStatus({
-        pollInterval: 2000,
-        enabled: true,
-        networkOnly: true // This gets tickets from all users (not just current user)
-    });
+        tickets: allTickets,
+        tables: dataManagerTables,
+        loading: dataLoading,
+        error: dataError,
+        refresh: refreshData
+    } = useDataManager();
 
     // Theme context
     const { toggleTheme, isDarkMode } = useCustomTheme();
@@ -73,7 +69,6 @@ const TableView = () => {
     // Select from auth slice (Immutable.js)
     const user = useSelector(state => state.auth.get('user'));
     const isAuthenticated = useSelector(state => state.auth.get('isAuthenticated'));
-    const reduxTables = useSelector(state => state.app.get('tables')); // Get tables from Redux
     const dispatch = useDispatch();
     const navigate = useNavigate();
 
@@ -214,13 +209,26 @@ const TableView = () => {
 
             debug('✅ Found ticket for occupied table:', existingTicket);
 
-            // Navigate directly with ticket (no terminal operations needed for viewing)
+            // Ensure terminal context has this ticket loaded (Discovery fast-path)
+            try {
+                const userName = (user?.get ? user.get('name') : user?.name) || null;
+                let terminalId = terminalService.getTerminalId();
+                if (!terminalId) terminalId = await terminalService.ensureTerminalRegistered(userName);
+                if (terminalId && existingTicket?.id) {
+                    await loadTerminalTicketWithOrders(terminalId, String(existingTicket.id));
+                    debug('🔄 Ticket loaded into terminal before navigation:', existingTicket.id);
+                }
+            } catch (ctxErr) {
+                debug('⚠️ Could not load ticket into terminal context:', ctxErr);
+            }
+
+            // Navigate with basic state; POS will have terminal context ready
             navigate('/pos', {
                 state: {
                     ticket: existingTicket,
                     tableId: table.name,
                     isNew: false,
-                    isOwnTicket: false, // This ticket belongs to another user
+                    isOwnTicket: false,
                     ticketId: existingTicket.id
                 }
             });
@@ -237,8 +245,11 @@ const TableView = () => {
             setLoading(true);
             setError(null);
 
-            const tableStatus = parseTableStatus(table);
+            let tableStatus = parseTableStatus(table);
             debug(`🔍 Clicked table ${table.name} with status: ${tableStatus}`);
+
+            // REMOVED: Unnecessary server check that causes extra requests
+            // Trust the status from allTickets (already has this data)
 
             if (tableStatus === 'LIBRE') {
                 await handleLibreTable(table);
@@ -258,13 +269,14 @@ const TableView = () => {
     };
 
     const parseTableStatus = (table) => {
-        // Use hybrid detection: check global tickets first, fallback to SambaPOS colors
+        // Source of truth: global tickets
         const mesaStatus = getMesaStatus(table.name, allTickets);
-        if (mesaStatus !== 'LIBRE') return mesaStatus;
+        if (mesaStatus === 'LIBRE' || mesaStatus === 'OCUPADO' || mesaStatus === 'CUENTA') {
+            return mesaStatus;
+        }
 
-        // Fallback to SambaPOS color-based detection
+        // Fallback to SambaPOS color-based detection only if we couldn't determine status
         if (!table) return 'BLOQUEADO';
-        // Mapear colores típicos de SambaPOS y los calculados
         const c = (table.color || '').toUpperCase();
         if (c === '#FF0000' || c === '#F44336') return 'CUENTA'; // rojo
         if (c === '#FFFF00' || c === '#FFEB3B') return 'OCUPADO'; // amarillo
@@ -293,14 +305,7 @@ const TableView = () => {
         }
     }, [dispatch, navigate]);
 
-    // Keep terminal status in sync on mount
-    useEffect(() => {
-        try {
-            setTerminalIdState(terminalService.getTerminalId());
-        } catch (e) {
-            // ignore
-        }
-    }, []);
+    // REMOVED: Terminal status sync - no longer needed
 
     // Manual terminal registration removed from UI
 
@@ -353,165 +358,87 @@ const TableView = () => {
         localStorage.setItem('pmpos_tables_cols', String(next));
     };
 
-    const loadTables = useCallback(async (forceRefresh = false, showRefresh = false) => {
-        if (showRefresh) setRefreshing(true);
-        else setLoading(true);
+    // REMOVED: loadTables function - replaced by useDataManager hook
+    // All table loading is now handled by dataManager centrally
 
-        try {
-            debug('📋 Loading tables via DataManager...');
-
-            let tablesData;
-            
-            if (forceRefresh) {
-                // Force refresh via DataManager
-                tablesData = await dataManager.refreshData('tables');
-            } else {
-                // Try Redux store first (already loaded at startup)
-                if (reduxTables) {
-                    debug('✅ Using tables from Redux store');
-                    tablesData = reduxTables;
-                } else {
-                    // Try DataManager cache
-                    tablesData = dataManager.getCachedTables();
-                    
-                    if (!tablesData) {
-                        // Load from server via DataManager
-                        tablesData = await dataManager.loadTables();
-                    }
-                }
-            }
-
-            if (tablesData) {
-                debug(`✅ DataManager provided ${tablesData.length} tables`);
-                
-                // Process tables with hybrid status detection and time info
-                const processedTables = tablesData.map(table => {
-                    const mesaInfo = getMesaStatusWithTime(table.name, allTickets);
-                    const fallbackStatus = mesaInfo.status || parseTableStatus(table);
-                    // No sobreescribir table.color (viene del Entity Screen de SambaPOS)
-                    return {
-                        ...table,
-                        status: fallbackStatus,
-                        timeElapsed: parseTimeFromCaption(table.caption),
-                        timeInfo: mesaInfo.timeInfo
-                    };
-                });
-
-                setTables(processedTables);
-                setError(null);
-            } else {
-                debug('⚠️ No tables data available from DataManager');
-                setError('No hay datos de mesas disponibles');
-            }
-
-        } catch (err) {
-            debug('❌ Error loading tables via DataManager:', err);
-
-            // Fallback: try direct cache access
-            const cachedTables = dataManager.getCachedTables();
-            if (cachedTables) {
-                debug('📦 Using cached tables as fallback');
-                setTables(cachedTables);
-                setError('Usando datos en caché (sin conexión)');
-            } else {
-                setError(err.message || 'Error cargando mesas');
-            }
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
-        }
-    }, [allTickets, reduxTables]);
-
-    // Manual refresh handler (defined after loadTables to avoid TDZ)
+    // SIMPLIFIED manual refresh - uses unified dataManager
     const handleManualRefresh = useCallback(async () => {
         try {
             setManualRefreshing(true);
-            // Only refresh ticket states; do not reload full tables/menu/app
-            await refreshTickets();
-            setSnackbar({ open: true, message: 'Estados de mesas actualizados', severity: 'info' });
+            await refreshData(true); // Force refresh all data via dataManager
+            setSnackbar({ open: true, message: 'Datos actualizados', severity: 'info' });
         } catch (e) {
-            setSnackbar({ open: true, message: 'No se pudo actualizar estados', severity: 'error' });
+            setSnackbar({ open: true, message: 'No se pudo actualizar', severity: 'error' });
         } finally {
             setManualRefreshing(false);
         }
-    }, [refreshTickets]);
+    }, [refreshData]);
 
-    // Re-process tables when tickets are updated (real-time status updates)
+    // Process tables with status information
     useEffect(() => {
-        if (tables.length > 0 && allTickets.length >= 0) {
-            debug('🔄 Re-processing tables with updated tickets...');
-            const processedTables = tables.map(table => {
-                const mesaInfo = getMesaStatusWithTime(table.name, allTickets);
-                const fallbackStatus = mesaInfo.status || parseTableStatus(table);
+        if (dataManagerTables.length > 0) {
+            debug('🔄 Processing tables from dataManager...', { tablesCount: dataManagerTables.length, ticketsCount: allTickets.length });
+            
+            const tablesWithStatus = dataManagerTables.map(table => {
+                // Use backend status as primary source (Status field from backend)
+                let status = table.Status || table.status;
+                
+                // If we have tickets and status is not reliable, use ticket-based detection
+                if (allTickets.length > 0 && (!status || !['LIBRE','OCUPADO','CUENTA','BLOQUEADO'].includes(status))) {
+                    const mesaInfo = getMesaStatusWithTime(table.name, allTickets);
+                    status = mesaInfo.status || parseTableStatus(table);
+                }
+                
+                // Fallback to backend status or default
+                if (!status || !['LIBRE','OCUPADO','CUENTA','BLOQUEADO'].includes(status)) {
+                    status = table.Status || 'LIBRE';
+                }
+                
+                // Use backend color as primary, with status-based fallbacks
+                let color = table.Color || table.color;
+                if (!color) {
+                    if (status === 'CUENTA') color = '#F44336';
+                    else if (status === 'BLOQUEADO') color = '#808080';
+                    else if (status === 'OCUPADO') color = '#FFFF00';
+                    else color = '#FFFFFF'; // LIBRE
+                }
+                
                 return {
                     ...table,
-                    status: fallbackStatus,
-                    timeElapsed: parseTimeFromCaption(table.caption),
-                    backgroundColor: mesaInfo.color,
-                    timeInfo: mesaInfo.timeInfo
+                    status,
+                    color,
+                    timeElapsed: table.TimeElapsed || parseTimeFromCaption(table.caption),
+                    backgroundColor: color,
+                    timeInfo: allTickets.length > 0 ? getMesaStatusWithTime(table.name, allTickets).timeInfo : null
                 };
             });
-            setTables(processedTables);
+            
+            debug('✅ Processed tables:', { count: tablesWithStatus.length, sample: tablesWithStatus[0] });
+            setProcessedTables(tablesWithStatus);
+            setLoading(false); // Tables processed successfully, hide loading spinner
+            debug('🎉 Loading state set to false - tables should now be visible!');
+        } else {
+            debug('⚠️ No tables from dataManager yet');
         }
-    }, [allTickets]); // Re-process when tickets change
+    }, [dataManagerTables, allTickets]); // Re-process when tables or tickets change
 
-    // SignalR real-time event listeners
+    // REMOVED: SignalR listeners duplicated with useMesasStatus hook
+    // The hook already handles SignalR events and triggers refreshes
+    // This was causing double requests on every SignalR event
+
+    // REMOVED: Duplicate polling useEffect - dataManager handles all data loading and polling
+    // Authentication check is now simpler
     useEffect(() => {
-        const handleTableStatusChanged = (event) => {
-            debug('📡 SignalR: Table status changed', event.detail);
-            // Refresh tables when SignalR notifies of changes
-            loadTables(false, false);
-        };
-
-        const handleTicketUpdated = (event) => {
-            debug('📡 SignalR: Ticket updated', event.detail);
-            // Refresh tickets immediately via hook
-            refreshTickets();
-        };
-
-        // Add event listeners for SignalR events
-        window.addEventListener('tableStatusChanged', handleTableStatusChanged);
-        window.addEventListener('ticketUpdated', handleTicketUpdated);
-
-        return () => {
-            window.removeEventListener('tableStatusChanged', handleTableStatusChanged);
-            window.removeEventListener('ticketUpdated', handleTicketUpdated);
-        };
-    }, [loadTables, refreshTickets]);
-
-    useEffect(() => {
-        let mounted = true;
-        let intervalId = null;
-
         if (!isAuthenticated) {
-            debug('📤 Usuario no autenticado, limpiando datos...');
-            setTables([]);
+            debug('📤 Usuario no autenticado...');
             navigate('/', { replace: true });
-            return;
         }
-
-        const fetchTables = async () => {
-            if (!mounted) return;
-            await loadTables();
-        };
-
-        fetchTables();
-        // Tables refresh every 30s (tickets refresh every 2s via hook)
-        // SignalR provides real-time updates between polls
-        intervalId = setInterval(() => fetchTables(), 30000);
-
-        return () => {
-            mounted = false;
-            if (intervalId) {
-                clearInterval(intervalId);
-            }
-        };
-    }, [isAuthenticated, loadTables, navigate]);
+    }, [isAuthenticated, navigate]);
 
     // If not authenticated, don't render anything
     if (!isAuthenticated) return null;
 
-    if (error) {
+    if (error || dataError) {
         return (
             <Alert
                 severity="error"
@@ -521,7 +448,7 @@ const TableView = () => {
                     </Button>
                 }
             >
-                {error}
+                {error || dataError?.message || 'Error desconocido'}
             </Alert>
         );
     }
@@ -624,7 +551,7 @@ const TableView = () => {
                     
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                         <Typography variant="h4">Mesas</Typography>
-                        {isPolling && (
+                        {!dataLoading && (
                             <Box
                                 sx={{
                                     width: 8,
@@ -633,34 +560,34 @@ const TableView = () => {
                                     backgroundColor: 'success.main',
                                     animation: 'pulse 2s infinite'
                                 }}
-                                title="Actualizando estado en tiempo real (cada 2s)"
+                                title="Datos actualizados"
                             />
                         )}
                     </Box>
 
-                    {loading ? (
+                    {loading || dataLoading ? (
                         <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
                             <CircularProgress />
                         </Box>
-                    ) : (error || ticketsError) ? (
+                    ) : (error || dataError) ? (
                         <Alert
                             severity="error"
                             action={
-                                <Button color="inherit" size="small" onClick={() => loadTables()}>
+                                <Button color="inherit" size="small" onClick={handleManualRefresh}>
                                     Reintentar
                                 </Button>
                             }
                         >
-                            {error || ticketsError?.message || 'Error desconocido'}
+                            {error || dataError?.message || 'Error desconocido'}
                         </Alert>
                     ) : (
                         <Box ref={gridRef}>
                             <Grid container spacing={2}>
-                                {tables.map(table => {
+                                {processedTables.map((table, idx) => {
                                     const colSpan = Math.max(1, Math.min(6, cols));
                                     const gridSize = 12 / colSpan; // valid values: 12, 6, 4, 3, 2
                                     return (
-                                    <Grid item xs={gridSize} sm={gridSize} md={gridSize} lg={gridSize} key={table.name}>
+                                    <Grid item xs={gridSize} sm={gridSize} md={gridSize} lg={gridSize} key={`${table.id || table.EntityId || table.name || 'mesa'}-${idx}`}>
                                         <TableCard
                                             table={{
                                                 ...table,

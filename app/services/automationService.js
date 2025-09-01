@@ -200,6 +200,34 @@ export const automationService = {
     async getEntities(type, search = null, state = null) {
         debug('📋 Getting entities:', { type, search, state });
         try {
+            const useSql = process.env.REACT_APP_USE_SQL_READS === 'true';
+            if (useSql) {
+                // Prefer read-service for Clientes and generic entity searches
+                const { fetchEntitiesByType, searchCustomers } = await import('../queries');
+                const t = String(type || '').toLowerCase();
+                if (t.includes('cliente')) {
+                    const rows = await searchCustomers(search || '', 50);
+                    const mapped = (rows || []).map(r => ({
+                        id: r.ClienteId || r.EntityId || r.Id,
+                        name: r.Nombre || r.Name,
+                        customData: r.CustomData || null,
+                        states: []
+                    }));
+                    debug('✅ Entities retrieved (read-service: clientes):', mapped.length);
+                    return mapped;
+                }
+                const rows = await fetchEntitiesByType(type, search, 200);
+                const mapped = (rows || []).map(r => ({
+                    id: r.EntityId || r.Id,
+                    name: r.Name,
+                    customData: r.CustomData || null,
+                    states: []
+                }));
+                debug('✅ Entities retrieved (read-service):', mapped.length);
+                return mapped;
+            }
+
+            // Fallback to GraphQL
             const variables = { type };
             if (search) variables.search = search;
             if (state) variables.state = state;

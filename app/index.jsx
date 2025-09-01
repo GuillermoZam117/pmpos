@@ -13,6 +13,9 @@ import Debug from 'debug';
 import './utils/consoleProxy';
 import CircularProgress from '@mui/material/CircularProgress';
 
+// Initialize log export helpers
+import './utils/logExporter';
+
 // Lazy load components
 const App = React.lazy(() => import('./components/App'));
 

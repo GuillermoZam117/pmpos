@@ -261,6 +261,7 @@ class TokenService {
             console.log('👤 User validation response:', result);
 
             if (result.errors) {
+                console.log('❌ GraphQL errors:', result.errors);
                 throw new Error(result.errors[0]?.message || 'GraphQL Error');
             }
 
@@ -268,6 +269,11 @@ class TokenService {
             console.log('User name from response:', userName);
 
             if (!userName || userName === '*') {
+                console.log('❌ Invalid PIN - SambaPOS returned:', { 
+                    userName, 
+                    pin: pin,
+                    fullResponse: result.data?.getUser 
+                });
                 throw new Error('Invalid PIN');
             }
 

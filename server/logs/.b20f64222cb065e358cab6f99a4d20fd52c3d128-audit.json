@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "C:\\pmpos\\pmpos\\server\\logs\\.b20f64222cb065e358cab6f99a4d20fd52c3d128-audit.json",
+    "files": [
+        {
+            "date": 1756674740840,
+            "name": "C:\\pmpos\\pmpos\\server\\logs\\graphql-2025-08-31.log",
+            "hash": "6ae8776919c9569cc3ccffc40cfdf234dd48978a459d626bc32dda79567eb2a5"
+        }
+    ],
+    "hashType": "sha256"
+}

@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "C:\\pmpos\\pmpos\\server\\logs\\.ddc4d70a6bda3e2a260c63811325e2778fd153aa-audit.json",
+    "files": [
+        {
+            "date": 1756674740838,
+            "name": "C:\\pmpos\\pmpos\\server\\logs\\api-2025-08-31.log",
+            "hash": "318a0b4734bee76ad0f2848fe725efb030123a2b3cfc6aa6c734c3c59696a16f"
+        }
+    ],
+    "hashType": "sha256"
+}

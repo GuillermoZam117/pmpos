@@ -1,0 +1,20 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "C:\\PMPOS\\pmpos\\server\\logs\\.fba800739ca238461433f647d21d2579a2994540-audit.json",
+    "files": [
+        {
+            "date": 1756674740845,
+            "name": "C:\\PMPOS\\pmpos\\server\\logs\\api-2025-08-31.log",
+            "hash": "878fb1f2c42299a41c7bd041dc42e3d855df865a49b40797e56514ae7a856439"
+        },
+        {
+            "date": 1756731358101,
+            "name": "C:\\PMPOS\\pmpos\\server\\logs\\api-2025-09-01.log",
+            "hash": "e0e47e5173a19c6f56ad89fa72638f73a6b10bffb578409998d2b2eff1838248"
+        }
+    ],
+    "hashType": "sha256"
+}

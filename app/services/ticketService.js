@@ -3,8 +3,9 @@ import { debugAuth } from '../utils/debug';
 import { gql } from '@apollo/client';
 import { client } from '../apollo';
 import Debug from 'debug';
-import { getAllOpenTickets, getTicketForMesa, loadTicketToTerminal, getCurrentTerminalId, createTerminalTicketAsync, changeEntityOfTerminalTicketAsync, closeTerminalTicket as closeTerminalTicketInline, registerTerminalAsync, addOrderToTerminalTicketAsync } from '../queries';
+import { getTicketForMesa, loadTicketToTerminal, getCurrentTerminalId, createTerminalTicketAsync, changeEntityOfTerminalTicketAsync, closeTerminalTicket as closeTerminalTicketInline, registerTerminalAsync, addOrderToTerminalTicketAsync } from '../queries';
 import cacheService from './cacheService';
+import dataManager from './dataManager';
 import { orderService } from './orderService';
 
 const debug = Debug('pmpos:ticket');
@@ -162,8 +163,8 @@ export const ticketService = {
         try {
             debug('📝 Opening ticket for table:', tableName);
 
-            // HYBRID APPROACH: Check global tickets first
-            const allTickets = await getAllOpenTickets();
+            // UNIFIED APPROACH: Use dataManager for all ticket data
+            const allTickets = await dataManager.getActiveTickets();
             const existingTicket = getTicketForMesa(tableName, allTickets);
 
             if (existingTicket) {
@@ -371,8 +372,8 @@ export const ticketService = {
         debug('🔍 Getting ticket for table (hybrid method):', tableId);
 
         try {
-            // HYBRID APPROACH: Try global tickets first
-            const allTickets = await getAllOpenTickets();
+            // UNIFIED APPROACH: Use dataManager for all ticket data
+            const allTickets = await dataManager.getActiveTickets();
             const ticketFromGlobal = getTicketForMesa(tableId, allTickets);
 
             if (ticketFromGlobal) {

@@ -1,0 +1,104 @@
+**Resumen Ejecutivo**
+- Objetivo: Lecturas “pesadas” desde el read-service SQL y mantener GraphQL solo para operaciones (writes) que respetan el flujo SambaPOS.
+- Estado: Integración híbrida completada. UI consume estados en tiempo real vía SQL (mesas, tickets abiertos, detalle de ticket). Se deshabilitan lecturas GraphQL por defecto. Reglas de rol/bloqueo aplicadas en POS.
+
+**Configuración Clave**
+- `REACT_APP_USE_SQL_READS=true`: activa el camino de lecturas por SQL.
+- `REACT_APP_ALLOW_GQL_READ_FALLBACK=false`: deshabilita fallback a GraphQL para lecturas (default en dev).
+- `REACT_APP_SEND_INTERNAL_KEY=false`: enviar header desde cliente apagado por defecto (usar proxy en dev y reverse proxy en prod).
+- Proxy dev: `webpack.config.js` añade `'/internal-api'` → `http://localhost:4000` e inyecta `X-INTERNAL-API-KEY`.
+- Seguridad backend: `X-INTERNAL-API-KEY` verificado por middleware; configurar `server/.env` con `INTERNAL_API_KEY` y `DB_CONN`.
+
+**Backend (Read-Service SQL)**
+- Endpoints principales (Express):
+  - `GET /internal-api/active-tickets` (TTL ~2s): tickets abiertos enriquecidos (mesa, estados, pagos dominantes, métricas de tiempo).
+  - `GET /internal-api/tables` (TTL ~3s): entidades de tipo mesa con color/estado + ticket actual.
+  - `GET /internal-api/tickets/:id/details` (TTL ~2s): header + órdenes + pagos del ticket.
+  - Adicionales: `GET /internal-api/tickets` (filtros), `by-entity/:entityId/current`, `tickets/number/:num`, `tickets/uid/:uid`, `entities`, `entities/:id`, `customers/search`.
+- SQL: basado en vistas (`VistaTicketsEnriquecida`, `VistaDetalleOrdenes`, `VistaClientes`, `VistaEntidades`, etc.). Índices recomendados: `IsClosed`, `LastUpdateTime`, `MesaId`, `ClienteId`, `TicketId`, `TicketUid`.
+- Caching: en memoria con TTL corto (Node-Cache). Swagger en `/api-docs`.
+
+**Frontend (React/Redux)**
+- Lecturas (solo SQL):
+  - `app/queries.js` wrappers con fetch a `/internal-api` y fallback deshabilitable por `REACT_APP_ALLOW_GQL_READ_FALLBACK`:
+    - `fetchTables()`, `fetchActiveTickets()`, `fetchTicketDetails(ticketId)`
+    - `fetchEntitiesByType()`, `searchCustomers()`, `fetchTicketsList()`, `fetchOpenTicketByEntityId()`, `fetchTicketByNumber()`, `fetchTicketByUid()`
+    - `getAllOpenTickets()` mapea `active-tickets` de SQL a la forma esperada por hooks.
+  - `app/services/dataManager.js`: usa SQL para tablas, tickets activos y detalle.
+- Writes (solo GraphQL):
+  - `createTerminalTicketAsync`, `changeEntityOfTerminalTicketAsync`, `addOrderToTerminalTicketAsync`, `closeTerminalTicket`, `executeAutomationCommandForTerminalTicketAsync` (incluye “Desbloquear ticket”), `executePrintJobAsync`.
+- Señales y polling:
+  - `useMesasStatus`: polling ~2s a SQL (tickets abiertos) + eventos SignalR (`ticketUpdated`, `tableStatusChanged`) para invalidación inmediata.
+  - `TableView`: refresca mesas cada 30s; escucha eventos para refresco forzado.
+
+**Historias de Usuario (con Detalles Técnicos)**
+
+- Mesero: Ver Mesas en Tiempo Real
+  - Como mesero, quiero ver el estado de las mesas (Libre/Ocupado/Cuenta/Bloqueado) casi en tiempo real.
+  - Frontend: `useMesasStatus` llama `getAllOpenTickets()` → `/internal-api/active-tickets`. Mapea estados a la UI. Poll 2s + eventos SignalR para refresh inmediato.
+  - Backend: `GET /internal-api/active-tickets` consulta `VistaTicketsEnriquecida` y aplica TTL de 2s.
+
+- Mesero: Abrir Mesa Ocupada y Ver Ticket
+  - Al abrir una mesa ocupada, el POS debe cargar el detalle del ticket rápido.
+  - Frontend: `POSViewMobile` obtiene `ticket.id` y llama `fetchTicketDetails(id)` → `/internal-api/tickets/:id/details`. Se deriva `ticketBlocked` desde `PaymentStatus` o `TicketStates`.
+  - Backend: `GET /internal-api/tickets/:id/details` retorna header + órdenes + pagos. TTL 2s.
+
+- Mesero: Agregar Productos (Ticket NO Bloqueado)
+  - Puede agregar productos en mesas Libres/Ocupadas no bloqueadas, aunque no sea quien abrió el ticket.
+  - Frontend: al click en producto, si `ticketBlocked` es false, agrega local y ejecuta `addOrderToTerminalTicketAsync` (GraphQL) respetando flujo de Terminal Ticket. Si hace falta, prepara contexto de terminal y asocia mesa.
+  - Backend: solo el write se hace por GraphQL; la UI se actualiza con refresco (evento + poll SQL).
+
+- Mesero: Imprimir Cuenta (Bloquear Ticket)
+  - Puede imprimir cuenta en cualquier mesa ocupada. Al imprimir, el ticket pasa a bloqueado.
+  - Frontend: ejecuta `executeAutomationCommandForTerminalTicketAsync(printCmd)` o `executePrintJobAsync`, emite `ticketUpdated` y navega a mesas.
+  - Backend: SambaPOS aplica “Bloqueado”. El read-service reflejará `PaymentStatus='BLOCKED'` y estados en el siguiente poll.
+
+- Mesero: Intentar Agregar en Ticket Bloqueado
+  - No debe poder agregar.
+  - Frontend: si `userRole==='Mesero'` y `ticketBlocked===true`, muestra snackbar y bloquea la acción.
+  - Backend: no se ejecuta el write.
+
+- Admin/Cajero: Agregar en Ticket Bloqueado (Desbloquear)
+  - Debe poder desbloquear y agregar.
+  - Frontend: si `isAdmin` y `ticketBlocked`, prepara contexto de terminal y ejecuta `executeAutomationCommandForTerminalTicketAsync('Desbloquear ticket')`. Marca `ticketBlocked=false` y continua con `addOrderToTerminalTicketAsync`.
+  - Backend: GraphQL procesa el comando de automatización; el read-service reflejará `No Pagado/No Bloqueado` y entidad “No Pagado”.
+
+- Operador: Ver y Operar con Muchas Órdenes en el Ticket
+  - Con >5 productos, los botones de acción deben ser siempre visibles.
+  - Frontend: en `POSViewMobile`, el panel de carrito es columna con lista de órdenes scrollable y un resumen/botones pegado al fondo (no desplazable).
+  - Backend: sin impacto.
+
+- Cortesía / Anular / Eliminar
+  - Órdenes nuevas: se pueden eliminar localmente antes de enviar (papelera).
+  - Órdenes existentes: se muestran acciones “Regalo” y “Anular” (PIN admin si aplica) en cada card de la orden.
+  - Frontend: los botones viven en el carrito (panel de la derecha). Opcional: se puede duplicar comandos en el panel del menú si se requiere.
+  - Backend: las acciones definitivas sobre órdenes se realizan mediante GraphQL (automation/updates) según el flujo de SambaPOS.
+
+**Evitar Lecturas GraphQL**
+- Flags: `REACT_APP_ALLOW_GQL_READ_FALLBACK=false` aseguran no usar `getTickets(...)` ni `getEntityScreenItems(...)` para lecturas. Solo se usa GraphQL para writes.
+- Wrappers en `app/queries.js` verifican esa flag y, si está en false, retornan vacío/null ante error del middleware sin caer a GraphQL.
+
+**Rendimiento y TTL**
+- Polling tickets abiertos: 2000 ms.
+- Mesas: 30000 ms (con invalidación por eventos).
+- Búsquedas (clientes/entidades): TTL ~5s en read-service.
+- Caching en server: TTL cortos; se recomienda ajustar a la latencia y carga objetivo.
+
+**Seguridad y Despliegue**
+- Dev: header `X-INTERNAL-API-KEY` inyectado por proxy de `webpack-dev-server`.
+- Prod: read-service detrás del mismo origen/reverse proxy. No exponer la API key en el bundle. Restringir por red/IP.
+- DB: usuario con permisos `SELECT` solo sobre vistas necesarias.
+
+**Pruebas Rápidas**
+- Scripts: `scripts/read_service_smoke.(sh|bat)` validan salud, auth 401/200 y endpoints principales con/ sin header.
+- Flujo recomendado: levantar `server`, verificar `/api-docs`, luego `npm start` y validar tiempos (mesas <1s con caché caliente; detalle de ticket <300–500ms en LAN).
+
+**Riesgos Conocidos y Mitigaciones**
+- Si el read-service cae: con la flag `REACT_APP_ALLOW_GQL_READ_FALLBACK=false`, la UI no caerá a GraphQL para lecturas. Decisión de producto consciente (evitar estados “desfasados”). Se pueden mostrar mensajes de degradación (ya se loguea en consola y se mantiene la UI segura).
+- Consistencia de estados: al disparar automatizaciones (Imprimir/Desbloquear), se emiten eventos y se refresca por SQL. Esto evita “reinicios” incorrectos de estados.
+
+**Rutas y Código Relevante**
+- Backend: `server/index.js`, `server/lib/db.js`, `server/lib/cache.js`, `server/middleware/auth.js`.
+- Frontend: `app/queries.js`, `app/services/dataManager.js`, `app/components/POS/POSViewMobile.jsx`, `app/components/TableView.jsx`, `app/hooks/useMesasStatus.js`.
+- Config: `.env.development`, `webpack.config.js`.
+

@@ -1,0 +1,188 @@
+2025-08-31 15:12:20.852 [INFO] ================================================== START SESSION ==================================================
+2025-08-31 15:12:20.857 [INFO] Server started at 2025-08-31T21:12:20.854Z
+2025-08-31 15:12:20.858 [INFO] Log directory: C:\PMPOS\pmpos\server\logs
+2025-08-31 15:12:20.845 [INFO] ================================================== START SESSION ==================================================
+2025-08-31 15:12:20.846 [INFO] Server started at 2025-08-31T21:12:20.845Z
+2025-08-31 15:12:20.846 [INFO] Log directory: C:\pmpos\pmpos\server\logs
+2025-08-31 15:13:03.006 [INFO] 🟦 [htfr7b3z] GET /internal-api/tables?screen=MESAS {"requestId":"htfr7b3z","method":"GET","url":"/internal-api/tables?screen=MESAS","query":{"screen":"MESAS"},"ip":"127.0.0.1","hasAuth":true}
+2025-08-31 15:13:09.048 [INFO] 🟢 [htfr7b3z] 200 GET /internal-api/tables?screen=MESAS - 6045ms {"requestId":"htfr7b3z","method":"GET","url":"/internal-api/tables?screen=MESAS","status":200,"duration":6045,"slow":true}
+2025-08-31 15:13:09.049 [WARN] ⚠️  [htfr7b3z] SLOW API REQUEST: 6045ms for GET /internal-api/tables?screen=MESAS {"requestId":"htfr7b3z","method":"GET","url":"/internal-api/tables?screen=MESAS","duration":6045,"slow":true}
+2025-08-31 15:13:32.892 [INFO] 🟦 [y7ww1tr2] POST /internal-api/frontend-logs {"requestId":"y7ww1tr2","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 15:13:32.897 [INFO] 🟢 [y7ww1tr2] 200 POST /internal-api/frontend-logs - 5ms {"requestId":"y7ww1tr2","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":5,"slow":false}
+2025-08-31 15:16:35.110 [INFO] 🟦 [rn4ogtf2] GET /internal-api/tables?screen=MESAS {"requestId":"rn4ogtf2","method":"GET","url":"/internal-api/tables?screen=MESAS","query":{"screen":"MESAS"},"ip":"127.0.0.1","hasAuth":true}
+2025-08-31 15:16:35.205 [INFO] 🟢 [rn4ogtf2] 200 GET /internal-api/tables?screen=MESAS - 96ms {"requestId":"rn4ogtf2","method":"GET","url":"/internal-api/tables?screen=MESAS","status":200,"duration":96,"slow":false}
+2025-08-31 15:17:05.768 [INFO] 🟦 [id3lw28u] POST /internal-api/frontend-logs {"requestId":"id3lw28u","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 15:17:05.772 [INFO] 🟢 [id3lw28u] 200 POST /internal-api/frontend-logs - 4ms {"requestId":"id3lw28u","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":4,"slow":false}
+2025-08-31 15:17:12.305 [INFO] ================================================== START SESSION ==================================================
+2025-08-31 15:17:12.306 [INFO] Server started at 2025-08-31T21:17:12.306Z
+2025-08-31 15:17:12.307 [INFO] Log directory: C:\pmpos\pmpos\server\logs
+2025-08-31 15:17:28.892 [INFO] 🟦 [evazof36] GET /internal-api/health {"requestId":"evazof36","method":"GET","url":"/internal-api/health","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 15:17:28.893 [WARN] 🟡 [evazof36] 401 GET /health - 1ms {"requestId":"evazof36","method":"GET","url":"/health","status":401,"duration":1,"slow":false}
+2025-08-31 15:17:34.901 [INFO] 🟦 [1xmls4it] GET /health {"requestId":"1xmls4it","method":"GET","url":"/health","ip":"127.0.0.1","hasAuth":false}
+2025-08-31 15:17:34.902 [INFO] 🟢 [1xmls4it] 200 GET /health - 1ms {"requestId":"1xmls4it","method":"GET","url":"/health","status":200,"duration":1,"slow":false}
+2025-08-31 15:18:13.672 [INFO] ================================================== START SESSION ==================================================
+2025-08-31 15:18:13.673 [INFO] Server started at 2025-08-31T21:18:13.673Z
+2025-08-31 15:18:13.673 [INFO] Log directory: C:\pmpos\pmpos\server\logs
+2025-08-31 15:18:35.756 [INFO] 🟦 [qupxh65f] GET /internal-api/active-tickets {"requestId":"qupxh65f","method":"GET","url":"/internal-api/active-tickets","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 15:18:35.871 [INFO] 🟢 [qupxh65f] 200 GET /internal-api/active-tickets - 115ms {"requestId":"qupxh65f","method":"GET","url":"/internal-api/active-tickets","status":200,"duration":115,"slow":false}
+2025-08-31 15:19:05.767 [INFO] 🟦 [skl1pd5l] POST /internal-api/frontend-logs {"requestId":"skl1pd5l","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 15:19:05.770 [INFO] 🟢 [skl1pd5l] 200 POST /internal-api/frontend-logs - 4ms {"requestId":"skl1pd5l","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":4,"slow":false}
+2025-08-31 15:22:33.041 [INFO] Server stopped at 2025-08-31T21:22:33.040Z
+2025-08-31 15:22:36.947 [INFO] ================================================== START SESSION ==================================================
+2025-08-31 15:22:36.949 [INFO] Server started at 2025-08-31T21:22:36.948Z
+2025-08-31 15:22:36.949 [INFO] Log directory: C:\PMPOS\pmpos\server\logs
+2025-08-31 15:22:44.728 [INFO] 🟦 [kuau5agk] GET /internal-api/tables?screen=MESAS {"requestId":"kuau5agk","method":"GET","url":"/internal-api/tables?screen=MESAS","query":{"screen":"MESAS"},"ip":"127.0.0.1","hasAuth":true}
+2025-08-31 15:22:45.364 [INFO] 🟢 [kuau5agk] 200 GET /internal-api/tables?screen=MESAS - 638ms {"requestId":"kuau5agk","method":"GET","url":"/internal-api/tables?screen=MESAS","status":200,"duration":638,"slow":false}
+2025-08-31 15:22:45.382 [INFO] 🟦 [jlfxn6hq] GET /internal-api/tables?screen=MESAS {"requestId":"jlfxn6hq","method":"GET","url":"/internal-api/tables?screen=MESAS","query":{"screen":"MESAS"},"ip":"127.0.0.1","hasAuth":true}
+2025-08-31 15:22:45.384 [INFO] 🟢 [jlfxn6hq] 200 GET /internal-api/tables?screen=MESAS - 2ms {"requestId":"jlfxn6hq","method":"GET","url":"/internal-api/tables?screen=MESAS","status":200,"duration":2,"slow":false}
+2025-08-31 15:22:55.464 [INFO] 🟦 [coz9fme7] POST /internal-api/frontend-logs {"requestId":"coz9fme7","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 15:22:55.470 [INFO] 🟢 [coz9fme7] 200 POST /internal-api/frontend-logs - 7ms {"requestId":"coz9fme7","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":7,"slow":false}
+2025-08-31 15:23:16.313 [INFO] 🟦 [ckh5pd3u] POST /internal-api/frontend-logs {"requestId":"ckh5pd3u","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 15:23:16.317 [INFO] 🟢 [ckh5pd3u] 200 POST /internal-api/frontend-logs - 5ms {"requestId":"ckh5pd3u","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":5,"slow":false}
+2025-08-31 15:25:45.800 [INFO] 🟦 [f5v1zggw] GET /internal-api/active-tickets {"requestId":"f5v1zggw","method":"GET","url":"/internal-api/active-tickets","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 15:25:45.887 [INFO] 🟢 [f5v1zggw] 200 GET /internal-api/active-tickets - 88ms {"requestId":"f5v1zggw","method":"GET","url":"/internal-api/active-tickets","status":200,"duration":88,"slow":false}
+2025-08-31 15:25:50.649 [INFO] 🟦 [qvsjczhl] POST /internal-api/frontend-logs {"requestId":"qvsjczhl","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 15:25:50.651 [INFO] 🟢 [qvsjczhl] 200 POST /internal-api/frontend-logs - 3ms {"requestId":"qvsjczhl","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":3,"slow":false}
+2025-08-31 15:29:36.062 [INFO] 🟦 [eimy3eca] GET /internal-api/tables?screen=MESAS {"requestId":"eimy3eca","method":"GET","url":"/internal-api/tables?screen=MESAS","query":{"screen":"MESAS"},"ip":"127.0.0.1","hasAuth":true}
+2025-08-31 15:29:36.145 [INFO] 🟢 [eimy3eca] 200 GET /internal-api/tables?screen=MESAS - 83ms {"requestId":"eimy3eca","method":"GET","url":"/internal-api/tables?screen=MESAS","status":200,"duration":83,"slow":false}
+2025-08-31 15:30:06.010 [INFO] 🟦 [cxcibbvf] POST /internal-api/frontend-logs {"requestId":"cxcibbvf","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 15:30:06.011 [INFO] 🟢 [cxcibbvf] 200 POST /internal-api/frontend-logs - 2ms {"requestId":"cxcibbvf","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":2,"slow":false}
+2025-08-31 15:30:36.220 [INFO] 🟦 [1dz43b1x] GET /internal-api/active-tickets {"requestId":"1dz43b1x","method":"GET","url":"/internal-api/active-tickets","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 15:30:36.305 [INFO] 🟢 [1dz43b1x] 200 GET /internal-api/active-tickets - 85ms {"requestId":"1dz43b1x","method":"GET","url":"/internal-api/active-tickets","status":200,"duration":85,"slow":false}
+2025-08-31 15:31:06.013 [INFO] 🟦 [7vl07dol] POST /internal-api/frontend-logs {"requestId":"7vl07dol","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 15:31:06.015 [INFO] 🟢 [7vl07dol] 200 POST /internal-api/frontend-logs - 3ms {"requestId":"7vl07dol","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":3,"slow":false}
+2025-08-31 15:38:05.758 [INFO] 🟦 [a14xz6le] GET /internal-api/active-tickets {"requestId":"a14xz6le","method":"GET","url":"/internal-api/active-tickets","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 15:38:05.848 [INFO] 🟢 [a14xz6le] 200 GET /internal-api/active-tickets - 90ms {"requestId":"a14xz6le","method":"GET","url":"/internal-api/active-tickets","status":200,"duration":90,"slow":false}
+2025-08-31 15:39:05.763 [INFO] 🟦 [y6aiv2a2] GET /internal-api/active-tickets {"requestId":"y6aiv2a2","method":"GET","url":"/internal-api/active-tickets","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 15:39:05.767 [INFO] 🟦 [mr9vrumn] POST /internal-api/frontend-logs {"requestId":"mr9vrumn","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 15:39:05.771 [INFO] 🟢 [mr9vrumn] 200 POST /internal-api/frontend-logs - 4ms {"requestId":"mr9vrumn","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":4,"slow":false}
+2025-08-31 15:39:05.855 [INFO] 🟢 [y6aiv2a2] 200 GET /internal-api/active-tickets - 93ms {"requestId":"y6aiv2a2","method":"GET","url":"/internal-api/active-tickets","status":200,"duration":93,"slow":false}
+2025-08-31 19:44:28.342 [INFO] 🟦 [9iyvxvw8] POST /internal-api/frontend-logs {"requestId":"9iyvxvw8","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 19:44:28.401 [INFO] 🟢 [9iyvxvw8] 200 POST /internal-api/frontend-logs - 71ms {"requestId":"9iyvxvw8","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":71,"slow":false}
+2025-08-31 20:08:36.098 [INFO] 🟦 [j3o79pdd] GET /internal-api/tables?screen=MESAS {"requestId":"j3o79pdd","method":"GET","url":"/internal-api/tables?screen=MESAS","query":{"screen":"MESAS"},"ip":"127.0.0.1","hasAuth":true}
+2025-08-31 20:08:36.495 [INFO] 🟢 [j3o79pdd] 200 GET /internal-api/tables?screen=MESAS - 415ms {"requestId":"j3o79pdd","method":"GET","url":"/internal-api/tables?screen=MESAS","status":200,"duration":415,"slow":false}
+2025-08-31 20:08:52.894 [INFO] Server stopped at 2025-09-01T02:08:52.893Z
+2025-08-31 20:08:57.182 [INFO] ================================================== START SESSION ==================================================
+2025-08-31 20:08:57.187 [INFO] Server started at 2025-09-01T02:08:57.185Z
+2025-08-31 20:08:57.188 [INFO] Log directory: C:\PMPOS\pmpos\server\logs
+2025-08-31 20:09:06.189 [INFO] 🟦 [5uiaigkq] POST /internal-api/frontend-logs {"requestId":"5uiaigkq","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 20:09:06.195 [INFO] 🟢 [5uiaigkq] 200 POST /internal-api/frontend-logs - 13ms {"requestId":"5uiaigkq","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":13,"slow":false}
+2025-08-31 20:09:20.560 [INFO] 🟦 [d6owczxr] GET /internal-api/tables?screen=MESAS {"requestId":"d6owczxr","method":"GET","url":"/internal-api/tables?screen=MESAS","query":{"screen":"MESAS"},"ip":"127.0.0.1","hasAuth":true}
+2025-08-31 20:09:21.535 [INFO] 🟢 [d6owczxr] 200 GET /internal-api/tables?screen=MESAS - 976ms {"requestId":"d6owczxr","method":"GET","url":"/internal-api/tables?screen=MESAS","status":200,"duration":976,"slow":false}
+2025-08-31 20:09:26.869 [INFO] 🟦 [owywohol] POST /internal-api/frontend-logs {"requestId":"owywohol","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 20:09:26.873 [INFO] 🟢 [owywohol] 200 POST /internal-api/frontend-logs - 5ms {"requestId":"owywohol","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":5,"slow":false}
+2025-08-31 20:09:27.520 [INFO] 🟦 [hkjrizkf] GET /internal-api/tables?screen=MESAS {"requestId":"hkjrizkf","method":"GET","url":"/internal-api/tables?screen=MESAS","query":{"screen":"MESAS"},"ip":"127.0.0.1","hasAuth":true}
+2025-08-31 20:09:27.584 [INFO] 🟢 [hkjrizkf] 200 GET /internal-api/tables?screen=MESAS - 65ms {"requestId":"hkjrizkf","method":"GET","url":"/internal-api/tables?screen=MESAS","status":200,"duration":65,"slow":false}
+2025-08-31 20:09:57.768 [INFO] 🟦 [uapmjmps] POST /internal-api/frontend-logs {"requestId":"uapmjmps","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 20:09:57.771 [INFO] 🟢 [uapmjmps] 200 POST /internal-api/frontend-logs - 4ms {"requestId":"uapmjmps","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":4,"slow":false}
+2025-08-31 20:15:40.594 [INFO] Server stopped at 2025-09-01T02:15:40.594Z
+2025-08-31 20:15:45.561 [INFO] ================================================== START SESSION ==================================================
+2025-08-31 20:15:45.563 [INFO] Server started at 2025-09-01T02:15:45.563Z
+2025-08-31 20:15:45.564 [INFO] Log directory: C:\PMPOS\pmpos\server\logs
+2025-08-31 20:16:07.886 [INFO] 🟦 [ubvvu20f] GET /internal-api/tables?screen=MESAS {"requestId":"ubvvu20f","method":"GET","url":"/internal-api/tables?screen=MESAS","query":{"screen":"MESAS"},"ip":"127.0.0.1","hasAuth":true}
+2025-08-31 20:16:08.631 [INFO] 🟢 [ubvvu20f] 200 GET /internal-api/tables?screen=MESAS - 748ms {"requestId":"ubvvu20f","method":"GET","url":"/internal-api/tables?screen=MESAS","status":200,"duration":748,"slow":false}
+2025-08-31 20:16:37.788 [INFO] 🟦 [5ywrgljp] POST /internal-api/frontend-logs {"requestId":"5ywrgljp","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 20:16:37.794 [INFO] 🟢 [5ywrgljp] 200 POST /internal-api/frontend-logs - 7ms {"requestId":"5ywrgljp","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":7,"slow":false}
+2025-08-31 20:17:40.025 [INFO] 🟦 [x3jyqvt4] GET /internal-api/tables?screen=MESAS {"requestId":"x3jyqvt4","method":"GET","url":"/internal-api/tables?screen=MESAS","query":{"screen":"MESAS"},"ip":"127.0.0.1","hasAuth":true}
+2025-08-31 20:17:40.097 [INFO] 🟢 [x3jyqvt4] 200 GET /internal-api/tables?screen=MESAS - 73ms {"requestId":"x3jyqvt4","method":"GET","url":"/internal-api/tables?screen=MESAS","status":200,"duration":73,"slow":false}
+2025-08-31 20:18:10.759 [INFO] 🟦 [q7topm61] POST /internal-api/frontend-logs {"requestId":"q7topm61","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 20:18:10.765 [INFO] 🟢 [q7topm61] 200 POST /internal-api/frontend-logs - 5ms {"requestId":"q7topm61","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":5,"slow":false}
+2025-08-31 20:18:23.379 [INFO] Server stopped at 2025-09-01T02:18:23.379Z
+2025-08-31 20:18:48.448 [INFO] ================================================== START SESSION ==================================================
+2025-08-31 20:18:48.449 [INFO] Server started at 2025-09-01T02:18:48.449Z
+2025-08-31 20:18:48.449 [INFO] Log directory: C:\PMPOS\pmpos\server\logs
+2025-08-31 20:19:04.694 [INFO] 🟦 [668o4swm] POST /internal-api/frontend-logs {"requestId":"668o4swm","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 20:19:04.701 [INFO] 🟢 [668o4swm] 200 POST /internal-api/frontend-logs - 9ms {"requestId":"668o4swm","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":9,"slow":false}
+2025-08-31 20:19:09.564 [INFO] 🟦 [tdnjpl55] GET /internal-api/tables?screen=MESAS {"requestId":"tdnjpl55","method":"GET","url":"/internal-api/tables?screen=MESAS","query":{"screen":"MESAS"},"ip":"127.0.0.1","hasAuth":true}
+2025-08-31 20:19:10.430 [INFO] 🟢 [tdnjpl55] 200 GET /internal-api/tables?screen=MESAS - 866ms {"requestId":"tdnjpl55","method":"GET","url":"/internal-api/tables?screen=MESAS","status":200,"duration":866,"slow":false}
+2025-08-31 20:19:39.476 [INFO] 🟦 [rs1xgefr] POST /internal-api/frontend-logs {"requestId":"rs1xgefr","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 20:19:39.479 [INFO] 🟢 [rs1xgefr] 200 POST /internal-api/frontend-logs - 3ms {"requestId":"rs1xgefr","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":3,"slow":false}
+2025-08-31 20:19:40.149 [INFO] 🟦 [szhlvads] GET /internal-api/active-tickets {"requestId":"szhlvads","method":"GET","url":"/internal-api/active-tickets","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 20:19:40.255 [INFO] 🟢 [szhlvads] 200 GET /internal-api/active-tickets - 105ms {"requestId":"szhlvads","method":"GET","url":"/internal-api/active-tickets","status":200,"duration":105,"slow":false}
+2025-08-31 20:20:09.767 [INFO] 🟦 [qyqswlte] POST /internal-api/frontend-logs {"requestId":"qyqswlte","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 20:20:09.771 [INFO] 🟢 [qyqswlte] 200 POST /internal-api/frontend-logs - 4ms {"requestId":"qyqswlte","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":4,"slow":false}
+2025-08-31 20:20:10.760 [INFO] 🟦 [0vb3uwbm] GET /internal-api/active-tickets {"requestId":"0vb3uwbm","method":"GET","url":"/internal-api/active-tickets","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 20:20:10.844 [INFO] 🟢 [0vb3uwbm] 200 GET /internal-api/active-tickets - 84ms {"requestId":"0vb3uwbm","method":"GET","url":"/internal-api/active-tickets","status":200,"duration":84,"slow":false}
+2025-08-31 20:20:39.474 [INFO] 🟦 [qk9olxvo] POST /internal-api/frontend-logs {"requestId":"qk9olxvo","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 20:20:39.477 [INFO] 🟢 [qk9olxvo] 200 POST /internal-api/frontend-logs - 4ms {"requestId":"qk9olxvo","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":4,"slow":false}
+2025-08-31 20:22:10.520 [INFO] 🟦 [27cd4bx1] GET /internal-api/active-tickets {"requestId":"27cd4bx1","method":"GET","url":"/internal-api/active-tickets","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 20:22:10.617 [INFO] 🟢 [27cd4bx1] 200 GET /internal-api/active-tickets - 98ms {"requestId":"27cd4bx1","method":"GET","url":"/internal-api/active-tickets","status":200,"duration":98,"slow":false}
+2025-08-31 20:22:39.767 [INFO] 🟦 [bebsrisg] POST /internal-api/frontend-logs {"requestId":"bebsrisg","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 20:22:39.769 [INFO] 🟢 [bebsrisg] 200 POST /internal-api/frontend-logs - 3ms {"requestId":"bebsrisg","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":3,"slow":false}
+2025-08-31 21:26:20.195 [INFO] 🟦 [ihvppjzu] GET /internal-api/tables?screen=MESAS {"requestId":"ihvppjzu","method":"GET","url":"/internal-api/tables?screen=MESAS","query":{"screen":"MESAS"},"ip":"127.0.0.1","hasAuth":true}
+2025-08-31 21:26:20.382 [INFO] 🟢 [ihvppjzu] 200 GET /internal-api/tables?screen=MESAS - 199ms {"requestId":"ihvppjzu","method":"GET","url":"/internal-api/tables?screen=MESAS","status":200,"duration":199,"slow":false}
+2025-08-31 21:26:24.081 [INFO] 🟦 [cqtsl5od] GET /internal-api/active-tickets {"requestId":"cqtsl5od","method":"GET","url":"/internal-api/active-tickets","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 21:26:24.171 [INFO] 🟢 [cqtsl5od] 200 GET /internal-api/active-tickets - 91ms {"requestId":"cqtsl5od","method":"GET","url":"/internal-api/active-tickets","status":200,"duration":91,"slow":false}
+2025-08-31 21:26:49.759 [INFO] 🟦 [vbdkiw6k] POST /internal-api/frontend-logs {"requestId":"vbdkiw6k","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 21:26:49.764 [INFO] 🟢 [vbdkiw6k] 200 POST /internal-api/frontend-logs - 5ms {"requestId":"vbdkiw6k","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":5,"slow":false}
+2025-08-31 21:27:20.759 [INFO] 🟦 [fz5aat6i] GET /internal-api/active-tickets {"requestId":"fz5aat6i","method":"GET","url":"/internal-api/active-tickets","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 21:27:20.860 [INFO] 🟢 [fz5aat6i] 200 GET /internal-api/active-tickets - 100ms {"requestId":"fz5aat6i","method":"GET","url":"/internal-api/active-tickets","status":200,"duration":100,"slow":false}
+2025-08-31 21:27:49.756 [INFO] 🟦 [728cjgsc] POST /internal-api/frontend-logs {"requestId":"728cjgsc","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 21:27:49.762 [INFO] 🟢 [728cjgsc] 200 POST /internal-api/frontend-logs - 6ms {"requestId":"728cjgsc","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":6,"slow":false}
+2025-08-31 21:33:43.358 [INFO] 🟦 [xd61x215] GET /internal-api/active-tickets {"requestId":"xd61x215","method":"GET","url":"/internal-api/active-tickets","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 21:33:43.476 [INFO] 🟢 [xd61x215] 200 GET /internal-api/active-tickets - 118ms {"requestId":"xd61x215","method":"GET","url":"/internal-api/active-tickets","status":200,"duration":118,"slow":false}
+2025-08-31 21:33:49.764 [INFO] 🟦 [va8auduu] POST /internal-api/frontend-logs {"requestId":"va8auduu","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 21:33:49.768 [INFO] 🟢 [va8auduu] 200 POST /internal-api/frontend-logs - 4ms {"requestId":"va8auduu","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":4,"slow":false}
+2025-08-31 21:39:05.773 [INFO] 🟦 [9ghp6zno] GET /internal-api/active-tickets {"requestId":"9ghp6zno","method":"GET","url":"/internal-api/active-tickets","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 21:39:05.899 [INFO] 🟢 [9ghp6zno] 200 GET /internal-api/active-tickets - 126ms {"requestId":"9ghp6zno","method":"GET","url":"/internal-api/active-tickets","status":200,"duration":126,"slow":false}
+2025-08-31 21:40:05.769 [INFO] 🟦 [behjkwah] POST /internal-api/frontend-logs {"requestId":"behjkwah","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 21:40:05.773 [INFO] 🟢 [behjkwah] 200 POST /internal-api/frontend-logs - 3ms {"requestId":"behjkwah","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":3,"slow":false}
+2025-08-31 21:48:05.769 [INFO] 🟦 [o8px87x3] GET /internal-api/active-tickets {"requestId":"o8px87x3","method":"GET","url":"/internal-api/active-tickets","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 21:48:05.871 [INFO] 🟢 [o8px87x3] 200 GET /internal-api/active-tickets - 102ms {"requestId":"o8px87x3","method":"GET","url":"/internal-api/active-tickets","status":200,"duration":102,"slow":false}
+2025-08-31 21:49:05.767 [INFO] 🟦 [ush8ixg6] POST /internal-api/frontend-logs {"requestId":"ush8ixg6","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 21:49:05.771 [INFO] 🟦 [4she6toz] GET /internal-api/active-tickets {"requestId":"4she6toz","method":"GET","url":"/internal-api/active-tickets","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 21:49:05.774 [INFO] 🟢 [ush8ixg6] 200 POST /internal-api/frontend-logs - 8ms {"requestId":"ush8ixg6","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":8,"slow":false}
+2025-08-31 21:49:05.867 [INFO] 🟢 [4she6toz] 200 GET /internal-api/active-tickets - 96ms {"requestId":"4she6toz","method":"GET","url":"/internal-api/active-tickets","status":200,"duration":96,"slow":false}
+2025-08-31 21:50:05.770 [INFO] 🟦 [p5kqkb0t] POST /internal-api/frontend-logs {"requestId":"p5kqkb0t","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 21:50:05.775 [INFO] 🟢 [p5kqkb0t] 200 POST /internal-api/frontend-logs - 4ms {"requestId":"p5kqkb0t","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":4,"slow":false}
+2025-08-31 21:51:05.773 [INFO] 🟦 [lke8vxwr] GET /internal-api/active-tickets {"requestId":"lke8vxwr","method":"GET","url":"/internal-api/active-tickets","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 21:51:05.877 [INFO] 🟢 [lke8vxwr] 200 GET /internal-api/active-tickets - 105ms {"requestId":"lke8vxwr","method":"GET","url":"/internal-api/active-tickets","status":200,"duration":105,"slow":false}
+2025-08-31 21:51:11.876 [INFO] 🟦 [3b9rsf67] POST /internal-api/frontend-logs {"requestId":"3b9rsf67","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 21:51:11.883 [INFO] 🟢 [3b9rsf67] 200 POST /internal-api/frontend-logs - 6ms {"requestId":"3b9rsf67","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":6,"slow":false}
+2025-08-31 21:51:13.051 [INFO] 🟦 [pcky6xq0] GET /internal-api/tables?screen=MESAS {"requestId":"pcky6xq0","method":"GET","url":"/internal-api/tables?screen=MESAS","query":{"screen":"MESAS"},"ip":"127.0.0.1","hasAuth":true}
+2025-08-31 21:51:13.119 [INFO] 🟢 [pcky6xq0] 200 GET /internal-api/tables?screen=MESAS - 68ms {"requestId":"pcky6xq0","method":"GET","url":"/internal-api/tables?screen=MESAS","status":200,"duration":68,"slow":false}
+2025-08-31 21:51:16.438 [INFO] 🟦 [2rjynqos] GET /internal-api/active-tickets {"requestId":"2rjynqos","method":"GET","url":"/internal-api/active-tickets","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 21:51:16.524 [INFO] 🟢 [2rjynqos] 200 GET /internal-api/active-tickets - 87ms {"requestId":"2rjynqos","method":"GET","url":"/internal-api/active-tickets","status":200,"duration":87,"slow":false}
+2025-08-31 21:51:42.848 [INFO] 🟦 [qm1zu5s9] POST /internal-api/frontend-logs {"requestId":"qm1zu5s9","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 21:51:42.851 [INFO] 🟢 [qm1zu5s9] 200 POST /internal-api/frontend-logs - 3ms {"requestId":"qm1zu5s9","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":3,"slow":false}
+2025-08-31 21:52:13.242 [INFO] 🟦 [5l8h9bni] GET /internal-api/active-tickets {"requestId":"5l8h9bni","method":"GET","url":"/internal-api/active-tickets","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 21:52:13.336 [INFO] 🟢 [5l8h9bni] 200 GET /internal-api/active-tickets - 93ms {"requestId":"5l8h9bni","method":"GET","url":"/internal-api/active-tickets","status":200,"duration":93,"slow":false}
+2025-08-31 21:52:42.853 [INFO] 🟦 [jurblo9v] POST /internal-api/frontend-logs {"requestId":"jurblo9v","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 21:52:42.857 [INFO] 🟢 [jurblo9v] 200 POST /internal-api/frontend-logs - 4ms {"requestId":"jurblo9v","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":4,"slow":false}
+2025-08-31 21:53:13.757 [INFO] 🟦 [re8updt9] GET /internal-api/active-tickets {"requestId":"re8updt9","method":"GET","url":"/internal-api/active-tickets","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 21:53:13.925 [INFO] 🟢 [re8updt9] 200 GET /internal-api/active-tickets - 167ms {"requestId":"re8updt9","method":"GET","url":"/internal-api/active-tickets","status":200,"duration":167,"slow":false}
+2025-08-31 21:53:43.766 [INFO] 🟦 [jy98g43g] POST /internal-api/frontend-logs {"requestId":"jy98g43g","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 21:53:43.768 [INFO] 🟢 [jy98g43g] 200 POST /internal-api/frontend-logs - 3ms {"requestId":"jy98g43g","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":3,"slow":false}
+2025-08-31 22:18:30.209 [INFO] Server stopped at 2025-09-01T04:18:30.204Z
+2025-08-31 22:18:37.512 [INFO] ================================================== START SESSION ==================================================
+2025-08-31 22:18:37.518 [INFO] Server started at 2025-09-01T04:18:37.515Z
+2025-08-31 22:18:37.519 [INFO] Log directory: C:\PMPOS\pmpos\server\logs
+2025-08-31 22:19:41.969 [INFO] 🟦 [hg1zh4nk] GET /internal-api/tables?screen=MESAS {"requestId":"hg1zh4nk","method":"GET","url":"/internal-api/tables?screen=MESAS","query":{"screen":"MESAS"},"ip":"127.0.0.1","hasAuth":true}
+2025-08-31 22:19:48.004 [INFO] 🟢 [hg1zh4nk] 200 GET /internal-api/tables?screen=MESAS - 6037ms {"requestId":"hg1zh4nk","method":"GET","url":"/internal-api/tables?screen=MESAS","status":200,"duration":6037,"slow":true}
+2025-08-31 22:19:48.006 [WARN] ⚠️  [hg1zh4nk] SLOW API REQUEST: 6037ms for GET /internal-api/tables?screen=MESAS {"requestId":"hg1zh4nk","method":"GET","url":"/internal-api/tables?screen=MESAS","duration":6037,"slow":true}
+2025-08-31 22:20:11.876 [INFO] 🟦 [4zh5356p] POST /internal-api/frontend-logs {"requestId":"4zh5356p","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 22:20:11.883 [INFO] 🟢 [4zh5356p] 200 POST /internal-api/frontend-logs - 7ms {"requestId":"4zh5356p","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":7,"slow":false}
+2025-08-31 22:21:48.770 [INFO] 🟦 [4b9gein5] GET /internal-api/active-tickets {"requestId":"4b9gein5","method":"GET","url":"/internal-api/active-tickets","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 22:21:49.000 [INFO] 🟢 [4b9gein5] 200 GET /internal-api/active-tickets - 230ms {"requestId":"4b9gein5","method":"GET","url":"/internal-api/active-tickets","status":200,"duration":230,"slow":false}
+2025-08-31 22:22:11.771 [INFO] 🟦 [cydy7i37] POST /internal-api/frontend-logs {"requestId":"cydy7i37","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 22:22:11.775 [INFO] 🟢 [cydy7i37] 200 POST /internal-api/frontend-logs - 4ms {"requestId":"cydy7i37","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":4,"slow":false}
+2025-08-31 22:25:48.757 [INFO] 🟦 [oyjx14pu] GET /internal-api/active-tickets {"requestId":"oyjx14pu","method":"GET","url":"/internal-api/active-tickets","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 22:25:48.850 [INFO] 🟢 [oyjx14pu] 200 GET /internal-api/active-tickets - 94ms {"requestId":"oyjx14pu","method":"GET","url":"/internal-api/active-tickets","status":200,"duration":94,"slow":false}
+2025-08-31 22:26:05.788 [INFO] 🟦 [ac2dl5p0] POST /internal-api/frontend-logs {"requestId":"ac2dl5p0","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 22:26:05.793 [INFO] 🟢 [ac2dl5p0] 200 POST /internal-api/frontend-logs - 6ms {"requestId":"ac2dl5p0","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":6,"slow":false}
+2025-08-31 22:35:05.761 [INFO] 🟦 [ou7g573b] GET /internal-api/active-tickets {"requestId":"ou7g573b","method":"GET","url":"/internal-api/active-tickets","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 22:35:05.863 [INFO] 🟢 [ou7g573b] 200 GET /internal-api/active-tickets - 103ms {"requestId":"ou7g573b","method":"GET","url":"/internal-api/active-tickets","status":200,"duration":103,"slow":false}
+2025-08-31 22:35:50.171 [INFO] 🟦 [u38dtrhc] POST /internal-api/frontend-logs {"requestId":"u38dtrhc","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 22:35:50.177 [INFO] 🟢 [u38dtrhc] 200 POST /internal-api/frontend-logs - 7ms {"requestId":"u38dtrhc","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":7,"slow":false}
+2025-08-31 22:35:52.805 [INFO] 🟦 [v44invd7] GET /internal-api/active-tickets {"requestId":"v44invd7","method":"GET","url":"/internal-api/active-tickets","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 22:35:52.892 [INFO] 🟢 [v44invd7] 200 GET /internal-api/active-tickets - 88ms {"requestId":"v44invd7","method":"GET","url":"/internal-api/active-tickets","status":200,"duration":88,"slow":false}
+2025-08-31 22:36:11.770 [INFO] 🟦 [i8rtj3hd] POST /internal-api/frontend-logs {"requestId":"i8rtj3hd","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 22:36:11.774 [INFO] 🟢 [i8rtj3hd] 200 POST /internal-api/frontend-logs - 4ms {"requestId":"i8rtj3hd","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":4,"slow":false}
+2025-08-31 22:38:48.770 [INFO] 🟦 [v1ykurtg] GET /internal-api/active-tickets {"requestId":"v1ykurtg","method":"GET","url":"/internal-api/active-tickets","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 22:38:48.869 [INFO] 🟢 [v1ykurtg] 200 GET /internal-api/active-tickets - 99ms {"requestId":"v1ykurtg","method":"GET","url":"/internal-api/active-tickets","status":200,"duration":99,"slow":false}
+2025-08-31 22:39:11.762 [INFO] 🟦 [al9hir7s] POST /internal-api/frontend-logs {"requestId":"al9hir7s","method":"POST","url":"/internal-api/frontend-logs","ip":"127.0.0.1","hasAuth":true}
+2025-08-31 22:39:11.764 [INFO] 🟢 [al9hir7s] 200 POST /internal-api/frontend-logs - 2ms {"requestId":"al9hir7s","method":"POST","url":"/internal-api/frontend-logs","status":200,"duration":2,"slow":false}
+2025-08-31 22:42:30.926 [INFO] 🟦 [e6z0hreh] GET /health {"requestId":"e6z0hreh","method":"GET","url":"/health","ip":"127.0.0.1","hasAuth":false}
+2025-08-31 22:42:30.928 [INFO] 🟢 [e6z0hreh] 200 GET /health - 3ms {"requestId":"e6z0hreh","method":"GET","url":"/health","status":200,"duration":3,"slow":false}
+2025-08-31 22:42:42.841 [INFO] 🟦 [dopcv0ot] GET /internal-api/tables?screen=MESAS {"requestId":"dopcv0ot","method":"GET","url":"/internal-api/tables?screen=MESAS","query":{"screen":"MESAS"},"ip":"127.0.0.1","hasAuth":true}
+2025-08-31 22:42:42.843 [WARN] 🟡 [dopcv0ot] 401 GET /tables?screen=MESAS - 2ms {"requestId":"dopcv0ot","method":"GET","url":"/tables?screen=MESAS","status":401,"duration":2,"slow":false}

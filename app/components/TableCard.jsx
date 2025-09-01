@@ -1,9 +1,9 @@
 import React from 'react';
 import { Paper, Typography, Stack, Chip } from '@mui/material';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import GroupIcon from '@mui/icons-material/Group';
-import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
-import TableRestaurantIcon from '@mui/icons-material/TableRestaurant';
+import AccessTimeOutlined from '@mui/icons-material/AccessTimeOutlined';
+import GroupOutlined from '@mui/icons-material/GroupOutlined';
+import AttachMoneyOutlined from '@mui/icons-material/AttachMoneyOutlined';
+import EventSeatOutlined from '@mui/icons-material/EventSeatOutlined';
 
 const TableCard = ({ table, onClick }) => {
     const getStatusChip = (status) => {
@@ -11,48 +11,65 @@ const TableCard = ({ table, onClick }) => {
             case 'CUENTA':
                 return (
                     <Chip
-                        icon={<AttachMoneyIcon sx={{ color: 'red !important' }} />}
+                        icon={<AttachMoneyOutlined sx={{ color: '#dc2626 !important' }} />}
                         label="CUENTA"
                         sx={{ 
-                            color: 'red !important',
-                            backgroundColor: 'transparent',
-                            border: '2px solid red',
-                            fontWeight: 'bold',
-                            fontSize: '1rem'
+                            color: '#dc2626 !important',
+                            backgroundColor: 'rgba(220, 38, 38, 0.1)',
+                            border: '1px solid #dc2626',
+                            fontWeight: 600,
+                            fontSize: '0.875rem',
+                            backdropFilter: 'blur(4px)'
                         }}
                     />
                 );
             case 'OCUPADO':
                 return (
                     <Chip
-                        icon={<GroupIcon sx={{ color: 'black !important' }} />}
+                        icon={<GroupOutlined sx={{ color: '#d97706 !important' }} />}
                         label="OCUPADO"
                         sx={{ 
-                            color: 'black !important',
-                            backgroundColor: 'transparent',
-                            border: '2px solid black',
-                            fontWeight: 'bold',
-                            fontSize: '1rem'
+                            color: '#d97706 !important',
+                            backgroundColor: 'rgba(217, 119, 6, 0.1)',
+                            border: '1px solid #d97706',
+                            fontWeight: 600,
+                            fontSize: '0.875rem',
+                            backdropFilter: 'blur(4px)'
+                        }}
+                    />
+                );
+            case 'BLOQUEADO':
+                return (
+                    <Chip
+                        icon={<AttachMoneyOutlined sx={{ color: '#dc2626 !important' }} />}
+                        label="BLOQUEADO"
+                        sx={{ 
+                            color: '#dc2626 !important',
+                            backgroundColor: 'rgba(220, 38, 38, 0.1)',
+                            border: '1px solid #dc2626',
+                            fontWeight: 600,
+                            fontSize: '0.875rem',
+                            backdropFilter: 'blur(4px)'
                         }}
                     />
                 );
             default:
                 return (
                     <Chip
-                        icon={<TableRestaurantIcon sx={{ 
-                            color: 'black !important',
-                            fontSize: '2rem' // 2x más grande
+                        icon={<EventSeatOutlined sx={{ 
+                            color: '#374151 !important',
+                            fontSize: '1.25rem'
                         }} />}
                         label="LIBRE"
                         sx={{ 
-                            color: 'black !important',
-                            backgroundColor: 'transparent',
-                            border: '2px solid black',
-                            fontWeight: 'bold',
-                            fontSize: '1.5rem', // 2x más grande
+                            color: '#374151 !important',
+                            backgroundColor: 'rgba(55, 65, 81, 0.1)',
+                            border: '1px solid #9ca3af',
+                            fontWeight: 600,
+                            fontSize: '1rem',
+                            backdropFilter: 'blur(4px)',
                             '& .MuiChip-label': {
-                                fontSize: '1.5rem', // 2x más grande para el texto
-                                fontWeight: 'bold'
+                                fontWeight: 600
                             }
                         }}
                     />
@@ -68,12 +85,13 @@ const TableCard = ({ table, onClick }) => {
                 p: 2,
                 height: '100%',
                 cursor: 'pointer',
-                bgcolor: table.color || '#F5F1E6', // Color sólido según estado
-                border: '2px solid black', // margen negro
-                transition: 'all 0.2s',
+                bgcolor: table.color || '#f5f5f4', // Solid color exactly matching SambaPOS
+                border: '2px solid #374151',
+                borderRadius: '8px',
+                transition: 'all 0.2s ease',
                 '&:hover': {
                     transform: 'scale(1.02)',
-                    boxShadow: 6
+                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
                 },
                 display: 'flex',
                 flexDirection: 'column',
@@ -86,7 +104,8 @@ const TableCard = ({ table, onClick }) => {
                 sx={{ 
                     fontWeight: 'bold',
                     mb: 1,
-                    color: 'black !important' // Siempre texto negro
+                    color: '#000000', // Always black text for contrast on light backgrounds
+                    textShadow: 'none'
                 }}
             >
                 {table.name}
@@ -96,15 +115,16 @@ const TableCard = ({ table, onClick }) => {
                 {/* Status-based time info (priority) */}
                 {table.timeInfo && (
                     <Chip
-                        icon={<AccessTimeIcon sx={{ 
-                            color: table.timeInfo.status === 'cuenta' ? 'red !important' : 'black !important'
+                        icon={<AccessTimeOutlined sx={{ 
+                            color: table.timeInfo.status === 'cuenta' ? '#dc2626 !important' : '#374151 !important'
                         }} />}
                         label={table.timeInfo.text}
                         sx={{ 
-                            color: table.timeInfo.status === 'cuenta' ? 'red !important' : 'black !important',
+                            color: table.timeInfo.status === 'cuenta' ? '#dc2626' : '#374151',
                             backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                            border: `1px solid ${table.timeInfo.status === 'cuenta' ? '#dc2626' : '#374151'}`,
                             fontWeight: 'bold',
-                            fontSize: '0.9rem',
+                            fontSize: '0.8rem',
                             maxWidth: '100%',
                             '& .MuiChip-label': {
                                 whiteSpace: 'nowrap',
@@ -118,11 +138,12 @@ const TableCard = ({ table, onClick }) => {
                 {/* Fallback to SambaPOS time (if no timeInfo available) */}
                 {!table.timeInfo && table.timeElapsed && (
                     <Chip
-                        icon={<AccessTimeIcon sx={{ color: 'black !important' }} />}
+                        icon={<AccessTimeOutlined sx={{ color: '#374151 !important' }} />}
                         label={`${Math.floor(table.timeElapsed / 60000)} min`}
                         sx={{ 
-                            color: 'black !important',
+                            color: '#374151',
                             backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                            border: '1px solid #374151',
                             fontWeight: 'bold'
                         }}
                     />

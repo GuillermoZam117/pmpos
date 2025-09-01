@@ -5,7 +5,19 @@
       "Bash(npm start)",
       "Bash(node:*)",
       "Bash(rm:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(curl:*)",
+      "Read(C:\\PMPOS/**)",
+      "Bash(npm run dev:*)",
+      "Bash(set TICKET_ID=27231)",
+      "Bash(scriptsread_service_smoke_full.bat)",
+      "Bash(read_service_smoke_full.bat)",
+      "Bash(taskkill:*)",
+      "Bash(set DEBUG=pmpos:*)",
+      "Bash(grep:*)",
+      "Bash(npm search:*)",
+      "Bash(PORT=4006 node index.js)",
+      "Bash(/dev/null)"
     ],
     "deny": [],
     "ask": []

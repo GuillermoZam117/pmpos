@@ -5,8 +5,19 @@
 
 import { appconfig } from './config';
 import Debug from 'debug';
+import requestLogger, { loggedFetch, loggedGraphQL } from './utils/requestLogger';
 
 const debug = Debug('pmpos:queries');
+
+// Optional header injection for internal read-service (dev-only / internal nets)
+const SEND_INTERNAL_KEY = process.env.REACT_APP_SEND_INTERNAL_KEY === 'true';
+const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
+const withInternalHeaders = (base = {}) => {
+    if (SEND_INTERNAL_KEY && INTERNAL_API_KEY) {
+        return { ...base, 'X-INTERNAL-API-KEY': INTERNAL_API_KEY };
+    }
+    return base;
+};
 
 // Helper para obtener token
 const getToken = async () => {
@@ -23,7 +34,8 @@ export async function postJSON(url, body) {
         throw new Error('No token available');
     }
 
-    const response = await fetch(url, {
+    // Use logged fetch for structured logging
+    const response = await loggedFetch(url, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -39,6 +51,127 @@ export async function postJSON(url, body) {
     }
 
     return data;
+}
+
+// -----------------------------
+// Read-service wrappers (SQL read-service with GraphQL fallback)
+// -----------------------------
+export async function fetchActiveTickets() {
+    const allowGqlFallback = process.env.REACT_APP_ALLOW_GQL_READ_FALLBACK === 'true';
+    try {
+        const resp = await loggedFetch('/internal-api/active-tickets', {
+            method: 'GET',
+            headers: withInternalHeaders({ 'Content-Type': 'application/json' })
+        });
+        if (resp.ok) return await resp.json();
+        throw new Error(`HTTP ${resp.status}`);
+    } catch (err) {
+        if (!allowGqlFallback) {
+            debug('❌ active-tickets SQL failed and GraphQL fallback disabled:', err.message);
+            throw err; // Important: don't overwrite with []
+        }
+        const config = appconfig();
+        const query = `query { getTickets(isClosed: false) { id uid number totalAmount remainingAmount entities { type name } orders { id name quantity price } states { stateName state } user { name } } }`;
+        const result = await loggedGraphQL(config.GQLurl, { 
+            query,
+            headers: { 'Authorization': `Bearer ${await getToken()}` }
+        });
+        return result.data?.getTickets || [];
+    }
+}
+
+export async function fetchTicketDetails(ticketId) {
+    const allowGqlFallback = process.env.REACT_APP_ALLOW_GQL_READ_FALLBACK === 'true';
+    try {
+        const resp = await loggedFetch(`/internal-api/tickets/${encodeURIComponent(ticketId)}/details`, {
+            method: 'GET',
+            headers: withInternalHeaders({ 'Content-Type': 'application/json' })
+        });
+        if (resp.ok) return await resp.json();
+        throw new Error(`HTTP ${resp.status}`);
+    } catch (err) {
+        if (!allowGqlFallback) {
+            debug('❌ ticket details SQL failed and GraphQL fallback disabled:', err.message);
+            return null;
+        }
+        const config = appconfig();
+        const query = `query GetTicket($ticketId: String!) { ticket(id: $ticketId) { id uid number date totalAmount remainingAmount entities { name type } orders { id uid productId name caption quantity price portion orderTags priceTag calculatePrice locked tags { tag tagName price quantity } states { stateName state stateValue } } states { stateName state } tags { tagName tag } } }`;
+        const result = await postJSON(config.GQLurl, { query, variables: { ticketId } });
+        return result.data?.ticket || null;
+    }
+}
+
+export async function fetchAutomationCommands(commandName = null) {
+    try {
+        const url = commandName ? `/internal-api/automation-commands?name=${encodeURIComponent(commandName)}` : '/internal-api/automation-commands';
+        const resp = await loggedFetch(url, {
+            method: 'GET',
+            headers: withInternalHeaders({ 'Content-Type': 'application/json' })
+        });
+        if (resp.ok) return await resp.json();
+        throw new Error(`HTTP ${resp.status}`);
+    } catch (err) {
+        debug('❌ automation-commands failed:', err.message);
+        return [];
+    }
+}
+
+export async function fetchAutomationReasons(commandName = 'Anular') {
+    try {
+        const resp = await loggedFetch(`/internal-api/automation-reasons?command=${encodeURIComponent(commandName)}`, {
+            method: 'GET',
+            headers: withInternalHeaders({ 'Content-Type': 'application/json' })
+        });
+        if (resp.ok) return await resp.json();
+        throw new Error(`HTTP ${resp.status}`);
+    } catch (err) {
+        debug('❌ automation-reasons failed:', err.message);
+        // Return fallback reasons if API fails
+        return [
+            { id: 1, reason: 'CAMBIO DE PRODUCTO', actionType: 'void' },
+            { id: 2, reason: 'ERROR DEL MESERO', actionType: 'void' },
+            { id: 3, reason: 'CAMBIO DE OPINION CLIENTE', actionType: 'void' },
+            { id: 4, reason: 'NO LO QUISO', actionType: 'void' },
+            { id: 5, reason: 'ERROR COCINA', actionType: 'void' },
+            { id: 6, reason: 'EL CLIENTE SE FUE', actionType: 'void' }
+        ];
+    }
+}
+
+export async function fetchTables() {
+    const allowGqlFallback = process.env.REACT_APP_ALLOW_GQL_READ_FALLBACK === 'true';
+    try {
+        const screen = encodeURIComponent(process.env.SAMBAPOS_ENTITY_SCREEN || '');
+        const url = screen ? `/internal-api/tables?screen=${screen}` : '/internal-api/tables';
+        const resp = await loggedFetch(url, {
+            method: 'GET',
+            headers: withInternalHeaders({ 'Content-Type': 'application/json' })
+        });
+        if (resp.ok) {
+            const rows = await resp.json();
+            // Map read-service shape -> UI shape expected by TableView/TableCard
+            const mapped = (Array.isArray(rows) ? rows : []).map(r => ({
+                id: r.EntityId ?? r.Id ?? r.entityId ?? r.id ?? null,
+                name: String(r.EntityName ?? r.Name ?? r.entityName ?? r.name ?? ''),
+                caption: String(r.Caption ?? r.EntityCaption ?? r.Name ?? r.name ?? ''),
+                color: r.Color ?? null,
+                labelColor: r.LabelColor ?? '#000000',
+                status: r.Status ?? r.status ?? null,
+                customData: r.CustomData ?? r.customData ?? null
+            }));
+            return mapped;
+        }
+        throw new Error(`HTTP ${resp.status}`);
+    } catch (err) {
+        if (!allowGqlFallback) {
+            debug('❌ tables SQL failed and GraphQL fallback disabled:', err.message);
+            return [];
+        }
+        const config = appconfig();
+        const query = `query { getEntityScreenItems(name: \"MESAS\") { id name caption color labelColor state customData } }`;
+        const result = await postJSON(config.GQLurl, { query });
+        return result.data?.getEntityScreenItems || [];
+    }
 }
 
 // ============================================
@@ -86,14 +219,11 @@ export const getRealNames = async () => {
     }`;
 
     try {
-        const response = await fetch(config.GQLurl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ query })
+        const responseData = await loggedGraphQL(config.GQLurl, { 
+            query,
+            headers: { 'Authorization': `Bearer ${token}` }
         });
+        return responseData;
 
         const data = await response.json();
         console.log('Real SambaPOS names:', data);
@@ -397,21 +527,9 @@ export const getTerminalTicket = async () => {
     const token = await ensureAuthenticated();
     const config = appconfig();
 
-    const query = `query GetTerminalTicket($terminalId: String!) {
-        getTerminalTicket(terminalId: $terminalId) {
-            uid
-            number
-            totalAmount
-            remainingAmount
-            orders {
-                uid
-                productId
-                quantity
-                price
-                portion
-            }
-        }
-    }`;
+    // Fetch essential fields; include order 'name' for reliable matching after add
+    const safe = (s) => String(s).replace(/\"/g, '\\"');
+    const inline = `query { getTerminalTicket(terminalId: \"${safe(terminalId)}\") { uid number totalAmount remainingAmount orders { uid name productId quantity price portion } } }`;
 
     try {
         const response = await fetch(config.GQLurl, {
@@ -420,10 +538,7 @@ export const getTerminalTicket = async () => {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify({
-                query,
-                variables: { terminalId }
-            })
+            body: JSON.stringify({ query: inline })
         });
 
         const data = await response.json();
@@ -756,9 +871,9 @@ export const changeEntityOfTerminalTicketAsync = async (terminalId, tableName) =
         throw new Error('changeEntityOfTerminalTicketAsync requires tableName');
     }
 
-    // Prefer 'entity' argument (simpler) and fall back to type/name
-    const inlineEntity = `mutation { changeEntityOfTerminalTicket(terminalId: \"${safe(terminalId)}\", entity: \"${safe(tableName)}\") { id entities { name type } } }`;
+    // Prefer Discovery-correct type/name first; keep 'entity' as a fallback only
     const inlineTypeName = `mutation { changeEntityOfTerminalTicket(terminalId: \"${safe(terminalId)}\", type: \"${safe(type)}\", name: \"${safe(tableName)}\") { id entities { name type } } }`;
+    const inlineEntity = `mutation { changeEntityOfTerminalTicket(terminalId: \"${safe(terminalId)}\", entity: \"${safe(tableName)}\") { id entities { name type } } }`;
 
     const exec = async (query) => {
         const res = await fetch(cfg.GQLurl, {
@@ -774,16 +889,16 @@ export const changeEntityOfTerminalTicketAsync = async (terminalId, tableName) =
         try {
             json = JSON.parse(text);
         } catch (e) {
-            json = { errors: [{ message: `HTTP ${res.status}: ${text?.slice(0,200) || 'Invalid JSON'}` }] };
+            json = { errors: [{ message: `HTTP ${res.status}: ${text?.slice(0, 200) || 'Invalid JSON'}` }] };
         }
         if (!res.ok && (!json || !json.errors)) {
-            json = { errors: [{ message: `HTTP ${res.status}: ${text?.slice(0,200) || res.statusText}` }] };
+            json = { errors: [{ message: `HTTP ${res.status}: ${text?.slice(0, 200) || res.statusText}` }] };
         }
         return json;
     };
 
-    // Try entity-only first
-    let data = await exec(inlineEntity);
+    // Try type/name first (Discovery)
+    let data = await exec(inlineTypeName);
 
     // Handle no ticket open: open ticket and retry once with same query
     const handleNoTicketOpen = async (query) => {
@@ -800,14 +915,14 @@ export const changeEntityOfTerminalTicketAsync = async (terminalId, tableName) =
     if (data.errors) {
         const msg = data.errors.map(e => e.message).join(', ');
         if (/No ticket open on terminal/i.test(msg)) {
-            data = await handleNoTicketOpen(inlineEntity);
+            data = await handleNoTicketOpen(inlineTypeName);
         } else {
-            // Be liberal: if entity form fails for any reason (400/validation), try type+name
-            let fallback = await exec(inlineTypeName);
+            // Fallback: try the 'entity' variant as a last resort
+            let fallback = await exec(inlineEntity);
             if (fallback.errors) {
                 const msg2 = fallback.errors.map(e => e.message).join(', ');
                 if (/No ticket open on terminal/i.test(msg2)) {
-                    fallback = await handleNoTicketOpen(inlineTypeName);
+                    fallback = await handleNoTicketOpen(inlineEntity);
                 } else {
                     throw new Error(msg2 || msg);
                 }
@@ -849,6 +964,72 @@ export const executeAutomationCommandForTerminalTicketAsync = async (terminalId,
         throw new Error(msg);
     }
     return data.data?.executeAutomationCommandForTerminalTicket;
+};
+
+// Helper: update order tags for a specific order on a terminal ticket
+export const updateOrderTagOnTerminalTicket = async (terminalId, orderUid, tagName, tagValue) => {
+    const token = await ensureAuthenticated();
+    const cfg = appconfig();
+    const safe = (s) => String(s).replace(/"/g, '\\"');
+
+    // Build inline mutation to update order tags (array of objects)
+    const inline = `mutation { ticket: updateOrderOfTerminalTicket(terminalId: "${safe(terminalId)}", orderUid: "${safe(orderUid)}", orderTags: [{ tagName: "${safe(tagName)}", tag: "${safe(tagValue)}" }]) { id orders { uid tags { tagName tag } } } }`;
+
+    const response = await fetch(cfg.GQLurl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ query: inline })
+    });
+
+    const data = await response.json();
+    if (data.errors) {
+        const msg = data.errors.map(e => e.message).join(', ');
+        throw new Error(msg);
+    }
+
+    return data.data?.ticket || data.data?.updateOrderOfTerminalTicket || null;
+};
+
+// Convenience flow: try server Automation Command first, then patch the order tag if the server didn't set the tag value
+export const executeComentarioWithFallback = async (terminalId, orderUid, commentValue) => {
+    // 1) Try the Automation Command (server-side rule may handle tag creation)
+    try {
+        await executeAutomationCommandForTerminalTicketAsync(terminalId, 'COMENTARIO', commentValue, orderUid);
+    } catch (err) {
+        // If command fails, continue to attempt client-side tag update
+        console.warn('Automation Command failed (continuing with fallback):', err.message || err);
+    }
+
+    // 2) Fetch current ticket and check if the order already has the tag with value
+    const token = await ensureAuthenticated();
+    const cfg = appconfig();
+    const getQuery = `query { getTerminalTicket(terminalId: "${String(terminalId).replace(/"/g, '\\"')}") { orders { uid tags { tagName tag } } } }`;
+    const resp = await fetch(cfg.GQLurl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ query: getQuery })
+    });
+    const json = await resp.json();
+
+    const orders = json?.data?.getTerminalTicket?.orders || [];
+    const target = orders.find(o => o.uid === orderUid);
+
+    if (target) {
+        const hasTagWithValue = Array.isArray(target.tags) && target.tags.some(t => t.tagName === 'COMENTARIO' && t.tag && String(t.tag).trim().length > 0);
+        if (hasTagWithValue) {
+            return { appliedBy: 'server', order: target };
+        }
+    }
+
+    // 3) If no tag or tag empty, write it directly
+    const updated = await updateOrderTagOnTerminalTicket(terminalId, orderUid, 'COMENTARIO', commentValue);
+    return { appliedBy: 'client-fallback', updated };
 };
 
 // List available Automation Command buttons for the active terminal ticket
@@ -944,12 +1125,17 @@ export const payTerminalTicket = async (terminalId, paymentTypeName, amount, cal
     const token = await ensureAuthenticated();
     const config = appconfig();
 
-    const query = `
-        mutation PayTerminalTicket($terminalId: String!, $paymentTypeName: String!, $amount: Decimal!) {
+    if (!terminalId) throw new Error('Terminal ID is required');
+    if (!paymentTypeName) throw new Error('paymentTypeName is required');
+    const amt = amount != null ? parseFloat(amount) : null;
+
+    const mutation = `
+        mutation PayTerminalTicket($terminalId: String!, $paymentTypeName: String!, $amount: Decimal) {
             payTerminalTicket(terminalId: $terminalId, paymentTypeName: $paymentTypeName, amount: $amount) {
-                id
-                    remainingAmount
-                totalAmount
+                ticketId
+                amount
+                remainingAmount
+                errorMessage
             }
         }
     `;
@@ -960,19 +1146,157 @@ export const payTerminalTicket = async (terminalId, paymentTypeName, amount, cal
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-            query,
-            variables: { terminalId, paymentTypeName, amount: parseFloat(amount) }
-        })
+        body: JSON.stringify({ query: mutation, variables: { terminalId, paymentTypeName, amount: amt } })
     });
 
     const data = await response.json();
 
-    if (callback) {
-        callback(data);
-    }
+    if (callback) callback(data);
 
     return data;
+};
+
+// ============================================
+// CALCULATIONS & ORDER UPDATE HELPERS
+// ============================================
+export const addCalculationToTerminalTicketAsync = async (terminalId, calculationName, amount) => {
+    debug('🧮 Adding calculation to terminal ticket', { terminalId, calculationName, amount });
+    const token = await ensureAuthenticated();
+    const config = appconfig();
+    if (!terminalId) throw new Error('Terminal ID is required');
+    if (!calculationName) throw new Error('calculationName is required');
+    const amt = amount != null ? parseFloat(amount) : 0;
+
+    const query = `mutation AddCalc($terminalId:String!,$calculationName:String!,$amount:Decimal!){
+        addCalculationToTerminalTicket(terminalId:$terminalId, calculationName:$calculationName, amount:$amount){
+            id
+            totalAmount
+            remainingAmount
+            calculations{ name calculationAmount }
+        }
+    }`;
+
+    const response = await fetch(config.GQLurl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ query, variables: { terminalId, calculationName, amount: amt } })
+    });
+
+    const data = await response.json();
+    if (data.errors) {
+        throw new Error(data.errors.map(e => e.message).join(', '));
+    }
+    return data.data?.addCalculationToTerminalTicket;
+};
+
+export const updateOrderOfTerminalTicketAsync = async (terminalId, orderUid, patch = {}) => {
+    debug('✏️ Updating terminal ticket order', { terminalId, orderUid, patch });
+    const token = await ensureAuthenticated();
+    const config = appconfig();
+    if (!terminalId) throw new Error('Terminal ID is required');
+    if (!orderUid) throw new Error('orderUid is required');
+
+    // Build variables and dynamic argument list based on provided patch keys
+    const vars = { terminalId, orderUid };
+    const argList = ['terminalId:$terminalId', 'orderUid:$orderUid'];
+
+    const addOpt = (key, gqlType, valueTransform = (v) => v) => {
+        if (patch[key] !== undefined && patch[key] !== null) {
+            vars[key] = valueTransform(patch[key]);
+            argList.push(`${key}:$${key}`);
+            return `$${key}:${gqlType}`;
+        }
+        return null;
+    };
+
+    const varDefs = [
+        '$terminalId:String!',
+        '$orderUid:String!',
+        addOpt('portion', 'String'),
+        addOpt('quantity', 'Decimal', (v) => parseFloat(v)),
+        addOpt('price', 'Decimal', (v) => parseFloat(v)),
+        addOpt('priceTag', 'String'),
+        addOpt('locked', 'Boolean'),
+        addOpt('increaseInventory', 'Boolean'),
+        addOpt('decreaseInventory', 'Boolean'),
+        addOpt('calculatePrice', 'Boolean'),
+        addOpt('disablePortionSelection', 'Boolean'),
+        addOpt('name', 'String'),
+        addOpt('taxTemplate', 'String'),
+        addOpt('warehouseName', 'String'),
+        addOpt('accountTransactionType', 'String'),
+        addOpt('groupTagName', 'String'),
+        addOpt('groupTagFormat', 'String'),
+    ].filter(Boolean).join(',');
+
+    // Order Tags if provided
+    if (patch.orderTags) {
+        vars.orderTags = patch.orderTags;
+        argList.push('orderTags:$orderTags');
+    }
+
+    const query = `mutation UpdateOrder(${varDefs}${patch.orderTags ? ', $orderTags:[OrderTagInputType]' : ''}){
+        updateOrderOfTerminalTicket(${argList.join(', ')}){
+            id
+            totalAmount
+            remainingAmount
+            orders{ uid quantity price portion }
+        }
+    }`;
+
+    const response = await fetch(config.GQLurl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ query, variables: vars })
+    });
+
+    const data = await response.json();
+    if (data.errors) {
+        throw new Error(data.errors.map(e => e.message).join(', '));
+    }
+    return data.data?.updateOrderOfTerminalTicket;
+};
+
+export const getPaymentTypesAsync = async () => {
+    debug('💳 Fetching payment types');
+    const token = await ensureAuthenticated();
+    const config = appconfig();
+    const query = `query { getPaymentTypes { id name buttonHeader buttonColor processorSettings } }`;
+    const resp = await fetch(config.GQLurl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ query })
+    });
+    const data = await resp.json();
+    if (data.errors) throw new Error(data.errors.map(e => e.message).join(', '));
+    return data.data?.getPaymentTypes || [];
+};
+
+export const getCalculationSelectorsAsync = async () => {
+    debug('🧮 Fetching calculation selectors');
+    const token = await ensureAuthenticated();
+    const config = appconfig();
+    const query = `query { getCalculationSelectors { name buttonHeader buttonColor } }`;
+    const resp = await fetch(config.GQLurl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ query })
+    });
+    const data = await resp.json();
+    if (data.errors) throw new Error(data.errors.map(e => e.message).join(', '));
+    return data.data?.getCalculationSelectors || [];
 };
 
 // ============================================
@@ -1162,57 +1486,133 @@ export const debugTicketQueries = async (terminalId) => {
  */
 export const getAllOpenTickets = async () => {
     debug('🌍 Getting all open tickets for mesa occupancy...');
-    const token = await ensureAuthenticated();
-    const config = appconfig();
-
-    // Optimized query with minimal fields for polling
-    const query = `query GetAllOpenTickets {
-        getTickets(isClosed: false) {
-            id
-            date
-            lastUpdateDate
-            totalAmount
-            remainingAmount
-            entities { name type }
-            states { stateName state }
-            orders { id menuItemName quantity price }
-        }
-    }`;
-
+    const allowGqlFallback = process.env.REACT_APP_ALLOW_GQL_READ_FALLBACK === 'true';
     try {
-        const response = await fetch(config.GQLurl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ query })
-        });
-
-        const data = await response.json();
-
-        if (data.errors) {
-            console.error('🚨 GraphQL errors getting all tickets:', data.errors);
+        const rows = await fetchActiveTickets();
+        const parsed = Array.isArray(rows) ? rows.map(r => {
+            let states = [];
+            try {
+                if (r.TicketStates && typeof r.TicketStates === 'string') {
+                    const js = JSON.parse(r.TicketStates);
+                    if (Array.isArray(js)) {
+                        states = js.map(s => ({ stateName: s.SN || s.stateName || 'Estado', state: s.S || s.state || '' }));
+                    }
+                }
+            } catch (_) {}
+            return {
+                id: r.TicketId,
+                number: r.TicketNumber,
+                date: r.OpenedAt || r.Date,
+                lastUpdateDate: r.LastUpdateTime || r.Date,
+                entities: r.MesaNombre ? [{ type: 'Mesas', name: String(r.MesaNombre) }] : [],
+                states
+            };
+        }) : [];
+        debug(`✅ Found ${parsed.length} open tickets (read-service)`);
+        return parsed;
+    } catch (err) {
+        if (!allowGqlFallback) {
+            debug('❌ getAllOpenTickets SQL failed and GraphQL fallback disabled:', err.message);
             return [];
         }
-
-        const tickets = data.data?.getTickets || [];
-        debug(`✅ Found ${tickets.length} open tickets from all users`);
-        return tickets;
-
-    } catch (error) {
-        debug('❌ Failed to get all open tickets:', error);
-        return [];
+        const token = await ensureAuthenticated();
+        const config = appconfig();
+        const query = `query GetAllOpenTickets { getTickets(isClosed: false) { id date lastUpdateDate entities { name type } states { stateName state } } }`;
+        try {
+            const response = await fetch(config.GQLurl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ query }) });
+            const data = await response.json();
+            if (data.errors) return [];
+            const tickets = data.data?.getTickets || [];
+            debug(`✅ Found ${tickets.length} open tickets from all users (GraphQL fallback)`);
+            return tickets;
+        } catch (error) {
+            debug('❌ Failed to get all open tickets (GraphQL fallback):', error);
+            return [];
+        }
     }
 };
+
+// ============================================
+// Read-service: Entities, Customers, Tickets (Generic)
+// ============================================
+
+export async function fetchEntitiesByType(type, search = null, limit = 200) {
+    const params = new URLSearchParams();
+    if (type) params.set('type', type);
+    if (search) params.set('search', search);
+    if (limit) params.set('limit', String(limit));
+    const resp = await loggedFetch(`/internal-api/entities?${params.toString()}`, {
+        method: 'GET',
+        headers: withInternalHeaders({ 'Content-Type': 'application/json' })
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return await resp.json();
+}
+
+export async function searchCustomers(term, limit = 50) {
+    const params = new URLSearchParams({ term: term || '', limit: String(limit) });
+    const resp = await loggedFetch(`/internal-api/customers/search?${params.toString()}`, {
+        method: 'GET',
+        headers: withInternalHeaders({ 'Content-Type': 'application/json' })
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return await resp.json();
+}
+
+export async function fetchTicketsList({ isClosed = false, entityId = null, customerId = null, sinceMinutes = null, limit = 200 } = {}) {
+    const params = new URLSearchParams();
+    params.set('isClosed', String(!!isClosed));
+    if (entityId) params.set('entityId', String(entityId));
+    if (customerId) params.set('customerId', String(customerId));
+    if (sinceMinutes) params.set('sinceMinutes', String(sinceMinutes));
+    if (limit) params.set('limit', String(limit));
+    const resp = await loggedFetch(`/internal-api/tickets?${params.toString()}`, {
+        method: 'GET',
+        headers: withInternalHeaders({ 'Content-Type': 'application/json' })
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return await resp.json();
+}
+
+export async function fetchOpenTicketByEntityId(entityId) {
+    const resp = await loggedFetch(`/internal-api/tickets/by-entity/${encodeURIComponent(entityId)}/current`, {
+        method: 'GET',
+        headers: withInternalHeaders({ 'Content-Type': 'application/json' })
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return await resp.json();
+}
+
+export async function fetchTicketByNumber(number) {
+    const resp = await loggedFetch(`/internal-api/tickets/number/${encodeURIComponent(number)}`, {
+        method: 'GET',
+        headers: withInternalHeaders({ 'Content-Type': 'application/json' })
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return await resp.json();
+}
+
+export async function fetchTicketByUid(uid) {
+    const resp = await loggedFetch(`/internal-api/tickets/uid/${encodeURIComponent(uid)}`, {
+        method: 'GET',
+        headers: withInternalHeaders({ 'Content-Type': 'application/json' })
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return await resp.json();
+}
 
 /**
  * Gets mesa status based on global ticket data
  * Returns: 'LIBRE' | 'OCUPADO' | 'CUENTA'
  */
 export const getMesaStatus = (mesaNumber, allTickets) => {
+    const mesaStr = String(mesaNumber).trim();
     const ticket = allTickets.find(t =>
-        t.entities && t.entities.some(e => e.type === 'Mesas' && e.name === String(mesaNumber))
+        Array.isArray(t.entities) && t.entities.some(e => {
+            const type = (e.type || '').toString().toLowerCase();
+            const name = String(e.name || '').trim();
+            return type.includes('mesa') && name === mesaStr;
+        })
     );
 
     if (!ticket) return 'LIBRE';
@@ -1235,10 +1635,13 @@ export const getMesaStatus = (mesaNumber, allTickets) => {
  * If multiple tickets exist for same mesa, returns the most recently updated
  */
 export const getTicketForMesa = (mesaNumber, allTickets) => {
+    const mesaStr = String(mesaNumber).trim();
     const ticketsForMesa = allTickets.filter(ticket =>
-        ticket.entities && ticket.entities.some(entity =>
-            entity.type === 'Mesas' && entity.name === String(mesaNumber)
-        )
+        Array.isArray(ticket.entities) && ticket.entities.some(entity => {
+            const type = (entity.type || '').toString().toLowerCase();
+            const name = String(entity.name || '').trim();
+            return type.includes('mesa') && name === mesaStr;
+        })
     );
 
     if (ticketsForMesa.length === 0) return null;
@@ -1435,9 +1838,9 @@ export const loadTicketToTerminal = async (ticketId) => {
     }
 };
 
-// Legacy function - kept for compatibility
+// DEPRECATED: Use dataManager.getActiveTickets() instead
 export const findTicketByTableAlternative = async (tableName) => {
-    debug('🔍 Finding ticket by table (legacy method):', tableName);
-    const allTickets = await getAllOpenTickets();
-    return getTicketForMesa(tableName, allTickets);
+    debug('⚠️ DEPRECATED: Use dataManager.getActiveTickets() instead');
+    // Return null to force migration to new system
+    return null;
 };
