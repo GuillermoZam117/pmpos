@@ -65,7 +65,7 @@ class OptimizedQueries {
      */
     async getCompleteMenu(menuName = 'MENU') {
         debug('📋 Executing complete menu query...');
-        
+
         const query = `
             query GetCompleteMenu($menuName: String!) {
                 menu: getMenu(name: $menuName) {
@@ -145,7 +145,7 @@ class OptimizedQueries {
      */
     async getSimpleMenu(menuName = 'MENU') {
         debug('📋 Executing simple menu query...');
-        
+
         const query = `
             query GetSimpleMenu($menuName: String!) {
                 menu: getMenu(name: $menuName) {
@@ -181,7 +181,7 @@ class OptimizedQueries {
      */
     async getAllTables(screenName = 'MESAS') {
         debug('🏠 Executing tables query...');
-        
+
         const query = `
             query GetAllTables($screenName: String!) {
                 entities: getEntityScreenItems(name: $screenName) {
@@ -214,7 +214,7 @@ class OptimizedQueries {
      */
     async getAllActiveTickets() {
         debug('🎫 Executing active tickets query...');
-        
+
         const query = `
             query GetAllActiveTickets {
                 tickets: getTickets(isClosed: false) {
@@ -266,11 +266,15 @@ class OptimizedQueries {
     }
 
     /**
-     * Get active tickets for specific table
+     * Get active tickets for specific table (today only)
      */
     async getActiveTicketsForTable(tableName) {
-        debug('🎫 Executing table tickets query...', { tableName });
-        
+        debug('🎫 Executing table tickets query (today only)...', { tableName });
+
+        // Obtener tickets del día actual únicamente
+        const today = new Date();
+        const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
+
         const query = `
             query GetTableTickets($tableName: String!) {
                 tickets: getTickets(isClosed: false) {
@@ -300,14 +304,14 @@ class OptimizedQueries {
 
         try {
             const result = await this.executeQuery(query, { tableName });
-            
+
             // Filter tickets by table name
             const tableTickets = result.tickets?.filter(ticket =>
-                ticket.entities?.some(entity => 
+                ticket.entities?.some(entity =>
                     entity.type === 'Mesas' && entity.name === tableName
                 )
             ) || [];
-            
+
             debug(`✅ Table tickets loaded: ${tableTickets.length} tickets for ${tableName}`);
             return tableTickets;
         } catch (error) {
@@ -325,7 +329,7 @@ class OptimizedQueries {
      */
     async getTicketDetails(ticketId) {
         debug('🔍 Executing ticket details query...', { ticketId });
-        
+
         const query = `
             query GetTicketDetails($ticketId: String!) {
                 ticket(id: $ticketId) {
@@ -425,7 +429,7 @@ class OptimizedQueries {
      */
     async getSystemInfo() {
         debug('🔧 Executing system info query...');
-        
+
         const query = `
             query GetSystemInfo {
                 terminals: getTerminals {
@@ -472,7 +476,7 @@ class OptimizedQueries {
      */
     async healthCheck() {
         debug('🏥 Executing health check...');
-        
+
         const query = `
             query HealthCheck {
                 __schema {
@@ -489,10 +493,10 @@ class OptimizedQueries {
             return { status: 'healthy', timestamp: Date.now() };
         } catch (error) {
             debug('❌ GraphQL endpoint health check failed:', error);
-            return { 
-                status: 'unhealthy', 
-                error: error.message, 
-                timestamp: Date.now() 
+            return {
+                status: 'unhealthy',
+                error: error.message,
+                timestamp: Date.now()
             };
         }
     }
@@ -506,9 +510,9 @@ class OptimizedQueries {
      */
     async batchQueries(queries) {
         debug(`🔄 Executing ${queries.length} queries in parallel...`);
-        
+
         const startTime = performance.now();
-        
+
         try {
             const results = await Promise.allSettled(
                 queries.map(({ name, query, variables }) =>
@@ -550,7 +554,7 @@ class OptimizedQueries {
      */
     async initializeAppData(menuName = 'MENU', screenName = 'MESAS') {
         debug('🚀 Initializing app data with parallel queries...');
-        
+
         const queries = [
             {
                 name: 'menu',
@@ -570,7 +574,7 @@ class OptimizedQueries {
         ];
 
         const result = await this.batchQueries(queries);
-        
+
         // Process successful results
         const data = {};
         result.successful.forEach(({ name, data: queryData }) => {
@@ -588,7 +592,7 @@ class OptimizedQueries {
         });
 
         debug(`✅ App data initialized: menu=${!!data.menu}, tables=${data.tables?.length || 0}, tickets=${data.activeTickets?.length || 0}`);
-        
+
         return {
             ...data,
             loadTime: result.duration,

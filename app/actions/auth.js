@@ -88,11 +88,20 @@ export const login = (pin) => async (dispatch) => {
             
             console.log('✅ Login successful:', result.user.name);
             
-            // Set current user and register terminal (non-blocking)
+            // Set current user and register terminal (BLOCKING - required for session)
             terminalService.setCurrentUser(result.user.name);
-            terminalService.ensureTerminalRegistered(result.user.name).catch(e => {
-                console.warn("Terminal auto-registration failed (non-blocking):", e?.message || e);
-            });
+            console.log('🖥️ Registering terminal for session...');
+            try {
+                const terminalId = await terminalService.ensureTerminalRegistered(result.user.name);
+                if (terminalId) {
+                    console.log('✅ Terminal registered for session:', terminalId);
+                } else {
+                    console.warn('⚠️ Terminal registration returned null - continuing without terminal');
+                }
+            } catch (e) {
+                console.warn('⚠️ Terminal registration failed - continuing without terminal:', e?.message || e);
+                // Continue without terminal - app can still function
+            }
             
             console.timeEnd('Login Duration');
             console.groupEnd();
@@ -156,11 +165,20 @@ export const authenticateWithPin = (pin) => async (dispatch) => {
       });
       console.log('✅ Login successful:', result.user?.name);
       
-      // Set current user and register terminal (non-blocking)
+      // Set current user and register terminal (BLOCKING - required for session)
       terminalService.setCurrentUser(result.user.name);
-      terminalService.ensureTerminalRegistered(result.user.name).catch(e => {
-        console.warn("Terminal auto-registration failed (non-blocking):", e?.message || e);
-      });
+      console.log('🖥️ Registering terminal for session...');
+      try {
+        const terminalId = await terminalService.ensureTerminalRegistered(result.user.name);
+        if (terminalId) {
+          console.log('✅ Terminal registered for session:', terminalId);
+        } else {
+          console.warn('⚠️ Terminal registration returned null - continuing without terminal');
+        }
+      } catch (e) {
+        console.warn('⚠️ Terminal registration failed - continuing without terminal:', e?.message || e);
+        // Continue without terminal - app can still function
+      }
       
       console.timeEnd('Login Duration');
       console.groupEnd();
@@ -269,11 +287,20 @@ export const loginWithPin = (pin) => async (dispatch) => {
             }
         });
 
-        // Set current user and register terminal (non-blocking)
+        // Set current user and register terminal (BLOCKING - required for session)
         terminalService.setCurrentUser(data.getUser.name);
-        terminalService.ensureTerminalRegistered(data.getUser.name).catch(e => {
-            console.warn("Terminal auto-registration failed (non-blocking):", e?.message || e);
-        });
+        console.log('🖥️ Registering terminal for session...');
+        try {
+            const terminalId = await terminalService.ensureTerminalRegistered(data.getUser.name);
+            if (terminalId) {
+                console.log('✅ Terminal registered for session:', terminalId);
+            } else {
+                console.warn('⚠️ Terminal registration returned null - continuing without terminal');
+            }
+        } catch (e) {
+            console.warn('⚠️ Terminal registration failed - continuing without terminal:', e?.message || e);
+            // Continue without terminal - app can still function
+        }
 
         return data.getUser;
     } catch (error) {
@@ -374,8 +401,9 @@ export const logout = () => async (dispatch) => {
         // Clear user data but KEEP token for performance
         // tokenService.clearAuthentication(); // Removed to maintain token
         
-        // Clear terminal registration
-        terminalService.clearTerminal();
+        // DON'T clear terminal registration - let it persist for the session
+        // Only clear current user reference
+        terminalService.setCurrentUser(null);
         
         // Navigation will be handled by component
         debug('✅ Logout exitoso');

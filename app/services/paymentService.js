@@ -2,6 +2,9 @@ import { gql } from '@apollo/client';
 import { client } from '../apollo';
 import { appconfig } from '../config';
 import { tokenService } from './tokenService';
+import dataManager from './dataManager';
+import cacheService from './cacheService';
+import { closeTerminalTicket as closeTerminalTicketInline } from '../queries';
 import Debug from 'debug';
 
 const debug = Debug('pmpos:payment');
@@ -47,18 +50,21 @@ const ADD_CALCULATION_TO_TERMINAL_TICKET = gql`
   }
 `;
 
-const RECALCULATE_TICKET = gql`
-  mutation RecalculateTicket($terminalId: String!, $forceRecalculation: Boolean) {
-    recalculateTicket(
-      terminalId: $terminalId,
-      forceRecalculation: $forceRecalculation
-    ) {
-      id
-      totalAmount
-      remainingAmount
+let RECALCULATE_TICKET = null;
+try {
+  RECALCULATE_TICKET = gql`
+    mutation RecalculateTicket($terminalId: String!, $forceRecalculation: Boolean) {
+      recalculateTicket(
+        terminalId: $terminalId,
+        forceRecalculation: $forceRecalculation
+      ) {
+        id
+        totalAmount
+        remainingAmount
+      }
     }
-  }
-`;
+  `;
+} catch (_) {}
 
 export const paymentService = {
     /**
@@ -126,19 +132,46 @@ export const paymentService = {
     async payTicket(terminalId, paymentTypeName, amount) {
         debug('💰 Processing payment:', { terminalId, paymentTypeName, amount });
         try {
-            const { data } = await client.mutate({
-                mutation: PAY_TERMINAL_TICKET,
-                variables: {
-                    terminalId,
-                    paymentTypeName,
-                    amount: parseFloat(amount)
-                }
+            // Try Apollo mutate first
+            try {
+                const { data } = await client.mutate({
+                    mutation: PAY_TERMINAL_TICKET,
+                    variables: {
+                        terminalId,
+                        paymentTypeName,
+                        amount: parseFloat(amount)
+                    }
+                });
+                debug('✅ Payment processed (apollo):', data.payTerminalTicket);
+                return { success: true, ticket: data.payTerminalTicket };
+            } catch (apolloErr) {
+                debug('ℹ️ Apollo pay failed, trying inline fallback:', apolloErr?.message || apolloErr);
+            }
+
+            // Inline fetch fallback without variables (more compatible on some builds)
+            const token = await tokenService.getValidAccessToken();
+            const cfg = appconfig();
+            const amt = parseFloat(amount);
+            const inline = `mutation { payTerminalTicket(terminalId: "${terminalId}", paymentTypeName: "${paymentTypeName}", amount: ${isFinite(amt) ? amt : 0}) { id remainingAmount totalAmount } }`;
+            const resp = await fetch(cfg.GQLurl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ query: inline })
             });
-            debug('✅ Payment processed:', data.payTerminalTicket);
-            return {
-                success: true,
-                ticket: data.payTerminalTicket
-            };
+            if (!resp.ok) {
+                const text = await resp.text();
+                throw new Error(`HTTP ${resp.status} ${resp.statusText}: ${text}`);
+            }
+            const json = await resp.json();
+            if (json.errors && json.errors.length) {
+                throw new Error(json.errors[0].message || 'GraphQL Error');
+            }
+            const t = json?.data?.payTerminalTicket;
+            debug('✅ Payment processed (inline):', t);
+            return { success: true, ticket: t };
         } catch (error) {
             debug('❌ Payment failed:', error);
             throw new Error(`Error al procesar el pago: ${error.message}`);
@@ -176,21 +209,16 @@ export const paymentService = {
     async recalculateTicket(terminalId, forceRecalculation = false) {
         debug('🔄 Recalculating ticket:', { terminalId, forceRecalculation });
         try {
+            if (!RECALCULATE_TICKET) throw new Error('recalculateTicket not available');
             const { data } = await client.mutate({
                 mutation: RECALCULATE_TICKET,
-                variables: {
-                    terminalId,
-                    forceRecalculation
-                }
+                variables: { terminalId, forceRecalculation }
             });
             debug('✅ Ticket recalculated:', data.recalculateTicket);
-            return {
-                success: true,
-                ticket: data.recalculateTicket
-            };
+            return { success: true, ticket: data.recalculateTicket };
         } catch (error) {
-            debug('❌ Failed to recalculate ticket:', error);
-            throw new Error(`Error al recalcular ticket: ${error.message}`);
+            debug('⚠️ recalculateTicket unavailable or failed:', error?.message || error);
+            return { success: false };
         }
     },
 
@@ -270,8 +298,8 @@ export const paymentService = {
                 await this.applyTip(terminalId, tip.amount);
             }
             
-            // 3. Recalcular ticket después de descuentos/propinas
-            await this.recalculateTicket(terminalId, true);
+            // 3. Recalcular ticket después de descuentos/propinas (best-effort)
+            try { await this.recalculateTicket(terminalId, true); } catch (_) {}
             
             // 4. Procesar el pago
             const paymentResult = await this.payTicket(terminalId, paymentTypeName, amount);

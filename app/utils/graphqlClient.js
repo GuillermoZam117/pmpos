@@ -1,5 +1,6 @@
 import { GraphQLClient } from 'graphql-request';
 import { appconfig } from '../config';
+import { resolveGqlUrl } from './gqlEndpoint';
 
 export const createGraphQLClient = (token) => {
     const headers = {
@@ -7,7 +8,8 @@ export const createGraphQLClient = (token) => {
         'Content-Type': 'application/json',
     };
 
-    return new GraphQLClient(appconfig().GQLurl, { headers });
+    const url = resolveGqlUrl(appconfig());
+    return new GraphQLClient(url, { headers });
 };
 
 export const queries = {
@@ -60,6 +62,60 @@ export const queries = {
                     price
                 }
             }
+        }
+    `,
+
+    // Discovery - aligned GraphQL operations (work with GraphQLClient)
+    createTerminalTicket: `
+        mutation createTerminalTicket($terminalId: String!) {
+            createTerminalTicket(terminalId: $terminalId) {
+                id
+                uid
+                type
+                totalAmount
+                remainingAmount
+            }
+        }
+    `,
+
+    loadTerminalTicket: `
+        mutation loadTerminalTicket($terminalId: String!, $ticketId: String!) {
+            loadTerminalTicket(terminalId: $terminalId, ticketId: $ticketId) {
+                id
+                uid
+                number
+                type
+                totalAmount
+                remainingAmount
+                entities { name type }
+                orders {
+                    id
+                    uid
+                    name
+                    quantity
+                    price
+                    portion
+                }
+            }
+        }
+    `,
+
+    changeEntityOfTerminalTicket: `
+        mutation changeEntityOfTerminalTicket($terminalId: String!, $type: String!, $name: String!) {
+            changeEntityOfTerminalTicket(terminalId: $terminalId, type: $type, name: $name) {
+                id
+                uid
+                number
+                totalAmount
+                remainingAmount
+                entities { name type }
+            }
+        }
+    `,
+
+    closeTerminalTicket: `
+        mutation closeTerminalTicket($terminalId: String!) {
+            closeTerminalTicket(terminalId: $terminalId)
         }
     `
 };

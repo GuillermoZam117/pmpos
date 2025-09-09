@@ -1,34 +1,67 @@
-// Dynamic IP discovery utilities
+// Dynamic server discovery utilities
 const discoverSambaPOSServer = async () => {
-    const commonPorts = [9000, 8080, 3000];
-    const localNetwork = await getLocalNetworkIPs();
-    
-    for (const ip of localNetwork) {
+    // Configurable ports from environment, with fallbacks
+    const portsList = process.env.SAMBAPOS_DISCOVERY_PORTS || '9000,8080,3000';
+    const commonPorts = portsList.split(',').map(p => parseInt(p.trim()));
+    const targets = await getServerTargets();
+
+    // Try each target (server names and IPs) with each port
+    for (const target of targets) {
         for (const port of commonPorts) {
             try {
-                const response = await fetch(`http://${ip}:${port}/api/health`, { 
-                    method: 'HEAD', 
-                    timeout: 2000 
+                const url = `http://${target}:${port}`;
+                console.log(`🔍 Testing SambaPOS at ${url}`);
+
+                const response = await fetch(`${url}/api/health`, {
+                    method: 'HEAD',
+                    signal: AbortSignal.timeout(3000)
                 });
+
                 if (response.ok) {
-                    return `http://${ip}:${port}`;
+                    console.log(`✅ Found SambaPOS server at ${url}`);
+                    return url;
                 }
             } catch (e) {
-                // Continue searching
+                console.log(`❌ Failed to connect to ${target}:${port} - ${e.message}`);
             }
         }
     }
+    console.warn('⚠️ No SambaPOS server found in network');
     return null;
 };
 
-const getLocalNetworkIPs = () => {
+const getServerTargets = () => {
     return new Promise((resolve) => {
-        const ips = ['192.168.1.125', '192.168.1.111', '192.168.0.1', '10.0.0.1'];
-        // Add current host IP if different
-        if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
-            ips.unshift(window.location.hostname);
+        const targets = [];
+
+        // 1. Environment/config specified server name or IP (highest priority)
+        const configuredHost = process.env.SAMBAPOS_SERVER_NAME || process.env.API_HOST;
+        if (configuredHost) {
+            targets.push(configuredHost);
         }
-        resolve(ips);
+
+        // 2. Additional configured server names from environment
+        const additionalServers = process.env.SAMBAPOS_ADDITIONAL_SERVERS;
+        if (additionalServers) {
+            additionalServers.split(',').forEach(server => {
+                targets.push(server.trim());
+            });
+        }
+
+        // 3. Current machine IP (if not localhost)
+        if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+            targets.push(window.location.hostname);
+        }
+
+        // 4. Network gateway (often the router/main server)
+        const currentIP = typeof window !== 'undefined' ? window.location.hostname : null;
+        if (currentIP && /^\d+\.\d+\.\d+\.\d+$/.test(currentIP)) {
+            // Extract network and try .1 (gateway)
+            const networkBase = currentIP.split('.').slice(0, 3).join('.');
+            targets.push(`${networkBase}.1`);
+        }
+
+        resolve([...new Set(targets)]); // Remove duplicates
     });
 };
 
@@ -51,7 +84,9 @@ export const appconfig = () => {
             const deptParam = params.get('dept'); // Department name
             const ttParam = params.get('tt');     // Ticket Type name
             const discoverParam = params.get('discover'); // auto-discover SambaPOS server
-            
+            const rskeyParam = params.get('rskey'); // read-service apikey override
+            const activeOnlyParam = params.get('activeOnly'); // force active-only tables
+
             if (apiParam) localStorage.setItem('SAMBAPOS_API_URL', apiParam);
             if (ipParam) localStorage.setItem('SAMBAPOS_API_HOST', ipParam);
             if (portParam) localStorage.setItem('SAMBAPOS_API_PORT', portParam);
@@ -60,7 +95,9 @@ export const appconfig = () => {
             if (clientParam) localStorage.setItem('SAMBAPOS_CLIENT_ID', clientParam);
             if (deptParam) localStorage.setItem('SAMBAPOS_DEPARTMENT', deptParam);
             if (ttParam) localStorage.setItem('SAMBAPOS_TICKET_TYPE', ttParam);
-            
+            if (rskeyParam) localStorage.setItem('READ_SERVICE_APIKEY', rskeyParam);
+            if (activeOnlyParam) localStorage.setItem('READ_SERVICE_ACTIVE_ONLY', activeOnlyParam);
+
             // Auto-discover SambaPOS server if requested
             if (discoverParam === 'true') {
                 discoverSambaPOSServer().then(discoveredUrl => {
@@ -71,7 +108,7 @@ export const appconfig = () => {
                     }
                 });
             }
-        } catch {}
+        } catch { }
     }
 
     const storedApi = hasWindow ? localStorage.getItem('SAMBAPOS_API_URL') : null;
@@ -80,14 +117,14 @@ export const appconfig = () => {
     const storedUser = hasWindow ? localStorage.getItem('SAMBAPOS_USERNAME') : null;
     const storedPass = hasWindow ? localStorage.getItem('SAMBAPOS_PASSWORD') : null;
     const storedClient = hasWindow ? localStorage.getItem('SAMBAPOS_CLIENT_ID') : null;
-    
+
     const envApi = process.env.SAMBAPOS_API_URL;
     const envHost = process.env.API_HOST;
     const envPort = process.env.SAMBAPOS_API_PORT;
 
     // Priority: stored full URL > environment URL > constructed from host:port > default
     const targetHost = storedHost || envHost || defaultHost;
-    const targetPort = storedPort || envPort || '9000';
+    const targetPort = storedPort || envPort || process.env.SAMBAPOS_API_PORT || '9000';
     const constructedApi = `http://${targetHost}:${targetPort}`;
     let API_URL = storedApi || envApi || constructedApi;
 
@@ -96,19 +133,36 @@ export const appconfig = () => {
     if (isDevServer && !storedApi && !envApi) {
         API_URL = window.location.origin; // e.g., http://HOST:8081
     }
-    // Using EXACT values that worked in your manual GraphQL testing
-    const USERNAME = storedUser || process.env.SAMBAPOS_USERNAME || process.env.SAMBAPOS_USER || 'graphiql';
-    const PASSWORD = storedPass || process.env.SAMBAPOS_PASSWORD || 'graphiql';
-    const TERMINAL = process.env.SAMBAPOS_TERMINAL || 'SERVIDOR';  // ✅ Matches your working config
+
+    // Auto-discover server if no specific configuration was found
+    const shouldAutoDiscover = hasWindow && !storedApi && !envApi && !localStorage.getItem('SAMBAPOS_DISCOVERED') && !isDevServer;
+    if (shouldAutoDiscover) {
+        setTimeout(() => {
+            discoverSambaPOSServer().then(discoveredUrl => {
+                if (discoveredUrl && discoveredUrl !== constructedApi) {
+                    localStorage.setItem('SAMBAPOS_API_URL', discoveredUrl);
+                    localStorage.setItem('SAMBAPOS_DISCOVERED', 'true');
+                    console.log('SambaPOS auto-discovered at:', discoveredUrl);
+                    window.location.reload(); // Reload to use discovered config
+                }
+            }).catch(err => {
+                console.warn('Auto-discovery failed:', err);
+            });
+        }, 1000); // Small delay to ensure page is fully loaded
+    }
+
+    // All configuration values from environment variables (no hardcoded defaults)
+    const USERNAME = storedUser || process.env.SAMBAPOS_USERNAME || process.env.SAMBAPOS_USER || process.env.USER_NAME;
+    const PASSWORD = storedPass || process.env.SAMBAPOS_PASSWORD || process.env.PASSWORD;
+    const TERMINAL = process.env.SAMBAPOS_TERMINAL;
     const storedDept = hasWindow ? localStorage.getItem('SAMBAPOS_DEPARTMENT') : null;
     const storedTT = hasWindow ? localStorage.getItem('SAMBAPOS_TICKET_TYPE') : null;
-    const DEPARTMENT = storedDept || process.env.SAMBAPOS_DEPARTMENT || 'MESAS';    // ✅ Matches your working config
-    const TICKET_TYPE = storedTT || process.env.SAMBAPOS_TICKET_TYPE || 'COMEDOR';  // ✅ Matches your working config
-    const ENTITY_SCREEN = process.env.SAMBAPOS_ENTITY_SCREEN || 'MESAS';
-    // EntityType in your schema is case-sensitive and should be 'Mesas'
-    const ENTITY_TYPE = process.env.SAMBAPOS_ENTITY_TYPE || 'Mesas';
-    const CLIENT_ID = storedClient || process.env.SAMBAPOS_CLIENT_ID || 'pmpos';
-    
+    const DEPARTMENT = storedDept || process.env.SAMBAPOS_DEPARTMENT;
+    const TICKET_TYPE = storedTT || process.env.SAMBAPOS_TICKET_TYPE;
+    const ENTITY_SCREEN = process.env.SAMBAPOS_ENTITY_SCREEN;
+    const ENTITY_TYPE = process.env.SAMBAPOS_ENTITY_TYPE;
+    const CLIENT_ID = storedClient || process.env.SAMBAPOS_CLIENT_ID;
+
     return {
         // SambaPOS API Configuration
         GQLserv: API_URL,
@@ -117,30 +171,30 @@ export const appconfig = () => {
         SIGNALRserv: process.env.SAMBAPOS_SIGNALR_URL || API_URL,
         SIGNALRurl: isDevServer ? `/signalr` : `${API_URL}/signalr`,
         authUrl: isDevServer ? `/Token` : `${API_URL}/Token`,
-        
+
         // Terminal Configuration
         terminalName: TERMINAL,
         userName: USERNAME,
         password: PASSWORD,
-        
+
         // Business Configuration
         departmentName: DEPARTMENT,
         ticketTypeName: TICKET_TYPE,
-        menuName: process.env.SAMBAPOS_MENU || 'MENU',
+        menuName: process.env.SAMBAPOS_MENU,
         entityScreenName: ENTITY_SCREEN,
         entityTypeName: ENTITY_TYPE,
-        
-        // Application Settings
-        autoConnectPrinter: true,
-        defaultPrinter: 'CAJA',
-        tableView: true,
-        showOrderTags: true,
-        allowSplitBill: true,
-        allowMergeTickets: true,
-        
-        // Timeouts
-        connectionTimeout: 30000,
-        refreshInterval: 5000,
+
+        // Application Settings (configurable)
+        autoConnectPrinter: process.env.SAMBAPOS_AUTO_CONNECT_PRINTER !== 'false',
+        defaultPrinter: process.env.SAMBAPOS_DEFAULT_PRINTER,
+        tableView: process.env.SAMBAPOS_TABLE_VIEW !== 'false',
+        showOrderTags: process.env.SAMBAPOS_SHOW_ORDER_TAGS !== 'false',
+        allowSplitBill: process.env.SAMBAPOS_ALLOW_SPLIT_BILL !== 'false',
+        allowMergeTickets: process.env.SAMBAPOS_ALLOW_MERGE_TICKETS !== 'false',
+
+        // Timeouts (configurable)
+        connectionTimeout: parseInt(process.env.SAMBAPOS_CONNECTION_TIMEOUT || '30000'),
+        refreshInterval: parseInt(process.env.SAMBAPOS_REFRESH_INTERVAL || '5000'),
 
         // Auth Configuration
         auth: {
@@ -148,34 +202,25 @@ export const appconfig = () => {
             grantType: 'password',
             tokenEndpoint: '/Token',
             refreshEndpoint: '/Token/refresh',
-            tokenValidity: 365 * 24 * 60 * 60 * 1000, // 365 days
-            refreshThreshold: 7 * 24 * 60 * 60 * 1000, // 7 days
+            tokenValidity: parseInt(process.env.SAMBAPOS_TOKEN_VALIDITY || '31536000000'), // 365 days
+            refreshThreshold: parseInt(process.env.SAMBAPOS_REFRESH_THRESHOLD || '604800000'), // 7 days
             baseUrl: API_URL
         }
     };
 };
 
-// Configuración para desarrollo
-export const DEV_CONFIG = {
-    development: true,
-    apiBaseUrl: 'http://localhost:9000',
-    graphqlEndpoint: '/api/graphql',
-    authEndpoint: '/Token'
-};
-
 export const TOKEN_CONFIG = {
-    STORAGE_KEY: 'sambapos_token_encrypted',
-    EXPIRY_KEY: 'sambapos_token_expiry',
-    REQUEST_TIMEOUT: 20000,
-    REFRESH_THRESHOLD: 7 * 24 * 60 * 60 * 1000, // 7 days
-    TOKEN_VALIDITY: 365 * 24 * 60 * 60 * 1000   // 365 days
+    STORAGE_KEY: process.env.SAMBAPOS_TOKEN_STORAGE_KEY || 'sambapos_token_encrypted',
+    EXPIRY_KEY: process.env.SAMBAPOS_TOKEN_EXPIRY_KEY || 'sambapos_token_expiry',
+    REQUEST_TIMEOUT: parseInt(process.env.SAMBAPOS_REQUEST_TIMEOUT || '20000'),
+    REFRESH_THRESHOLD: parseInt(process.env.SAMBAPOS_REFRESH_THRESHOLD || '604800000'), // 7 days
+    TOKEN_VALIDITY: parseInt(process.env.SAMBAPOS_TOKEN_VALIDITY || '31536000000')   // 365 days
 };
 
 // Export discovery utilities for use in components
 export const dynamicConfig = {
     discoverSambaPOSServer,
-    getLocalNetworkIPs,
-    
+
     // Utility to set a new server IP and reload config
     setServerIP: (ip, port = '9000') => {
         if (typeof window !== 'undefined') {
@@ -186,7 +231,7 @@ export const dynamicConfig = {
         }
         return false;
     },
-    
+
     // Get current configured server info
     getCurrentServer: () => {
         if (typeof window === 'undefined') return null;

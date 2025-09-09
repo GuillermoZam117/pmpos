@@ -3,10 +3,11 @@ import { debugAuth } from '../utils/debug';
 import { gql } from '@apollo/client';
 import { client } from '../apollo';
 import Debug from 'debug';
-import { getTicketForMesa, loadTicketToTerminal, getCurrentTerminalId, createTerminalTicketAsync, changeEntityOfTerminalTicketAsync, closeTerminalTicket as closeTerminalTicketInline, registerTerminalAsync, addOrderToTerminalTicketAsync } from '../queries';
+import { getTicketForMesa, loadTicketToTerminalRobust as loadTicketToTerminal, getCurrentTerminalId, createTerminalTicketAsync, changeEntityOfTerminalTicketSmart as changeEntityOfTerminalTicketAsync, closeTerminalTicketNormalized as closeTerminalTicketInline, registerTerminalAsync, addOrderToTerminalTicketUnified as addOrderToTerminalTicketAsync } from '../queries';
 import cacheService from './cacheService';
 import dataManager from './dataManager';
 import { orderService } from './orderService';
+import terminalFixService from './terminalFixService';
 
 const debug = Debug('pmpos:ticket');
 
@@ -90,37 +91,40 @@ export const createEmptyTicket = async (tableId) => {
 export const ticketService = {
     /**
      * Flujo completo: crear ticket -> asignar entidad -> agregar orden -> cerrar ticket
-     * Todos los pasos usan mutaciones inline y manejan auto-apertura/reintentos
+     * AHORA CON TERMINAL FIX SERVICE para evitar "Terminal not found"
      */
     async createAssignAddClose({ terminalId, tableName, order }) {
         const debugFlow = Debug('pmpos:ticket:flow');
-        debugFlow('🚀 Starting createAssignAddClose flow', { terminalId, tableName, order });
+        debugFlow('🚀 Starting createAssignAddClose flow with terminal fix', { terminalId, tableName, order });
 
-        if (!terminalId) throw new Error('terminalId requerido');
         if (!tableName) throw new Error('tableName requerido');
         if (!order?.productName) throw new Error('order.productName requerido');
 
-        // 1) Crear ticket de terminal (idempotente)
-        const created = await createTerminalTicketAsync(terminalId);
-        debugFlow('✅ Terminal ticket (created/existing):', created);
+        return await terminalFixService.executeWithTerminalFix(async (activeTerminalId) => {
+            debugFlow('✅ Using verified terminal ID:', activeTerminalId);
 
-        // 2) Asignar entidad (mesa)
-        const assigned = await changeEntityOfTerminalTicketAsync(terminalId, tableName);
-        debugFlow('✅ Entity assigned:', assigned?.entities);
+            // 1) Crear ticket de terminal (idempotente)
+            const created = await createTerminalTicketAsync(activeTerminalId);
+            debugFlow('✅ Terminal ticket (created/existing):', created);
 
-        // 3) Agregar orden
-        const added = await addOrderToTerminalTicketAsync(terminalId, {
-            productName: order.productName,
-            portion: order.portion || 'Normal',
-            quantity: order.quantity || 1
+            // 2) Asignar entidad (mesa)
+            const assigned = await changeEntityOfTerminalTicketAsync(activeTerminalId, tableName);
+            debugFlow('✅ Entity assigned:', assigned?.entities);
+
+            // 3) Agregar orden
+            const added = await addOrderToTerminalTicketAsync(activeTerminalId, {
+                productName: order.productName,
+                portion: order.portion || 'Normal',
+                quantity: order.quantity || 1
+            });
+            debugFlow('✅ Order added:', added);
+
+            // 4) Cerrar ticket del terminal (idempotente)
+            const closed = await closeTerminalTicketInline();
+            debugFlow('✅ Terminal ticket closed:', closed);
+
+            return { created, assigned, added, closed };
         });
-        debugFlow('✅ Order added:', added);
-
-        // 4) Cerrar ticket del terminal (idempotente)
-        const closed = await closeTerminalTicketInline();
-        debugFlow('✅ Terminal ticket closed:', closed);
-
-        return { created, assigned, added, closed };
     },
     /**
      * Carga un ticket cerrado en el contexto del terminal, agrega órdenes y cierra
@@ -133,9 +137,21 @@ export const ticketService = {
         if (!ticketId) throw new Error('ticketId requerido');
 
         // 1) Cargar ticket en el terminal
-        const { loadTerminalTicketWithOrders } = await import('../queries');
+        const { loadTerminalTicketWithOrders, getTerminalTicket } = await import('../queries');
         const loaded = await loadTerminalTicketWithOrders(terminalId, String(ticketId));
         debugFlow('✅ Ticket loaded into terminal session:', loaded?.id || ticketId);
+
+        // Small stabilization delay, then confirm terminal session has an open ticket
+        await new Promise(r => setTimeout(r, 300));
+        try {
+            const tt = await getTerminalTicket();
+            debugFlow('🔎 Terminal ticket after load (sanity):', tt?.uid || tt?.number || null);
+            if (!tt) {
+                debugFlow('⚠️ No terminal ticket visible after load. Retrying load once...');
+                await loadTerminalTicketWithOrders(terminalId, String(ticketId));
+                await new Promise(r => setTimeout(r, 300));
+            }
+        } catch (_) { /* ignore */ }
 
         // 2) Agregar órdenes en secuencia
         if (orders && Array.isArray(orders)) {
@@ -148,7 +164,11 @@ export const ticketService = {
                     });
                     debugFlow('✅ Order added:', { productName: ord.productName || ord.name, result: res });
                 } catch (e) {
-                    debugFlow('⚠️ Failed to add order, continuing with next', e?.message || e);
+                    debugFlow('⚠️ Failed to add order, attempting one reload then continue', e?.message || e);
+                    try {
+                        await loadTerminalTicketWithOrders(terminalId, String(ticketId));
+                        await new Promise(r => setTimeout(r, 300));
+                    } catch (_) { /* ignore */ }
                 }
             }
         }
@@ -164,6 +184,7 @@ export const ticketService = {
             debug('📝 Opening ticket for table:', tableName);
 
             // UNIFIED APPROACH: Use dataManager for all ticket data
+            try { await dataManager.refreshData('tickets'); } catch (_) { }
             const allTickets = await dataManager.getActiveTickets();
             const existingTicket = getTicketForMesa(tableName, allTickets);
 
@@ -202,14 +223,71 @@ export const ticketService = {
                 }
             }
 
-            // Fallback: check using legacy method
-            const legacyTicket = await this.getTicketByTable(tableName);
-            if (legacyTicket?.ticket) {
-                return {
-                    success: true,
-                    ticket: legacyTicket.ticket,
-                    url: this.getTicketUrl(legacyTicket.ticket.id, tableName)
-                };
+            // Fallback: check using active tickets (more reliable than getTicketByTable)
+            debug('🔍 Searching for table ticket in active tickets...');
+            try {
+                const { fetchActiveTickets } = await import('../queries');
+                const activeTickets = await fetchActiveTickets();
+                debug('Active tickets found:', activeTickets?.length || 0);
+
+                if (activeTickets?.length) {
+                    // Find ticket assigned to this table
+                    const tableTicket = activeTickets.find(ticket => {
+                        const entities = ticket.entities || [];
+                        return entities.some(entity =>
+                            entity.name === tableName &&
+                            (entity.type === 'Mesas' || entity.type === 'Mesa')
+                        );
+                    });
+
+                    if (tableTicket) {
+                        debug('✅ Found existing ticket for table:', tableName, tableTicket.id);
+                        // Convert to expected format
+                        const formattedTicket = {
+                            id: tableTicket.id,
+                            uid: tableTicket.uid,
+                            number: tableTicket.number,
+                            totalAmount: tableTicket.totalAmount,
+                            remainingAmount: tableTicket.remainingAmount,
+                            orders: (tableTicket.orders || []).map(order => ({
+                                uid: order.uid || order.id,
+                                name: order.name,
+                                quantity: order.quantity,
+                                price: order.price,
+                                productId: order.productId
+                            }))
+                        };
+
+                        return {
+                            success: true,
+                            ticket: formattedTicket,
+                            url: this.getTicketUrl(tableTicket.id, tableName),
+                            source: 'activeTickets'
+                        };
+                    } else {
+                        debug('⚠️ No active ticket found for table:', tableName);
+                    }
+                } else {
+                    debug('⚠️ No active tickets available');
+                }
+            } catch (error) {
+                debug('❌ Error checking active tickets:', error?.message);
+            }
+
+            // Legacy fallback (if really needed)
+            try {
+                const legacyTicket = await this.getTicketByTable(tableName);
+                if (legacyTicket?.ticket) {
+                    debug('✅ Found ticket via legacy method');
+                    return {
+                        success: true,
+                        ticket: legacyTicket.ticket,
+                        url: this.getTicketUrl(legacyTicket.ticket.id, tableName),
+                        source: 'legacy'
+                    };
+                }
+            } catch (error) {
+                debug('⚠️ Legacy getTicketByTable failed (expected):', error?.message);
             }
 
             // Register terminal using inline helper (env-driven payload + retries)
@@ -218,10 +296,12 @@ export const ticketService = {
 
             // Create terminal ticket (no table association)
             const ticket = await createTerminalTicketAsync(terminalId);
+            // Assign table immediately for new tickets (discovery-compliant)
+            try { await changeEntityOfTerminalTicketAsync(terminalId, tableName); } catch { }
             debug('✅ Terminal ticket created:', ticket.uid);
 
             // Close terminal session
-            await closeTerminalTicketInline();
+            // Do not close here; keep terminal ticket open for adding orders
 
             return {
                 success: true,

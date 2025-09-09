@@ -4,8 +4,11 @@
  */
 import { appconfig } from '../config';
 import { tokenService } from './tokenService';
+import networkHealthService from './networkHealthService';
 import cacheService from './cacheService';
 import menuService from './menuService';
+import orderTagService from './orderTagService';
+import './orderTagPreload';
 import Debug from 'debug';
 
 const debug = Debug('pmpos:datamanager');
@@ -53,6 +56,14 @@ class DataManager {
         debug('🚀 Starting application initialization...');
 
         try {
+            // Step 0: Check network connectivity first
+            debug('🌐 Step 0: Checking network connectivity...');
+            const isConnected = await networkHealthService.checkSambaPOSConnectivity();
+            if (!isConnected) {
+                debug('⚠️ Network connectivity issues detected, continuing with cached data...');
+                // Continue with cached data if available
+            }
+
             // Step 1: Load Menu (Global Cache - Level 1)
             debug('📋 Step 1: Loading menu...');
             const menuStartTime = performance.now();
@@ -61,6 +72,13 @@ class DataManager {
 
             const menuLoadTime = performance.now() - menuStartTime;
             debug(`✅ Menu loaded in ${menuLoadTime.toFixed(2)}ms - ${menu?.categories?.length || 0} categories`);
+
+            // Warm order tag groups cache asynchronously (non-blocking)
+            try {
+                orderTagService.preload(menu, 4).catch(() => { });
+            } catch (e) {
+                debug('⚠️ order tags preload failed to start:', e?.message || e);
+            }
 
             // Step 2: Load Tables (Semi-static Cache - Level 2)
             debug('🏠 Step 2: Loading tables...');
@@ -71,8 +89,7 @@ class DataManager {
             let tables;
             if (useSql) {
                 try {
-                    const { fetchTables } = await import('../queries');
-                    tables = await fetchTables();
+                    tables = await this.fetchTablesSql();
                 } catch (err) {
                     debug('\u26a0 fetchTables failed, falling back to previous loadTables()', err.message);
                     tables = await this.loadTables();
@@ -136,10 +153,9 @@ class DataManager {
             const useSql = process.env.REACT_APP_USE_SQL_READS === 'true';
             if (useSql) {
                 try {
-                    const { fetchTables } = await import('../queries');
-                    const tables = await fetchTables();
+                    const tables = await this.fetchTablesSql();
                     debug(`✅ Loaded ${tables?.length || 0} tables from read-service`);
-                    
+
                     // Process tables with status parsing
                     const processedTables = tables.map(table => {
                         const status = this.parseTableStatus(table);
@@ -150,19 +166,25 @@ class DataManager {
                             timeElapsed: this.parseTimeFromCaption(table.caption)
                         };
                     });
-                    
-                    // Cache tables with TTL (30 seconds)
+                    // Overlay active tickets to ensure occupied/bill states are visible
+                    try {
+                        await this.tryOverlayActiveTickets(processedTables);
+                    } catch (e) {
+                        debug('⚠️ overlay active tickets failed:', e?.message || e);
+                    }
+
+                    // Cache tables with longer TTL (60 seconds) since table structure doesn't change often
                     debug('💾 Saving tables to cache:', { count: processedTables.length, sample: processedTables[0] });
-                    cacheService.setTables(processedTables, 30 * 1000);
-                    
+                    cacheService.setTables(processedTables, 60 * 1000);
+
                     // Verify cache was set correctly
                     const cachedCheck = cacheService.getTables();
                     debug('✅ Cache verification:', { cachedCount: cachedCheck?.length || 0, success: !!cachedCheck });
-                    
+
                     // Emit event for components to update
                     if (typeof window !== 'undefined') {
-                        window.dispatchEvent(new CustomEvent('dataManagerRefresh', { 
-                            detail: { type: 'tables', count: processedTables.length, source: 'read-service' } 
+                        window.dispatchEvent(new CustomEvent('dataManagerRefresh', {
+                            detail: { type: 'tables', count: processedTables.length, source: 'read-service' }
                         }));
                     }
                     return processedTables;
@@ -222,18 +244,18 @@ class DataManager {
                 };
             });
 
-            // Cache tables with TTL (30 seconds)
+            // Cache tables with longer TTL (60 seconds) since table structure doesn't change often
             debug('💾 Saving tables to cache:', { count: processedTables.length, sample: processedTables[0] });
-            cacheService.setTables(processedTables, 30 * 1000);
-            
+            cacheService.setTables(processedTables, 60 * 1000);
+
             // Verify cache was set correctly
             const cachedCheck = cacheService.getTables();
             debug('✅ Cache verification:', { cachedCount: cachedCheck?.length || 0, success: !!cachedCheck });
-            
+
             // Emit event for components to update
             if (typeof window !== 'undefined') {
-                window.dispatchEvent(new CustomEvent('dataManagerRefresh', { 
-                    detail: { type: 'tables', count: processedTables.length } 
+                window.dispatchEvent(new CustomEvent('dataManagerRefresh', {
+                    detail: { type: 'tables', count: processedTables.length }
                 }));
             }
 
@@ -326,11 +348,11 @@ class DataManager {
 
             // Cache active tickets with short TTL (10 seconds)
             cacheService.setActiveTickets(tickets, 10 * 1000);
-            
+
             // Emit event for components to update
             if (typeof window !== 'undefined') {
-                window.dispatchEvent(new CustomEvent('dataManagerRefresh', { 
-                    detail: { type: 'tickets', count: tickets.length } 
+                window.dispatchEvent(new CustomEvent('dataManagerRefresh', {
+                    detail: { type: 'tickets', count: tickets.length }
                 }));
             }
 
@@ -501,6 +523,22 @@ class DataManager {
                 this.handleOrderUpdate(orderData);
             });
 
+            // Also handle common variants to keep UI in sync
+            this.signalRConnection.on('OrderUpdated', (orderData) => {
+                debug('📡 SignalR: Order updated', orderData);
+                this.handleOrderUpdate(orderData);
+            });
+
+            this.signalRConnection.on('EntityUpdated', (entityData) => {
+                debug('📡 SignalR: Entity updated', entityData);
+                this.handleEntitiesRefresh(entityData);
+            });
+
+            this.signalRConnection.on('EntityStateChanged', (entityData) => {
+                debug('📡 SignalR: Entity state changed', entityData);
+                this.handleEntitiesRefresh(entityData);
+            });
+
             this.signalRConnection.on('ENTITIES_REFRESH', (entityData) => {
                 debug('📡 SignalR: Entities refresh', entityData);
                 this.handleEntitiesRefresh(entityData);
@@ -522,16 +560,24 @@ class DataManager {
         // Mark SignalR activity
         this._lastSignalRActivity = Date.now();
         this._signalRConnected = true;
-        
-        // Debounce bursts of table events to avoid thrashing
+
+        // Debounce bursts of table events to avoid thrashing (increased debounce time)
         if (this._tableEventTimer) clearTimeout(this._tableEventTimer);
         this._tableEventTimer = setTimeout(() => {
-            // Invalidate tables cache to force refresh
-            cacheService.clearTables();
-            if (typeof window !== 'undefined') {
-                window.dispatchEvent(new CustomEvent('tableStatusChanged', { detail: tableData }));
-            }
-        }, 150);
+            // Proactively refresh tables so UI updates immediately
+            this.loadTables(true)
+                .then((tables) => {
+                    debug('✅ Tables refreshed after TableStatusChanged', { count: tables?.length || 0 });
+                    // loadTables handles cache + dataManagerRefresh event
+                })
+                .catch((err) => {
+                    debug('⚠️ Table refresh failed after TableStatusChanged, clearing cache', err?.message || err);
+                    cacheService.clearTables();
+                    if (typeof window !== 'undefined') {
+                        window.dispatchEvent(new CustomEvent('dataManagerRefresh', { detail: { type: 'tables', source: 'signalr-fallback' } }));
+                    }
+                });
+        }, 500); // Increased debounce from 150ms to 500ms to reduce rapid fire updates
     }
 
     /**
@@ -541,15 +587,24 @@ class DataManager {
         // Mark SignalR activity
         this._lastSignalRActivity = Date.now();
         this._signalRConnected = true;
-        
-        // Debounce bursts of ticket events to avoid thrashing
+
+        // Debounce bursts of ticket events to avoid thrashing (increased debounce time)
         if (this._ticketEventTimer) clearTimeout(this._ticketEventTimer);
         this._ticketEventTimer = setTimeout(() => {
-            cacheService.clearActiveTickets();
-            if (typeof window !== 'undefined') {
-                window.dispatchEvent(new CustomEvent('ticketUpdated', { detail: ticketData }));
-            }
-        }, 120);
+            // Proactively refresh active tickets so order/ticket status syncs immediately
+            this.getActiveTickets(true)
+                .then((tickets) => {
+                    debug('✅ Active tickets refreshed after Ticket event', { count: tickets?.length || 0 });
+                    // getActiveTickets handles cache + dataManagerRefresh event
+                })
+                .catch((err) => {
+                    debug('⚠️ Active tickets refresh failed, clearing cache', err?.message || err);
+                    cacheService.clearActiveTickets();
+                    if (typeof window !== 'undefined') {
+                        window.dispatchEvent(new CustomEvent('dataManagerRefresh', { detail: { type: 'tickets', source: 'signalr-fallback' } }));
+                    }
+                });
+        }, 400); // Increased debounce from 120ms to 400ms to reduce rapid fire updates
     }
 
     /**
@@ -562,6 +617,15 @@ class DataManager {
                 detail: orderData
             }));
         }
+
+        // Also refresh active tickets to sync order status changes in UI
+        this.getActiveTickets(true)
+            .then((tickets) => {
+                debug('✅ Active tickets refreshed after Order event', { count: tickets?.length || 0 });
+            })
+            .catch((err) => {
+                debug('⚠️ Active tickets refresh failed after Order event', err?.message || err);
+            });
     }
 
     /**
@@ -572,9 +636,11 @@ class DataManager {
         // Mark SignalR activity
         this._lastSignalRActivity = Date.now();
         this._signalRConnected = true;
-        
+
         debug('📡 Processing ENTITIES_REFRESH with data:', entityData);
-        
+        // Normalize to array if we received a single entity object
+        const payloadArray = Array.isArray(entityData) ? entityData : (entityData ? [entityData] : []);
+
         // Enhanced debugging for state changes
         if (Array.isArray(entityData)) {
             debug('📋 ENTITIES_REFRESH detailed data:', {
@@ -588,28 +654,28 @@ class DataManager {
                 }))
             });
         }
-        
+
         try {
             // entityData should be an array of table entities from SambaPOS
-            if (Array.isArray(entityData) && entityData.length > 0) {
+            if (payloadArray.length > 0) {
                 // Transform SambaPOS entities to our table format
-                const tables = entityData.map(entity => {
+                const tables = payloadArray.map(entity => {
                     // Extract status with better fallback handling
                     let status = entity.EntityState || entity.state || entity.Status;
-                    
+
                     // Normalize unknown statuses to prevent gray flickering
                     if (!status || status === '' || status === null || status === undefined) {
                         status = 'LIBRE'; // Default to available if status is missing
                     }
-                    
+
                     // Map status to ensure consistency with regular table loading
                     const mappedStatus = this.normalizeEntityStatus(status);
                     const color = this.mapStatusToColor(mappedStatus);
-                    
+
                     // Get raw entity name and clean HTML tags
                     const rawEntityName = entity.EntityName || entity.name || entity.Name || entity.EntityCustomData?.name || `Mesa ${entity.EntityId || entity.id}`;
                     const entityName = this.cleanHtmlFromEntityName(rawEntityName);
-                    
+
                     // Enhanced debugging for SignalR color flickering issues
                     debug(`🔄 SignalR Entity Transform: ${entityName}`, {
                         originalStatus: entity.EntityState || entity.state || entity.Status,
@@ -618,7 +684,7 @@ class DataManager {
                         rawName: rawEntityName,
                         cleanName: entityName
                     });
-                    
+
                     return {
                         id: entity.EntityId || entity.id,
                         name: entityName,
@@ -632,14 +698,14 @@ class DataManager {
                 });
 
                 debug(`✅ Transformed ${tables.length} entities to table format`);
-                
+
                 // Update cache with fresh data instead of clearing it
                 cacheService.setTables(tables, 60 * 1000); // Cache for 1 minute
-                
+
                 // Emit event for UI components
                 if (typeof window !== 'undefined') {
-                    window.dispatchEvent(new CustomEvent('dataManagerRefresh', { 
-                        detail: { type: 'tables', count: tables.length, source: 'signalr' } 
+                    window.dispatchEvent(new CustomEvent('dataManagerRefresh', {
+                        detail: { type: 'tables', count: tables.length, source: 'signalr' }
                     }));
                 }
             } else {
@@ -660,9 +726,9 @@ class DataManager {
         if (!status || typeof status !== 'string') {
             return 'LIBRE';
         }
-        
+
         const upperStatus = status.toUpperCase().trim();
-        
+
         // Map various status variations to consistent values
         const statusMap = {
             // Available variations
@@ -670,27 +736,27 @@ class DataManager {
             'AVAILABLE': 'LIBRE',
             'FREE': 'LIBRE',
             'EMPTY': 'LIBRE',
-            
+
             // Occupied variations
             'OCUPADO': 'OCUPADO',
             'OCCUPIED': 'OCUPADO',
             'BUSY': 'OCUPADO',
             'NUEVOS PEDIDOS': 'OCUPADO',
             'NEW ORDERS': 'OCUPADO',
-            
+
             // Bill requested variations
             'CUENTA': 'CUENTA',
             'BILL': 'CUENTA',
             'CHECK': 'CUENTA',
             'CUENTA SOLICITADA': 'CUENTA',
             'BILL REQUESTED': 'CUENTA',
-            
+
             // Blocked variations
             'BLOQUEADO': 'BLOQUEADO',
             'BLOCKED': 'BLOQUEADO',
             'LOCKED': 'BLOQUEADO'
         };
-        
+
         return statusMap[upperStatus] || upperStatus;
     }
 
@@ -723,7 +789,7 @@ class DataManager {
         if (!name || typeof name !== 'string') {
             return name;
         }
-        
+
         // Remove HTML tags like <size 190>...</size>, <br/>, etc.
         let cleanName = name
             .replace(/<[^>]*>/g, '') // Remove all HTML tags
@@ -732,15 +798,15 @@ class DataManager {
             .replace(/&amp;/g, '&')
             .replace(/&nbsp;/g, ' ')
             .trim();
-            
+
         // Handle complex patterns like "112" (where "1" is repeated), "314", etc.
         // These seem to be duplicated digits or complex entity names
-        
+
         // First, try to extract just the first meaningful number
         const singleNumberMatch = cleanName.match(/^(\d+)/);
         if (singleNumberMatch) {
             const number = singleNumberMatch[1];
-            
+
             // If it's a repeating pattern like "112" -> "1", "223" -> "2", etc.
             if (number.length >= 2) {
                 const firstDigit = number[0];
@@ -748,22 +814,22 @@ class DataManager {
                 if (isRepeatingPattern) {
                     return firstDigit; // Return just the first digit for repeating patterns
                 }
-                
+
                 // Check if it's a simple concatenation like "11" -> "1", "22" -> "2"
                 if (number.length === 2 && number[0] === number[1]) {
                     return number[0];
                 }
-                
+
                 // For other multi-digit cases, try to find the actual table number
                 // If the string contains time info, it might be like "1 1 min." -> extract first digit
                 if (cleanName.includes('min') || cleanName.includes(':')) {
                     return firstDigit;
                 }
             }
-            
+
             return number; // Return the full number if it seems legitimate
         }
-        
+
         return cleanName;
     }
 
@@ -774,6 +840,9 @@ class DataManager {
         if (!table) return 'BLOQUEADO';
 
         // First try to get status from entity state if available
+        if (table.status) {
+            return this.normalizeEntityStatus(table.status);
+        }
         if (table.EntityState || table.state) {
             return this.normalizeEntityStatus(table.EntityState || table.state);
         }
@@ -806,6 +875,170 @@ class DataManager {
         if (!caption) return null;
         const match = caption.match(/(\d+)\s*min/);
         return match ? parseInt(match[1], 10) * 60000 : null;
+    }
+
+    /**
+     * Resolve base URL for read-service in production (no dev proxy)
+     */
+    resolveReadServiceBase() {
+        try {
+            const env = process?.env?.READ_SERVICE_URL;
+            if (env) return String(env).replace(/\/$/, '');
+            const cfg = appconfig();
+            const base = cfg?.GQLserv || (typeof window !== 'undefined' ? window.location.origin : '');
+            if (!base) return null;
+            const u = new URL(base);
+            const port = (u.port && u.port !== '80' && u.port !== '443') ? u.port : '9000';
+            const hostPort = port === '9000' ? '4005' : port;
+            return `${u.protocol}//${u.hostname}:${hostPort}`;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    /**
+     * Fetch tables directly from read-service (prod-safe, no webpack dev proxy required)
+     */
+    async fetchTablesSql() {
+        const screenName = process.env.SAMBAPOS_ENTITY_SCREEN || 'MESAS';
+        const screen = encodeURIComponent(screenName);
+        const base = this.resolveReadServiceBase();
+        if (!base) throw new Error('No READ_SERVICE_URL or base derivation available');
+
+        // Build candidate endpoints (prefer active-only if available on server)
+        const ls = (typeof window !== 'undefined') ? window.localStorage : null;
+        const activeOnlyFlag = (ls && ls.getItem('READ_SERVICE_ACTIVE_ONLY')) || process?.env?.READ_SERVICE_ACTIVE_ONLY || 'false';
+        const preferActiveOnly = String(activeOnlyFlag).toLowerCase() === 'true';
+        const candidates = [];
+        if (preferActiveOnly) {
+            candidates.push(`${base}/internal-api/tables?screen=${screen}&activeOnly=true`);
+            candidates.push(`${base}/internal-api/tables/active?screen=${screen}`);
+        }
+        // Entity screen items shape (server may expose this alias)
+        candidates.push(`${base}/internal-api/entity-screen-items?name=${encodeURIComponent(screenName)}`);
+        // Generic tables list filtered by screen
+        candidates.push(`${base}/internal-api/tables?screen=${screen}`);
+
+        const headers = { 'Content-Type': 'application/json' };
+        const apiKey = (ls && (ls.getItem('READ_SERVICE_APIKEY') || ls.getItem('INTERNAL_API_KEY')))
+            || process?.env?.READ_SERVICE_APIKEY || process?.env?.INTERNAL_API_KEY;
+        if (apiKey) {
+            headers['apikeyAuth'] = apiKey;
+            headers['X-INTERNAL-API-KEY'] = apiKey;
+        }
+
+        let rows = null;
+        let lastErr = null;
+        for (const endpoint of candidates) {
+            try {
+                const resp = await fetch(endpoint, { method: 'GET', headers });
+                if (!resp.ok) {
+                    lastErr = new Error(`HTTP ${resp.status}`);
+                    continue;
+                }
+                rows = await resp.json();
+                break;
+            } catch (e) {
+                lastErr = e;
+            }
+        }
+        if (!rows) throw lastErr || new Error('No SQL endpoint available for tables');
+
+        return (Array.isArray(rows) ? rows : []).map(r => ({
+            id: r.EntityId ?? r.Id ?? r.entityId ?? r.id ?? null,
+            name: String(r.EntityName ?? r.Name ?? r.entityName ?? r.name ?? ''),
+            caption: String(r.Caption ?? r.EntityCaption ?? r.Name ?? r.name ?? ''),
+            color: r.Color ?? null,
+            labelColor: r.LabelColor ?? '#000000',
+            status: r.Status ?? r.status ?? null,
+            customData: r.CustomData ?? r.customData ?? null
+        }));
+    }
+
+    /**
+     * Fetch active tickets from read-service
+     */
+    async fetchActiveTicketsSql() {
+        const base = this.resolveReadServiceBase();
+        if (!base) throw new Error('No READ_SERVICE_URL or base derivation available');
+        const url = `${base}/internal-api/active-tickets`;
+        const headers = { 'Content-Type': 'application/json' };
+        const ls = (typeof window !== 'undefined') ? window.localStorage : null;
+        const apiKey = (ls && (ls.getItem('READ_SERVICE_APIKEY') || ls.getItem('INTERNAL_API_KEY')))
+            || process?.env?.READ_SERVICE_APIKEY || process?.env?.INTERNAL_API_KEY;
+        if (apiKey) {
+            headers['apikeyAuth'] = apiKey;
+            headers['X-INTERNAL-API-KEY'] = apiKey;
+        }
+        const resp = await fetch(url, { method: 'GET', headers });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const rows = await resp.json();
+        return Array.isArray(rows) ? rows : [];
+    }
+
+    /**
+     * Overlay active tickets info onto tables: sets status/ticketId/ticketNumber
+     */
+    async tryOverlayActiveTickets(tables) {
+        try {
+            const useSql = process.env.REACT_APP_USE_SQL_READS === 'true';
+            let tickets = [];
+            if (useSql) {
+                try { tickets = await this.fetchActiveTicketsSql(); } catch (_) { }
+            }
+            if (!tickets || tickets.length === 0) {
+                try { tickets = await this.getActiveTickets(true); } catch (_) { }
+            }
+            if (!tickets || tickets.length === 0) return tables;
+
+            const entityType = (process?.env?.SAMBAPOS_ENTITY_TYPE || 'Mesas');
+            const stateToStatus = (t) => {
+                try {
+                    const states = t.states || t.CurrentTicketStates || [];
+                    const statesArr = Array.isArray(states) ? states : [];
+                    const hasBill = statesArr.some(s => {
+                        const n = String(s.stateName || s.StateName || '').toUpperCase();
+                        const v = String(s.state || s.State || '').toUpperCase();
+                        return n.includes('BILL') || v.includes('BILL') || v.includes('CUENTA');
+                    });
+                    if (hasBill) return 'CUENTA';
+                } catch (_) { }
+                return 'OCUPADO';
+            };
+
+            const byTable = new Map();
+            for (const t of tickets) {
+                const ents = t.entities || t.Entities || [];
+                for (const e of ents) {
+                    const type = String(e.type || e.Type || e.EntityType || '').trim();
+                    const name = String(e.name || e.Name || e.EntityName || '').trim();
+                    if (!name) continue;
+                    if (type && entityType && type !== entityType) continue;
+                    byTable.set(name, {
+                        ticketId: String(t.id || t.Id || t.TicketId || ''),
+                        ticketNumber: String(t.number || t.Number || t.TicketNumber || ''),
+                        status: stateToStatus(t)
+                    });
+                }
+            }
+
+            for (const table of tables) {
+                const key = String(table.name || table.EntityName || '').trim();
+                if (byTable.has(key)) {
+                    const info = byTable.get(key);
+                    table.ticketId = info.ticketId || table.ticketId || null;
+                    table.ticketNumber = info.ticketNumber || table.ticketNumber || null;
+                    const st = info.status || table.status || 'OCUPADO';
+                    table.status = this.normalizeEntityStatus(st);
+                    table.color = this.mapStatusToColor(table.status);
+                }
+            }
+
+            return tables;
+        } catch (e) {
+            debug('⚠️ tryOverlayActiveTickets failed', e?.message || e);
+            return tables;
+        }
     }
 
     /**
@@ -884,33 +1117,33 @@ class DataManager {
         if (this._pollingInterval) return; // Already started
 
         debug('🔄 Starting intelligent polling backup system...');
-        
+
         this._pollingInterval = setInterval(() => {
             if (!this.initialized) return;
-            
+
             const now = Date.now();
             const timeSinceActivity = now - this._lastSignalRActivity;
-            const signalRIsHealthy = this._signalRConnected && timeSinceActivity < 30000; // 30s threshold
-            
+            const signalRIsHealthy = this._signalRConnected && timeSinceActivity < 60000; // 60s threshold (increased from 30s)
+
             if (signalRIsHealthy) {
                 // SignalR is working fine, no need to poll
                 return;
             }
-            
+
             // SignalR is down or inactive, do backup polling
             debug('📡 SignalR inactive, running backup data refresh...');
-            
-            // Refresh both tickets and tables more frequently since SignalR state changes aren't working
+
+            // Refresh both tickets and tables with reduced frequency to prevent server saturation
             this.getActiveTickets(true).catch(err => {
                 debug('⚠️ Backup polling failed:', err.message);
             });
-            
-            // Refresh tables every cycle (every 15s) to detect state changes like CUENTA
+
+            // Refresh tables every cycle (every 30s) to detect state changes like CUENTA
             this.loadTables(true).catch(err => {
                 debug('⚠️ Backup table refresh failed:', err.message);
             });
-            
-        }, 15000); // Check every 15 seconds (more responsive for state changes)
+
+        }, 30000); // Check every 30 seconds (reduced from 15s to prevent server overload)
     }
 
     /**

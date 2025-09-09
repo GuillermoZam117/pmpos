@@ -16,6 +16,11 @@ import CircularProgress from '@mui/material/CircularProgress';
 // Initialize log export helpers
 import './utils/logExporter';
 
+// Initialize debug commands in development
+if (process.env.NODE_ENV !== 'production') {
+    import('./utils/debugCommands');
+}
+
 // Lazy load components
 const App = React.lazy(() => import('./components/App'));
 
@@ -38,22 +43,22 @@ const RootApp = () => {
 };
 
 const LoadingFallback = () => (
-  <div style={{ 
-    display: 'flex', 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    height: '100vh' 
-  }}>
-    <CircularProgress />
-  </div>
+    <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh'
+    }}>
+        <CircularProgress />
+    </div>
 );
 
 // Silenciar warnings de React Router
 const router = {
-  future: {
-    v7_startTransition: true,
-    v7_relativeSplatPath: true
-  }
+    future: {
+        v7_startTransition: true,
+        v7_relativeSplatPath: true
+    }
 };
 
 // Initialize token handling

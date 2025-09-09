@@ -201,6 +201,97 @@ export const debugSambaPOS = async () => {
     console.groupEnd();
 };
 
+// Attach endpoint debugger to window for quick inspection
+export const attachDebugEndpoint = () => {
+  try {
+    const { resolveGqlUrl } = require('./gqlEndpoint');
+    const { appconfig } = require('../config');
+    window.debugEndpoint = () => {
+      const cfg = appconfig();
+      const url = resolveGqlUrl(cfg);
+      const qs = new URLSearchParams(window.location.search);
+      const info = {
+        resolvedUrl: url,
+        query: {
+          api: qs.get('api'),
+          port: qs.get('port')
+        },
+        env: {
+          REACT_APP_USE_PROXY: process?.env?.REACT_APP_USE_PROXY,
+          SAMBAPOS_API_URL: process?.env?.SAMBAPOS_API_URL,
+          SAMBAPOS_API_PORT: process?.env?.SAMBAPOS_API_PORT
+        },
+        storage: {
+          pmpos_api_url: localStorage.getItem('pmpos_api_url'),
+          pmpos_api_port: localStorage.getItem('pmpos_api_port')
+        }
+      };
+      console.group('GraphQL Endpoint Resolver');
+      console.log(info);
+      console.groupEnd();
+      return info;
+    };
+    console.log('🔧 debugEndpoint() attached. Call window.debugEndpoint() to inspect GraphQL endpoint.');
+  } catch (e) {
+    try { console.warn('debugEndpoint attachment failed:', e?.message || e); } catch (_) {}
+  }
+};
+
+// Auto-attach in development
+try {
+  if (typeof window !== 'undefined' && process && process.env && process.env.NODE_ENV !== 'production') {
+    attachDebugEndpoint();
+    try {
+      const { resolveGqlUrl } = require('./gqlEndpoint');
+      const { appconfig } = require('../config');
+      const url = resolveGqlUrl(appconfig());
+      // Startup banner for endpoint visibility in dev
+      console.log('🛰️ GraphQL endpoint:', url, {
+        REACT_APP_USE_PROXY: process?.env?.REACT_APP_USE_PROXY,
+        SAMBAPOS_API_URL: process?.env?.SAMBAPOS_API_URL,
+        SAMBAPOS_API_PORT: process?.env?.SAMBAPOS_API_PORT
+      });
+      // Attach fetch interceptor so all modules use the same endpoint transparently
+      try {
+        const { attachGraphQLFetchInterceptor } = require('./gqlEndpoint');
+        attachGraphQLFetchInterceptor(appconfig());
+      } catch (e) {
+        console.warn('GraphQL fetch interceptor failed:', e?.message || e);
+      }
+    } catch (_) {}
+  }
+} catch (_) {}
+
+// Utility: clear terminal mappings and force re-registration next time
+export const attachResetTerminalMapping = () => {
+  try {
+    window.resetTerminalMapping = () => {
+      try {
+        const keys = [
+          'pmpos_terminals_by_user',
+          'pmpos_current_terminal',
+          'pmpos_last_user',
+          'pmpos_last_terminal_user'
+        ];
+        keys.forEach(k => localStorage.removeItem(k));
+        console.log('🧹 Cleared terminal mapping from localStorage. Next operation will re-register terminal.');
+        return true;
+      } catch (e) {
+        console.warn('Failed clearing terminal mapping:', e?.message || e);
+        return false;
+      }
+    };
+    console.log('🔧 resetTerminalMapping() attached. Call to clear stored terminal IDs and force registration.');
+  } catch (_) {}
+};
+
+// Attach reset helper in dev
+try {
+  if (typeof window !== 'undefined' && process && process.env && process.env.NODE_ENV !== 'production') {
+    attachResetTerminalMapping();
+  }
+} catch (_) {}
+
 // Make available globally for browser console
 if (typeof window !== 'undefined') {
     window.debugSambaPOS = debugSambaPOS;

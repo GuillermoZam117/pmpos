@@ -28,6 +28,21 @@ class TerminalService {
                 this._terminalsByUser = new Map(Object.entries(terminals));
                 Object.keys(terminals).forEach(u => this._serverRegisteredUsers.add(u));
                 debug('✅ Loaded terminals from storage:', terminals);
+                
+                // If we have stored terminals, also check for current user in localStorage
+                try {
+                    const userData = localStorage.getItem('user');
+                    if (userData) {
+                        const user = JSON.parse(userData);
+                        const userName = user?.name;
+                        if (userName && this._terminalsByUser.has(userName)) {
+                            debug('✅ Restored current user with terminal from storage:', userName);
+                            this._currentUser = userName;
+                        }
+                    }
+                } catch (e) {
+                    debug('⚠️ Could not restore current user from storage:', e);
+                }
             }
         } catch (error) {
             debug('❌ Error loading terminals from storage:', error);
@@ -46,22 +61,51 @@ class TerminalService {
     }
 
     setCurrentUser(userName) {
+        const oldUser = this._currentUser;
         this._currentUser = userName;
-        debug('👤 Current user set to:', userName);
+        debug('👤 Current user changed from', oldUser, 'to:', userName);
+        
+        // If setting to same user that already has terminal, nothing to do
+        if (userName && oldUser === userName && this.getTerminalId(userName)) {
+            debug('✅ User unchanged and has terminal, no action needed');
+        }
     }
 
     getTerminalId(userName = null) {
         const user = userName || this._currentUser;
-        if (!user) return null;
+        
+        // Enhanced debugging for terminal ID retrieval
+        debug('🔍 getTerminalId called:', {
+            requestedUser: userName,
+            currentUser: this._currentUser,
+            effectiveUser: user,
+            hasUser: !!user
+        });
+        
+        if (!user) {
+            debug('❌ getTerminalId: No user specified');
+            return null;
+        }
 
         const terminalId = this._terminalsByUser.get(user);
-        if (terminalId) return terminalId;
+        if (terminalId) {
+            debug('✅ getTerminalId: Found in _terminalsByUser:', terminalId);
+            return terminalId;
+        }
 
         if (typeof window !== 'undefined') {
             try {
-                if (window.currentTerminalId) return window.currentTerminalId;
+                if (window.currentTerminalId) {
+                    debug('✅ getTerminalId: Found in window.currentTerminalId:', window.currentTerminalId);
+                    return window.currentTerminalId;
+                }
                 const legacy = localStorage.getItem('currentTerminalId') || localStorage.getItem('pmpos_terminal_id');
-                if (legacy) return legacy;
+                if (legacy) {
+                    debug('✅ getTerminalId: Found in localStorage:', legacy);
+                    return legacy;
+                }
+                
+                debug('❌ getTerminalId: No terminal ID found in any storage location');
             } catch (e) {
                 debug('❌ Error reading legacy terminalId from storage:', e);
             }
@@ -94,18 +138,32 @@ class TerminalService {
 
     async ensureTerminalRegistered(user = null) {
         const userName = user || this._currentUser;
-        if (!userName) return null;
+        if (!userName) {
+            debug('❌ ensureTerminalRegistered: No user specified');
+            return null;
+        }
         if (!this._currentUser) this.setCurrentUser(userName);
 
+        // Check if we already have a valid terminal ID for this user
         const existingId = this.getTerminalId(userName);
-        if (existingId) return existingId;
+        if (existingId) {
+            debug('✅ ensureTerminalRegistered: Using existing terminal ID:', existingId);
+            return existingId;
+        }
 
-        if (process.env.REACT_APP_SKIP_TERMINAL_REGISTER === 'true') return null;
+        // Skip registration if explicitly disabled
+        if (process.env.REACT_APP_SKIP_TERMINAL_REGISTER === 'true') {
+            debug('⚠️ Terminal registration skipped by environment variable');
+            return null;
+        }
 
+        // Prevent concurrent registrations for the same user
         if (this._registrationInFlight && this._registrationPromise) {
+            debug('⏳ Terminal registration already in flight, waiting...');
             return await this._registrationPromise;
         }
 
+        debug('🚀 Starting terminal registration for user:', userName);
         this._registrationInFlight = true;
         this._registrationPromise = this._performRegistration(userName);
 
@@ -113,6 +171,8 @@ class TerminalService {
             const terminalId = await this._registrationPromise;
             if (terminalId) {
                 this.setTerminalId(terminalId, userName);
+                debug('✅ Terminal registration successful:', terminalId);
+                
                 // Notify listeners about successful registration
                 try {
                     this._onRegisteredCallbacks.forEach(cb => {
@@ -123,10 +183,10 @@ class TerminalService {
                 }
                 return terminalId;
             }
-            debug('⚠️ Terminal registration returned no id for user', userName);
+            debug('⚠️ Terminal registration returned no ID for user', userName);
             return null;
         } catch (error) {
-            debug('❌ Terminal registration failed for user', userName + ':', error);
+            debug('❌ Terminal registration failed for user', userName + ':', error?.message || error);
             return null;
         } finally {
             this._registrationInFlight = false;

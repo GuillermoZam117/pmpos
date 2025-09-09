@@ -13,9 +13,16 @@ const Header = () => {
     };
 
     return (
-        <AppBar position="static">
-            <Toolbar>
-                <Typography variant="h6" color="inherit">
+        <AppBar position="sticky">
+            <Toolbar sx={{
+                minHeight: { xs: 56, sm: 64 },
+                pt: 'env(safe-area-inset-top, 0px)',
+                px: { xs: 1, sm: 2 },
+                display: 'flex',
+                flexWrap: { xs: 'wrap', sm: 'nowrap' },
+                gap: 1
+            }}>
+                <Typography variant="h6" sx={{ color: 'common.white', fontWeight: 700 }} noWrap>
                     SAMBASOFTMX
                 </Typography>
             </Toolbar>

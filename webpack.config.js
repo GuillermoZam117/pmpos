@@ -44,8 +44,11 @@ module.exports = (env, argv) => {
             SAMBAPOS_LABEL_SUBMIT: process.env.SAMBAPOS_LABEL_SUBMIT,
             SAMBAPOS_LABEL_PRINT_BILL: process.env.SAMBAPOS_LABEL_PRINT_BILL,
             SAMBAPOS_LABEL_PAY: process.env.SAMBAPOS_LABEL_PAY,
-            // Hybrid read-service feature flag and internal API key (dev only exposure)
-            REACT_APP_USE_SQL_READS: process.env.REACT_APP_USE_SQL_READS || 'false',
+            // Hybrid read-service feature flag and internal API key
+            // Default: enable SQL reads in production unless explicitly disabled
+            REACT_APP_USE_SQL_READS: process.env.REACT_APP_USE_SQL_READS || (isProduction ? 'true' : 'false'),
+            READ_SERVICE_URL: process.env.READ_SERVICE_URL || env.READ_SERVICE_URL,
+            READ_SERVICE_APIKEY: process.env.READ_SERVICE_APIKEY || env.READ_SERVICE_APIKEY,
             INTERNAL_API_KEY: process.env.INTERNAL_API_KEY || 'local-test-key',
             REACT_APP_SEND_INTERNAL_KEY: process.env.REACT_APP_SEND_INTERNAL_KEY || 'false',
             // Disable GraphQL read fallbacks by default
@@ -134,7 +137,8 @@ module.exports = (env, argv) => {
                     changeOrigin: true,
                     secure: false,
                     headers: {
-                        'X-INTERNAL-API-KEY': process.env.INTERNAL_API_KEY || 'local-test-key'
+                        'X-INTERNAL-API-KEY': process.env.READ_SERVICE_APIKEY || process.env.INTERNAL_API_KEY || 'local-test-key',
+                        'apikeyAuth': process.env.READ_SERVICE_APIKEY || process.env.INTERNAL_API_KEY || 'local-test-key'
                     },
                     onProxyReq: (proxyReq) => {
                         console.log('🧩 Read-service Request:', proxyReq.path);

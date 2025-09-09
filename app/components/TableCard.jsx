@@ -1,6 +1,7 @@
 import React from 'react';
 import { Paper, Typography, Stack, Chip } from '@mui/material';
 import AccessTimeOutlined from '@mui/icons-material/AccessTimeOutlined';
+import ReceiptLongOutlined from '@mui/icons-material/ReceiptLongOutlined';
 import GroupOutlined from '@mui/icons-material/GroupOutlined';
 import AttachMoneyOutlined from '@mui/icons-material/AttachMoneyOutlined';
 import EventSeatOutlined from '@mui/icons-material/EventSeatOutlined';
@@ -150,6 +151,21 @@ const TableCard = ({ table, onClick }) => {
                 )}
                 
                 {getStatusChip(table.status)}
+
+                {/* Show ticket number when available */}
+                {table.ticketNumber && (
+                    <Chip
+                        icon={<ReceiptLongOutlined sx={{ color: '#111827 !important' }} />}
+                        label={`Ticket #${String(table.ticketNumber)}`}
+                        sx={{
+                            color: '#111827',
+                            backgroundColor: 'rgba(17, 24, 39, 0.06)',
+                            border: '1px solid #9ca3af',
+                            fontWeight: 600,
+                            fontSize: '0.8rem'
+                        }}
+                    />
+                )}
             </Stack>
         </Paper>
     );

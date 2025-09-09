@@ -10,6 +10,7 @@ import { ThemeProvider } from '../contexts/ThemeContext';
 import { tokenService } from '../services/tokenService';
 import dataManager from '../services/dataManager';
 import ticketPromotionService from '../services/ticketPromotionService';
+import ConnectionStatus from './ConnectionStatus';
 import Debug from 'debug';
 
 const debug = Debug('pmpos:app');
@@ -43,10 +44,10 @@ const POSViewUnified = lazyWithRetry(() => import('./POS/POSViewUnified'));
 
 // Loading component with progress indication
 const LoadingComponent = ({ progress }) => (
-    <div style={{ 
-        display: 'flex', 
+    <div style={{
+        display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'center', 
+        justifyContent: 'center',
         alignItems: 'center',
         minHeight: '100vh',
         padding: '2rem',
@@ -101,18 +102,18 @@ const AppContent = () => {
                 setInitProgress({ stage: 'Inicializando autenticación...', progress: 25 });
                 console.log('🔄 Starting token preload for instant login...');
                 tokenService.preloadTokenIfNeeded(); // No await - background operation
-                
+
                 await dispatch(initializeAuth());
                 debug('✅ Authentication initialized');
 
                 // Step 2: Initialize DataManager - loads Menu + Tables + SignalR (75%)
                 setInitProgress({ stage: 'Cargando datos iniciales...', progress: 50 });
                 const initResult = await dataManager.initializeApp();
-                
+
                 if (initResult.success) {
                     setInitProgress({ stage: 'Configurando interfaz...', progress: 90 });
                     debug(`✅ DataManager initialized - Menu: ${initResult.menu?.categories?.length || 0} categories, Tables: ${initResult.tables?.length || 0} tables`);
-                    
+
                     // Dispatch data to Redux store
                     if (initResult.menu) {
                         dispatch({ type: 'SET_MENU', menu: initResult.menu });
@@ -123,9 +124,9 @@ const AppContent = () => {
                 } else {
                     debug('⚠️ DataManager initialization completed with warnings');
                 }
-                
+
                 setInitProgress({ stage: 'Completando configuración...', progress: 100 });
-                
+
                 // Add debug helpers to window for testing
                 if (typeof window !== 'undefined') {
                     window.debugDataManager = () => {
@@ -135,12 +136,12 @@ const AppContent = () => {
                         console.log('  - Cached Menu:', !!dataManager.getCachedMenu());
                         console.log('  - Cached Tables:', dataManager.getCachedTables()?.length || 0);
                     };
-                    
+
                     window.debugTicketPromotion = () => {
                         console.log('🎫 Ticket Promotion Debug Info:');
                         console.log(ticketPromotionService.getPromotionStatus());
                     };
-                    
+
                     window.retryTicketPromotion = async (ticketUid) => {
                         console.log('🔄 Manual ticket promotion retry:', ticketUid);
                         try {
@@ -152,14 +153,14 @@ const AppContent = () => {
                             throw error;
                         }
                     };
-                    
+
                     window.clearFailedTickets = () => {
                         console.log('🗑️ Clearing failed tickets...');
                         const count = ticketPromotionService.clearFailedTickets();
                         console.log(`✅ Cleared ${count} failed tickets`);
                         return count;
                     };
-                    
+
                     window.refreshData = async (type = 'all') => {
                         console.log('🔄 Refreshing data:', type);
                         try {
@@ -198,13 +199,39 @@ const AppContent = () => {
                             throw error;
                         }
                     };
-                    
+
+                    // Expose end-to-end GraphQL flow helper (create -> assign -> add -> close)
+                    window.runGraphqlFlow = async (tableName, productName, quantity = 1, portion = null, closeAfter = true) => {
+                        console.log('🚀 runGraphqlFlow:', { tableName, productName, quantity, portion, closeAfter });
+                        try {
+                            const { ticketService } = await import('../services/ticketService');
+                            const terminalService = (await import('../services/terminalService')).default;
+                            const userName = (window.__pmpos_user && window.__pmpos_user.name) || null;
+                            let terminalId = terminalService.getTerminalId();
+                            if (!terminalId) {
+                                try { terminalId = await terminalService.ensureTerminalRegistered(userName); } catch (_) { }
+                            }
+                            const res = await ticketService.createAssignAddClose({
+                                terminalId,
+                                tableName,
+                                order: { productName, quantity, portion },
+                                close: closeAfter
+                            });
+                            console.log('✅ runGraphqlFlow result:', res);
+                            return res;
+                        } catch (e) {
+                            console.error('❌ runGraphqlFlow failed:', e);
+                            throw e;
+                        }
+                    };
+
                     console.log('🔧 Debug commands available:');
                     console.log('  - window.debugDataManager() - Show DataManager status');
                     console.log('  - window.debugTicketPromotion() - Show ticket promotion status');
                     console.log('  - window.retryTicketPromotion(uid) - Manually retry ticket promotion');
                     console.log('  - window.clearFailedTickets() - Clear failed tickets from cache');
                     console.log('  - window.refreshData(type) - Refresh data (menu|tables|tickets|all)');
+                    console.log('  - window.runGraphqlFlow(table, product, qty?, portion?, closeAfter?)');
                 }
             } catch (err) {
                 debug('❌ Initialization error:', err);
@@ -225,13 +252,13 @@ const AppContent = () => {
     // Show error state if initialization failed
     if (error) {
         return (
-            <div style={{ 
-                display: 'flex', 
-                justifyContent: 'center', 
+            <div style={{
+                display: 'flex',
+                justifyContent: 'center',
                 alignItems: 'center',
                 minHeight: '100vh',
                 padding: '2rem',
-                color: '#ff0000' 
+                color: '#ff0000'
             }}>
                 <h2>Error: {error}</h2>
             </div>
@@ -241,35 +268,38 @@ const AppContent = () => {
     return (
         <>
             <CssBaseline />
+            {/* Connection Status Component - Always visible */}
+            <ConnectionStatus />
+
             <div className="app-container">
                 <Suspense fallback={<LoadingComponent />}>
                     <Routes>
                         {/* Default route redirects to PinPad */}
-                        <Route 
-                            path={ROUTES.PINPAD} 
-                            element={<PinPad />} 
+                        <Route
+                            path={ROUTES.PINPAD}
+                            element={<PinPad />}
                         />
                         {/* Protected Tables route */}
-                        <Route 
-                            path={ROUTES.TABLES} 
+                        <Route
+                            path={ROUTES.TABLES}
                             element={
                                 <PrivateRoute>
                                     <TableView />
                                 </PrivateRoute>
-                            } 
+                            }
                         />
-                        <Route 
+                        <Route
                             path={ROUTES.POS}
                             element={
                                 <PrivateRoute>
                                     <POSViewUnified />
                                 </PrivateRoute>
-                            } 
+                            }
                         />
                         {/* Catch all route redirects to PinPad */}
-                        <Route 
-                            path="*" 
-                            element={<Navigate to={ROUTES.PINPAD} replace />} 
+                        <Route
+                            path="*"
+                            element={<Navigate to={ROUTES.PINPAD} replace />}
                         />
                     </Routes>
                 </Suspense>

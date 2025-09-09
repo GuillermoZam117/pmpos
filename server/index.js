@@ -132,6 +132,223 @@ app.get('/internal-api/health', async (req, res) => {
 
 /**
  * @swagger
+ * /internal-api/validate-admin:
+ *   post:
+ *     summary: Validate if a PIN or user is ADMIN via SQL
+ *     description: Checks Users and UserRoles in SQL Server to determine admin privileges without touching token logic.
+ *     tags: [Auth]
+ *     security:
+ *       - ApiKeyAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               pin:
+ *                 type: string
+ *                 example: "1234"
+ *               name:
+ *                 type: string
+ *                 example: "GUILLERMO ZAMBRANO"
+ *     responses:
+ *       200:
+ *         description: Admin validation result
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok:
+ *                   type: boolean
+ *                 isAdmin:
+ *                   type: boolean
+ *                 name:
+ *                   type: string
+ *                 roleName:
+ *                   type: string
+ *                 roleId:
+ *                   type: integer
+ *       401:
+ *         description: Unauthorized - missing or invalid API key
+ *       500:
+ *         description: Server error
+ */
+app.post('/internal-api/validate-admin', async (req, res) => {
+    const requestId = req.requestId || Math.random().toString(36).slice(2,10);
+    try {
+        const { pin, name } = req.body || {};
+        if (!pin && !name) return res.status(400).json({ ok: false, error: 'pin or name required' });
+
+        const db = require('./lib/db');
+        // Normalize and query by PIN or NAME (db.query expects an object map of parameters)
+        let where = '';
+        let params = {};
+        if (pin) { where = 'u.PinCode = @pin'; params = { pin: String(pin) }; }
+        else { where = 'UPPER(LTRIM(RTRIM(u.Name))) = UPPER(LTRIM(RTRIM(@name)))'; params = { name: String(name) }; }
+
+        const sql = `
+            SELECT TOP 1
+                u.Id            AS userId,
+                u.Name          AS userName,
+                u.PinCode       AS pinCode,
+                ur.Id           AS roleId,
+                ur.Name         AS roleName,
+                ISNULL(ur.IsAdmin, 0) AS isAdmin
+            FROM Users u
+            LEFT JOIN UserRoles ur ON ur.Id = u.UserRole_Id
+            WHERE ${where}
+        `;
+
+        const rows = await db.query(sql, params);
+        if (!rows || rows.length === 0) {
+            return res.json({ ok: true, isAdmin: false, name: null, roleName: null, roleId: null });
+        }
+
+        const r = rows[0];
+        const roleName = (r.roleName || '').toString();
+        const roleUp = roleName.toUpperCase();
+        const isAdmin = (r.isAdmin === true || r.isAdmin === 1) || roleUp === 'ADMIN' || roleUp.startsWith('ADMIN');
+        return res.json({ ok: true, isAdmin, name: r.userName, roleName, roleId: r.roleId });
+    } catch (err) {
+        debug(`❌ [${requestId}] validate-admin error: ${err.message}`);
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * @swagger
+ * /internal-api/users/admins:
+ *   get:
+ *     summary: List admin users (by SQL)
+ *     description: Returns users whose role is marked as admin (UserRoles.IsAdmin=1) or role name starts with 'ADMIN'.
+ *     tags: [Auth]
+ *     security:
+ *       - ApiKeyAuth: []
+ *     responses:
+ *       200:
+ *         description: Array of admin users
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   userId:
+ *                     type: integer
+ *                   name:
+ *                     type: string
+ *                   roleId:
+ *                     type: integer
+ *                   roleName:
+ *                     type: string
+ *                   isAdmin:
+ *                     type: boolean
+ *       401:
+ *         description: Unauthorized - missing or invalid API key
+ *       500:
+ *         description: Server error
+ */
+app.get('/internal-api/users/admins', async (req, res) => {
+    const requestId = req.requestId || Math.random().toString(36).slice(2,10);
+    try {
+        const db = require('./lib/db');
+        const sql = `
+            SELECT 
+                u.Id            AS userId,
+                u.Name          AS name,
+                ur.Id           AS roleId,
+                ur.Name         AS roleName,
+                CASE WHEN ISNULL(ur.IsAdmin, 0)=1 OR UPPER(ur.Name) LIKE 'ADMIN%' THEN 1 ELSE 0 END AS isAdmin
+            FROM Users u
+            LEFT JOIN UserRoles ur ON ur.Id = u.UserRole_Id
+            WHERE ISNULL(ur.IsAdmin, 0) = 1 OR UPPER(ur.Name) LIKE 'ADMIN%'
+            ORDER BY name ASC
+        `;
+        const rows = await db.query(sql);
+        const list = (rows || []).map(r => ({
+            userId: r.userId,
+            name: r.name,
+            roleId: r.roleId,
+            roleName: r.roleName,
+            isAdmin: !!(r.isAdmin === 1 || r.isAdmin === true)
+        }));
+        res.json(list);
+    } catch (err) {
+        debug(`❌ [${requestId}] users/admins error: ${err.message}`);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * @swagger
+ * /internal-api/users:
+ *   get:
+ *     summary: List all users with role info
+ *     description: Returns all Users with their UserRoles and computed admin flag (IsAdmin=1 or role name starts with 'ADMIN').
+ *     tags: [Auth]
+ *     security:
+ *       - ApiKeyAuth: []
+ *     responses:
+ *       200:
+ *         description: Array of users
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   userId:
+ *                     type: integer
+ *                   name:
+ *                     type: string
+ *                   roleId:
+ *                     type: integer
+ *                   roleName:
+ *                     type: string
+ *                   isAdmin:
+ *                     type: boolean
+ *       401:
+ *         description: Unauthorized - missing or invalid API key
+ *       500:
+ *         description: Server error
+ */
+app.get('/internal-api/users', async (req, res) => {
+    const requestId = req.requestId || Math.random().toString(36).slice(2,10);
+    try {
+        const db = require('./lib/db');
+        const sql = `
+            SELECT 
+                u.Id            AS userId,
+                u.Name          AS name,
+                u.PinCode       AS pinCode,
+                ur.Id           AS roleId,
+                ur.Name         AS roleName,
+                ISNULL(ur.IsAdmin, 0) AS isAdmin
+            FROM Users u
+            LEFT JOIN UserRoles ur ON ur.Id = u.UserRole_Id
+            ORDER BY name ASC
+        `;
+        const rows = await db.query(sql);
+        const list = (rows || []).map(r => ({
+            userId: r.userId,
+            name: r.name,
+            roleId: r.roleId,
+            roleName: r.roleName,
+            isAdmin: !!(r.isAdmin === 1 || r.isAdmin === true || String(r.roleName || '').toUpperCase().startsWith('ADMIN'))
+        }));
+        res.json(list);
+    } catch (err) {
+        debug(`❌ [${requestId}] users list error: ${err.message}`);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * @swagger
  * /internal-api/active-tickets:
  *   get:
  *     summary: Get all active (open) tickets

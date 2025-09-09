@@ -66,9 +66,22 @@ const commonComponents = {
     MuiAppBar: {
         styleOverrides: {
             root: {
-                boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+                // Glassmorphism + login palette gradient
+                background: 'linear-gradient(135deg, rgba(25,118,210,0.55) 0%, rgba(21,101,192,0.55) 100%)',
+                color: '#ffffff',
+                boxShadow: '0 8px 24px rgba(13,27,42,0.25)',
                 backdropFilter: 'blur(12px)',
-                borderBottom: '1px solid rgba(148, 163, 184, 0.1)',
+                WebkitBackdropFilter: 'blur(12px)',
+                borderBottom: '1px solid rgba(148, 163, 184, 0.12)',
+                border: '1px solid rgba(255,255,255,0.18)',
+                borderRadius: 0,
+            },
+        },
+    },
+    MuiToolbar: {
+        styleOverrides: {
+            root: {
+                paddingTop: 'env(safe-area-inset-top, 0px)',
             },
         },
     },

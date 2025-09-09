@@ -27,6 +27,7 @@ import {
     WifiOff as DisconnectedIcon
 } from '@mui/icons-material';
 import terminalService from '../services/terminalService';
+import networkHealthService from '../services/networkHealthService';
 import { useSelector } from 'react-redux';
 import PropTypes from 'prop-types';
 
@@ -36,12 +37,19 @@ const TerminalStatus = ({ showManualRegistration = true, compact = false }) => {
     const [registrationError, setRegistrationError] = useState(null);
     const [expanded, setExpanded] = useState(false);
     const [retryAttempt, setRetryAttempt] = useState(0);
+    const [networkStatus, setNetworkStatus] = useState(networkHealthService.getSambaPOSStatus());
 
     const user = useSelector(state => state.auth.get('user'));
     const userName = user?.name || 'Unknown';
 
     useEffect(() => {
         checkTerminalStatus();
+
+        // Check network status periodically
+        const networkInterval = setInterval(() => {
+            const status = networkHealthService.getSambaPOSStatus();
+            setNetworkStatus(status);
+        }, 10000); // Check network status every 10 seconds (reduced from 5s)
 
         // Listen for terminal registration events
         const cleanup = terminalService.onRegistered((user, terminalId) => {
@@ -51,7 +59,10 @@ const TerminalStatus = ({ showManualRegistration = true, compact = false }) => {
             setRetryAttempt(0);
         });
 
-        return cleanup;
+        return () => {
+            clearInterval(networkInterval);
+            cleanup();
+        };
     }, []);
 
     const checkTerminalStatus = () => {
@@ -112,18 +123,66 @@ const TerminalStatus = ({ showManualRegistration = true, compact = false }) => {
         return 'Terminal No Registrado';
     };
 
+    const getNetworkStatusIcon = () => {
+        switch (networkStatus.status) {
+            case 'online':
+                return <ConnectedIcon />;
+            case 'offline':
+            case 'timeout':
+            default:
+                return <DisconnectedIcon />;
+        }
+    };
+
+    const getNetworkStatusColor = () => {
+        switch (networkStatus.status) {
+            case 'online':
+                return 'success';
+            case 'timeout':
+                return 'warning';
+            case 'offline':
+            default:
+                return 'error';
+        }
+    };
+
+    const getNetworkStatusText = () => {
+        switch (networkStatus.status) {
+            case 'online':
+                return 'Conectado';
+            case 'timeout':
+                return 'Lento';
+            case 'offline':
+            default:
+                return 'Sin Conexión';
+        }
+    };
+
     if (compact) {
         return (
             <Box display="flex" alignItems="center" gap={1}>
+                {/* Estado de Conexión */}
+                <Tooltip title={`SambaPOS: ${getNetworkStatusText()}`}>
+                    <Chip
+                        icon={getNetworkStatusIcon()}
+                        label={getNetworkStatusText()}
+                        color={getNetworkStatusColor()}
+                        size="small"
+                        variant="filled"
+                    />
+                </Tooltip>
+
+                {/* Estado del Terminal */}
                 <Tooltip title={getStatusText()}>
                     <Chip
                         icon={getStatusIcon()}
-                        label={terminalId ? `Terminal: ${terminalId}` : getStatusText()}
+                        label={terminalId ? `Terminal: ${terminalId.slice(-8)}` : getStatusText()}
                         color={getStatusColor()}
                         size="small"
                         variant={terminalId ? 'filled' : 'outlined'}
                     />
                 </Tooltip>
+
                 {showManualRegistration && !terminalId && (
                     <Tooltip title="Registro Manual">
                         <IconButton
@@ -181,11 +240,29 @@ const TerminalStatus = ({ showManualRegistration = true, compact = false }) => {
 
                 <Collapse in={expanded}>
                     <Box mt={2}>
+                        {/* Información de conexión */}
+                        <Alert
+                            severity={networkStatus.status === 'online' ? 'success' : networkStatus.status === 'timeout' ? 'warning' : 'error'}
+                            sx={{ mb: 2 }}
+                        >
+                            <Typography variant="body2">
+                                <strong>Conexión SambaPOS:</strong> {getNetworkStatusText()}<br />
+                                <strong>Estado:</strong> {networkStatus.status === 'online' ? 'Servidor accesible' :
+                                    networkStatus.status === 'timeout' ? 'Respuesta lenta' : 'Servidor no disponible'}<br />
+                                {networkStatus.lastCheck && (
+                                    <>
+                                        <strong>Última verificación:</strong> {networkStatus.lastCheck.toLocaleTimeString()}
+                                    </>
+                                )}
+                            </Typography>
+                        </Alert>
+
+                        {/* Información del terminal */}
                         {terminalId ? (
                             <Alert severity="success" sx={{ mb: 2 }}>
                                 <Typography variant="body2">
                                     <strong>Terminal ID:</strong> {terminalId}<br />
-                                    <strong>Estado:</strong> Conectado a SambaPOS<br />
+                                    <strong>Estado:</strong> Registrado en SambaPOS<br />
                                     <strong>Usuario:</strong> {userName}<br />
                                     <strong>Funcionalidad:</strong> Crear tickets, agregar órdenes, procesar pagos
                                 </Typography>

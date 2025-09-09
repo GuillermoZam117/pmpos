@@ -101,7 +101,12 @@ const MyTickets = ({
 
     return (
         <Paper className="myTickets" sx={{ borderRadius: 0 }}>
-            <List subheader={<ListSubheader>My Tickets</ListSubheader>}>
+            <AppBar position="sticky" elevation={1}>
+                <Toolbar sx={{ minHeight: { xs: 48, sm: 56 }, pt: 'env(safe-area-inset-top, 0px)', px: { xs: 1, sm: 2 } }}>
+                    <Typography variant="subtitle1" sx={{ color: 'common.white', fontWeight: 700 }}>Mis Tickets</Typography>
+                </Toolbar>
+            </AppBar>
+            <List subheader={<ListSubheader component="div">&nbsp;</ListSubheader>}>
                 {items
                     .sort((x, y) => new Date(y.lastOrderDate) - new Date(x.lastOrderDate))
                     .map((x) => (

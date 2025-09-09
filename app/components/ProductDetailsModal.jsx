@@ -32,6 +32,8 @@ import {
     Collapse,
     Alert,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import {
     Close as CloseIcon,
     Add as AddIcon,
@@ -45,6 +47,7 @@ import {
 } from '@mui/icons-material';
 import { formatMXN } from '../utils/currencyFormatter';
 import PropTypes from 'prop-types';
+import orderTagService from '../services/orderTagService';
 
 const ProductDetailsModal = ({ 
     open, 
@@ -58,6 +61,9 @@ const ProductDetailsModal = ({
 }) => {
     // Early return BEFORE hooks to avoid hooks rule violation
     if (!product) return null;
+
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
     const [quantity, setQuantity] = useState(1);
     const [selectedPortion, setSelectedPortion] = useState(null);
@@ -88,6 +94,7 @@ const ProductDetailsModal = ({
     const productDescription = product.description || product.product?.description || '';
     const portions = product.portions || product.product?.portions || [];
     const orderTags = product.defaultOrderTags || [];
+    const [availableOrderTags, setAvailableOrderTags] = useState([]);
     const currentPrice = selectedPortion ? parseFloat(selectedPortion.price) || 0 : 0;
     const totalPrice = currentPrice * quantity;
 
@@ -111,6 +118,22 @@ const ProductDetailsModal = ({
             }
         });
     }, []); // No dependencies needed for functional updates
+
+    // Load preloaded order tags for this product/portion (fast from cache)
+    useEffect(() => {
+        let canceled = false;
+        const load = async () => {
+            try {
+                const pid = product.productId || product.id || product.product?.id;
+                const portionName = selectedPortion?.name || 'Normal';
+                if (!pid) return;
+                const tags = await orderTagService.getGroups(pid, portionName);
+                if (!canceled) setAvailableOrderTags(tags?.map(t => ({ id: t.id, name: t.name, price: t.price })) || []);
+            } catch {}
+        };
+        if (open && selectedPortion) load();
+        return () => { canceled = true; };
+    }, [open, product?.id, product?.productId, selectedPortion?.name]);
 
     const handleAddToOrder = useCallback(() => {
         const orderData = {
@@ -152,19 +175,21 @@ const ProductDetailsModal = ({
         return tagPrice > 0 ? ` (+${formatMXN(tagPrice)})` : '';
     };
 
-    const displayedTags = showAllTags ? orderTags : orderTags.slice(0, 6);
+    const mergedTags = (availableOrderTags && availableOrderTags.length) ? availableOrderTags : orderTags;
+    const displayedTags = showAllTags ? mergedTags : mergedTags.slice(0, 6);
     const hasMoreTags = orderTags.length > 6;
 
     return (
         <Dialog 
             open={open} 
             onClose={onClose} 
-            maxWidth="md" 
+            maxWidth={isMobile ? false : 'md'} 
             fullWidth
+            fullScreen={isMobile}
             PaperProps={{
                 sx: {
-                    borderRadius: 2,
-                    maxHeight: '90vh'
+                    borderRadius: isMobile ? 0 : 2,
+                    maxHeight: isMobile ? '100vh' : '90vh'
                 }
             }}
         >
@@ -191,7 +216,7 @@ const ProductDetailsModal = ({
                 </Box>
             </DialogTitle>
 
-            <DialogContent dividers>
+            <DialogContent dividers sx={{ p: isMobile ? 2 : 3 }}>
                 <Grid container spacing={3}>
                     {/* Product Description */}
                     {productDescription && (
@@ -305,7 +330,7 @@ const ProductDetailsModal = ({
                                             onClick={handleToggleAllTags}
                                             endIcon={showAllTags ? <ExpandLessIcon /> : <ExpandMoreIcon />}
                                         >
-                                            {showAllTags ? 'Ver menos' : `Ver ${orderTags.length - 6} más`}
+                                            {showAllTags ? 'Ver menos' : `Ver ${Math.max(0, mergedTags.length - 6)} más`}
                                         </Button>
                                     )}
                                 </Box>
@@ -344,7 +369,7 @@ const ProductDetailsModal = ({
                                 <TextField
                                     fullWidth
                                     multiline
-                                    rows={2}
+                                    rows={isMobile ? 3 : 2}
                                     value={comments}
                                     onChange={(e) => setComments(e.target.value)}
                                     placeholder="Ej: Sin cebolla, término medio, salsa aparte..."
@@ -376,7 +401,7 @@ const ProductDetailsModal = ({
                 </Grid>
             </DialogContent>
 
-            <DialogActions sx={{ p: 2, gap: 1 }}>
+            <DialogActions sx={{ p: isMobile ? 1.5 : 2, gap: 1, position: isMobile ? 'sticky' : 'static', bottom: 0, bgcolor: isMobile ? 'background.paper' : 'transparent', borderTop: (t) => isMobile ? `1px solid ${t.palette.divider}` : 'none' }}>
                 <Button onClick={onClose} variant="outlined" size="large">
                     Cancelar
                 </Button>

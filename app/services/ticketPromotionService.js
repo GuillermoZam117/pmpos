@@ -5,7 +5,7 @@
  */
 import cacheService from './cacheService';
 import terminalService from './terminalService';
-import { createTerminalTicketAsync, changeEntityOfTerminalTicketAsync, addOrderToTerminalTicketAsync } from '../queries';
+import { createTerminalTicketAsync, changeEntityOfTerminalTicketSmart as changeEntityOfTerminalTicketAsync, addOrderToTerminalTicketUnified as addOrderToTerminalTicketAsync } from '../queries';
 import Debug from 'debug';
 
 const debug = Debug('pmpos:ticket-promotion');
