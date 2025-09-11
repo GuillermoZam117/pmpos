@@ -56,3 +56,5 @@
 2025-09-11 09:39:14.221 [INFO] 🟢 [0d4pcqc7] 200 POST /internal-api/validate-admin - 307ms {"requestId":"0d4pcqc7","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":307,"slow":false}
 2025-09-11 09:39:24.052 [INFO] 🟦 [kczv2wbq] POST /internal-api/validate-admin {"requestId":"kczv2wbq","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
 2025-09-11 09:39:24.061 [INFO] 🟢 [kczv2wbq] 200 POST /internal-api/validate-admin - 10ms {"requestId":"kczv2wbq","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":10,"slow":false}
+2025-09-11 09:42:36.636 [INFO] 🟦 [sp6fi090] POST /internal-api/validate-admin {"requestId":"sp6fi090","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-11 09:42:36.863 [INFO] 🟢 [sp6fi090] 200 POST /internal-api/validate-admin - 268ms {"requestId":"sp6fi090","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":268,"slow":false}
