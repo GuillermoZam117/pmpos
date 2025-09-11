@@ -13,9 +13,9 @@ export const orderService = {
      * Añade una nueva orden al ticket del terminal
      * Implementa el flujo correcto para mesa libre según documentación SambaPOS
      */
-    async addOrder(terminalId, productName, quantity = 1, portion = null, tableId = null) {
-        console.log('➕ [orderService] Adding order (mesa libre flow):', { terminalId, productName, quantity, portion, tableId });
-        debug('➕ Adding order (mesa libre flow):', { terminalId, productName, quantity, portion, tableId });
+    async addOrder(terminalId, productName, quantity = 1, portion = null, tableId = null, skipTicketReload = false) {
+        console.log('➕ [orderService] Adding order (mesa libre flow):', { terminalId, productName, quantity, portion, tableId, skipTicketReload });
+        debug('➕ Adding order (mesa libre flow):', { terminalId, productName, quantity, portion, tableId, skipTicketReload });
 
         if (!terminalId) {
             throw new Error('Terminal ID is required');
@@ -127,34 +127,40 @@ export const orderService = {
                 });
                 debug('📋 Using existing active table ticket:', tableTicket);
 
-                // 2.1. PASO OBLIGATORIO: Cargar el ticket existente en el terminal (según documento)
-                console.log('📥 [orderService] Loading existing ticket into terminal (required step):', tableTicket.id);
-                debug('📥 Loading existing ticket into terminal:', tableTicket.id);
+                // OPTIMIZACIÓN CRÍTICA: Solo cargar el ticket si no se solicita saltarse
+                if (!skipTicketReload) {
+                    // 2.1. PASO OBLIGATORIO: Cargar el ticket existente en el terminal (según documento)
+                    console.log('📥 [orderService] Loading existing ticket into terminal (required step):', tableTicket.id);
+                    debug('📥 Loading existing ticket into terminal:', tableTicket.id);
 
-                const loadTicketMutation = `mutation {
-                    loadTerminalTicket(
-                        terminalId: "${terminalId}"
-                        ticketId: "${String(tableTicket.id)}"
-                    ) {
-                        id
-                        number
-                        totalAmount
-                        orders {
-                            uid
-                            name
-                            quantity
-                            price
-                            portion
+                    const loadTicketMutation = `mutation {
+                        loadTerminalTicket(
+                            terminalId: "${terminalId}"
+                            ticketId: "${String(tableTicket.id)}"
+                        ) {
+                            id
+                            number
+                            totalAmount
+                            orders {
+                                uid
+                                name
+                                quantity
+                                price
+                                portion
+                            }
                         }
+                    }`;
+
+                    const loadedTicket = await graphqlRequest(loadTicketMutation);
+                    console.log('✅ [orderService] Existing ticket loaded into terminal:', loadedTicket?.loadTerminalTicket);
+                    debug('✅ Existing ticket loaded into terminal:', loadedTicket?.loadTerminalTicket);
+
+                    if (!loadedTicket?.loadTerminalTicket) {
+                        throw new Error(`Failed to load existing ticket ${tableTicket.id} into terminal ${terminalId}`);
                     }
-                }`;
-
-                const loadedTicket = await graphqlRequest(loadTicketMutation);
-                console.log('✅ [orderService] Existing ticket loaded into terminal:', loadedTicket?.loadTerminalTicket);
-                debug('✅ Existing ticket loaded into terminal:', loadedTicket?.loadTerminalTicket);
-
-                if (!loadedTicket?.loadTerminalTicket) {
-                    throw new Error(`Failed to load existing ticket ${tableTicket.id} into terminal ${terminalId}`);
+                } else {
+                    console.log('⚡ [orderService] OPTIMIZATION: Skipping ticket reload to preserve existing orders in terminal');
+                    debug('⚡ OPTIMIZATION: Skipping ticket reload for batch order processing');
                 }
             }
 

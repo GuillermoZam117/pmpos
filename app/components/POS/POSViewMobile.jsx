@@ -786,20 +786,40 @@ const POSViewMobile = () => {
     };
 
     const handleProductClick = useCallback((product) => {
+        console.log('🖱️ [PRODUCTO CLICKEADO] Usuario hizo click en producto:', {
+            name: product.name,
+            caption: product.caption,
+            id: product.id
+        });
+
         if (ticketBlocked && !isAdmin) {
+            console.log('🚫 [PRODUCTO CLICKEADO] Bloqueado por cuenta solicitada');
             setSnackbar({ open: true, severity: 'warning', message: 'Cuenta solicitada: requiere autorización' });
             return;
         }
+
+        console.log('✅ [PRODUCTO CLICKEADO] Abriendo modal de producto');
         debug('??? Product clicked:', product.name);
         setSelectedProduct(product);
         setProductModalOpen(true);
     }, [isWaiter, ticketBlocked]);
 
     const handleAddToOrder = useCallback(async (orderData) => {
+        console.log('📦 [MODAL CONFIRMADO] handleAddToOrder called with:', {
+            productName: orderData.product?.name,
+            quantity: orderData.quantity,
+            portion: orderData.portion?.name,
+            orderTags: orderData.orderTags,
+            comments: orderData.comments
+        });
+
         if (isWaiter && ticketBlocked) {
+            console.log('🚫 [MODAL CONFIRMADO] Bloqueado por cuenta bloqueada');
             setSnackbar({ open: true, severity: 'warning', message: 'Cuenta bloqueada. No puede agregar productos.' });
             return;
         }
+
+        console.log('✅ [MODAL CONFIRMADO] Procediendo a agregar orden al carrito...');
         debug('? Adding order (Discovery: server-first with comment):', orderData);
 
         // Local optimistic insert for UX
@@ -814,10 +834,29 @@ const POSViewMobile = () => {
             portion: orderData.portion?.name || 'Normal',
             orderTags: orderData.orderTags.map(tag => tag.name),
             comments: orderData.comments,
-            isExisting: false,
-            status: 'pending'
+            isExisting: false, // NUEVA orden - debe ser enviada
+            status: 'pending'  // Status inicial
         };
-        setOrders(prev => [...prev, newOrder]);
+
+        console.log('➕ [PRODUCTO AGREGADO] Nueva orden creada:', {
+            name: newOrder.name,
+            quantity: newOrder.quantity,
+            isExisting: newOrder.isExisting,
+            status: newOrder.status,
+            localId: localId,
+            fullOrder: newOrder
+        });
+
+        setOrders(prev => {
+            const newOrders = [...prev, newOrder];
+            console.log('🛒 [CARRITO ACTUALIZADO] Total órdenes después de agregar:', newOrders.length);
+            console.log('🛒 [CARRITO ACTUALIZADO] Órdenes en carrito:', newOrders.map(o => ({
+                name: o.name,
+                isExisting: o.isExisting,
+                status: o.status
+            })));
+            return newOrders;
+        });
         // Mantener el usuario en el menú para continuar agregando productos
         // if (isMobile) setActiveTab(1); // Comentado: permite al usuario permanecer en el menú
 
@@ -830,6 +869,7 @@ const POSViewMobile = () => {
     }, [isMobile, authUser, ticket?.id, tableId]);
 
     const handleCloseModal = useCallback(() => {
+        console.log('❌ [MODAL CERRADO] ProductDetailsModal closed');
         setProductModalOpen(false);
         setSelectedProduct(null);
     }, [isWaiter, isAdmin, ticketBlocked, authUser, ticket, tableId]);
@@ -1318,6 +1358,9 @@ const POSViewMobile = () => {
         console.log('🍳 [POSViewMobile] Starting kitchen submission...');
         debug('🍳 Submitting to kitchen - will send all pending orders first');
 
+        // Agregar indicador de procesamiento
+        setSnackbar({ open: true, severity: 'info', message: 'Enviando órdenes a cocina...' });
+
         try {
             console.log('🔍 [POSViewMobile] Getting terminal ID...');
             let terminalId = terminalService.getTerminalId();
@@ -1335,24 +1378,57 @@ const POSViewMobile = () => {
             }
 
             // STEP 1: Send all pending orders from cart to SambaPOS
-            const pendingOrders = orders.filter(order => !order.isExisting && !order.uid);
-            console.log('🛒 [POSViewMobile] DEBUGGING ORDER FILTER:');
+            // CRÍTICO: SOLO enviar órdenes NUEVAS (status 'pending' y NOT isExisting)
+            const pendingOrders = orders.filter(order => {
+                // DIAGNÓSTICO COMPLETO: Log cada orden individual
+                console.log('🔍 [FILTRO DEBUG] Evaluando orden:', {
+                    name: order.name,
+                    isExisting: order.isExisting,
+                    status: order.status,
+                    hasUid: !!order.uid,
+                    uid: order.uid,
+                    orderData: order
+                });
+
+                // CORRECCIÓN CRÍTICA: Solo incluir órdenes NUEVAS (nunca enviadas)
+                const isNewOrder = !order.isExisting &&
+                    order.status === 'pending' &&
+                    !order.uid;
+
+                console.log('🔍 [FILTRO DEBUG] Resultado:', {
+                    name: order.name,
+                    isNewOrder: isNewOrder,
+                    isExisting: order.isExisting,
+                    status: order.status,
+                    hasUid: !!order.uid
+                });
+
+                return isNewOrder;
+            });
+
+            console.log('🛒 [POSViewMobile] DEBUGGING ORDER FILTER (NUEVA LÓGICA):');
             console.log('🛒 [POSViewMobile] Total orders in cart:', orders.length);
+            console.log('🛒 [POSViewMobile] RAW ORDERS ARRAY:', JSON.stringify(orders, null, 2));
             orders.forEach((order, index) => {
+                const isNewOrder = !order.isExisting &&
+                    order.status === 'pending' &&
+                    !order.uid;
                 console.log(`🛒 [POSViewMobile] Order ${index + 1}:`, {
                     name: order.name,
                     isExisting: order.isExisting,
+                    status: order.status,
                     hasUid: !!order.uid,
                     uid: order.uid,
-                    status: order.status,
-                    willBeSent: !order.isExisting && !order.uid
+                    isNewOrder: isNewOrder,
+                    willBeSent: isNewOrder
                 });
             });
-            console.log('🛒 [POSViewMobile] Found pending orders to send:', pendingOrders.length);
-            console.log('🛒 [POSViewMobile] Pending orders details:', pendingOrders.map(o => ({
+            console.log('🛒 [POSViewMobile] Found NEW orders to send:', pendingOrders.length);
+            console.log('🛒 [POSViewMobile] NEW orders details:', pendingOrders.map(o => ({
                 name: o.name,
                 quantity: o.quantity,
-                portion: o.portion
+                portion: o.portion,
+                status: o.status
             })));
 
             if (pendingOrders.length > 0) {
@@ -1392,31 +1468,61 @@ const POSViewMobile = () => {
 
                 // Send each pending order to SambaPOS
                 console.log('🔄 [POSViewMobile] Starting to send orders one by one...');
+                console.log('🔄 [POSViewMobile] Total pendingOrders to process:', pendingOrders.length);
+                console.log('🔄 [POSViewMobile] PENDING ORDERS ARRAY:', JSON.stringify(pendingOrders.map(o => ({
+                    name: o.name,
+                    quantity: o.quantity,
+                    portion: o.portion,
+                    id: o.id,
+                    isExisting: o.isExisting,
+                    status: o.status
+                })), null, 2));
+
+                // OPTIMIZACIÓN CRÍTICA: Cargar el ticket UNA SOLA VEZ antes del bucle
+                // para evitar que se sobrescriba en cada iteración
+                console.log('🎫 [OPTIMIZACIÓN] Preparing for batch order processing...');
+
                 for (let i = 0; i < pendingOrders.length; i++) {
                     const order = pendingOrders[i];
+                    const isFirstOrder = i === 0;
+                    console.log(`🔄 [BUCLE INICIO] Processing order ${i + 1}/${pendingOrders.length}:`, {
+                        name: order.name,
+                        quantity: order.quantity,
+                        portion: order.portion,
+                        orderId: order.id,
+                        isFirstOrder: isFirstOrder
+                    });
+
                     try {
                         console.log(`➕ [POSViewMobile] Sending order ${i + 1}/${pendingOrders.length} to SambaPOS:`, {
                             name: order.name,
                             quantity: order.quantity,
                             portion: order.portion,
-                            tableId: tableId
+                            tableId: tableId,
+                            orderId: order.id
                         });
 
+                        // CRÍTICO: Solo la primera orden carga el ticket, las siguientes lo preservan
+                        console.log(`🚀 [ENVÍO] About to call orderService.addOrder for: ${order.name}, skipReload: ${!isFirstOrder}`);
                         const orderResult = await orderService.addOrder(
                             terminalId,
                             order.name,
                             order.quantity,
                             order.portion,
-                            tableId
+                            tableId,
+                            !isFirstOrder // skipTicketReload = true para órdenes después de la primera
                         );
 
                         console.log(`✅ [POSViewMobile] Order ${i + 1} sent successfully:`, orderResult);
+                        console.log(`🚀 [ENVÍO EXITOSO] orderService.addOrder completed for: ${order.name}`);
 
-                        // Try to resolve UID for the sent order
+                        // Try to resolve UID for the sent order with retries (OPTIMIZADO)
                         const sleep = (ms) => new Promise(r => setTimeout(r, ms));
                         let newUid = null;
-                        for (let attempt = 0; attempt < 3 && !newUid; attempt++) {
+                        // REDUCIDO: Solo 2 intentos con delay mínimo para mejorar rendimiento
+                        for (let attempt = 0; attempt < 2 && !newUid; attempt++) {
                             try {
+                                if (attempt > 0) await sleep(100); // Solo delay en retry
                                 const tt = await ticketService.getTerminalTicket(terminalId);
                                 const list = Array.isArray(tt?.orders) ? tt.orders : [];
                                 for (const o of list) {
@@ -1427,12 +1533,18 @@ const POSViewMobile = () => {
                                         break;
                                     }
                                 }
-                                if (!newUid && attempt < 2) await sleep(200);
-                            } catch { }
+                                if (newUid) {
+                                    console.log(`🔗 [POSViewMobile] Found UID for order ${i + 1}:`, newUid);
+                                    break;
+                                }
+                            } catch (uidErr) {
+                                console.warn(`⚠️ [POSViewMobile] Failed to get UID for order ${i + 1}, attempt ${attempt + 1}:`, uidErr);
+                            }
                         }
 
                         // Update local order with UID and mark as existing
                         if (newUid) {
+                            console.log(`🔗 [POSViewMobile] Updating local order ${i + 1} with UID:`, newUid);
                             setOrders(prev => prev.map(o =>
                                 o.id === order.id
                                     ? { ...o, uid: newUid, isExisting: true, status: 'ENVIADO' }
@@ -1442,6 +1554,7 @@ const POSViewMobile = () => {
                             // Apply comments if any
                             if (order.comments && order.comments.trim()) {
                                 try {
+                                    console.log(`💬 [POSViewMobile] Applying comments to order ${i + 1}:`, order.comments.trim());
                                     await automationService.executeAutomationCommand(
                                         terminalId,
                                         ORDER_COMMENT_COMMAND,
@@ -1449,21 +1562,33 @@ const POSViewMobile = () => {
                                         newUid
                                     );
                                 } catch (commentErr) {
-                                    console.warn('⚠️ Failed to apply comment:', commentErr);
+                                    console.warn(`⚠️ [POSViewMobile] Failed to apply comment to order ${i + 1}:`, commentErr);
                                 }
                             }
+                        } else {
+                            console.warn(`⚠️ [POSViewMobile] Could not resolve UID for order ${i + 1}, but order was sent successfully`);
+                            // Still mark as existing even without UID
+                            setOrders(prev => prev.map(o =>
+                                o.id === order.id
+                                    ? { ...o, isExisting: true, status: 'ENVIADO' }
+                                    : o
+                            ));
                         }
 
-                        console.log('✅ [POSViewMobile] Order sent successfully:', order.name);
+                        console.log(`✅ [POSViewMobile] Order ${i + 1} processing completed:`, order.name);
+                        console.log(`🏁 [BUCLE FIN] Completed processing order ${i + 1}/${pendingOrders.length}: ${order.name}`);
                     } catch (orderErr) {
-                        console.error('❌ [POSViewMobile] Failed to send order:', order.name, orderErr);
+                        console.error(`❌ [POSViewMobile] Failed to send order ${i + 1}:`, order.name, orderErr);
+                        console.error(`❌ [BUCLE ERROR] Error in order ${i + 1}/${pendingOrders.length}:`, orderErr);
                         setSnackbar({ open: true, severity: 'error', message: `Error enviando ${order.name}` });
-                        throw orderErr; // Stop process if any order fails
+                        // Continue with next order instead of stopping the entire process
+                        console.log(`⏭️ [POSViewMobile] Continuing with next order after error...`);
                     }
                 }
 
                 console.log('🏁 [POSViewMobile] ORDER SENDING LOOP COMPLETED!');
-                console.log('🏁 [POSViewMobile] Successfully sent all orders:', pendingOrders.map(o => o.name));
+                console.log('🏁 [POSViewMobile] Successfully processed all orders. Original count:', pendingOrders.length);
+                console.log('🏁 [POSViewMobile] Orders that were supposed to be sent:', pendingOrders.map(o => o.name));
 
                 // Bind mesa AFTER adding all orders (if needed)
                 try {
@@ -1489,14 +1614,13 @@ const POSViewMobile = () => {
             console.log('✅ [POSViewMobile] Terminal ticket closed successfully:', closeResult);
             debug('✅ Terminal ticket closed successfully');
 
-            // CRITICAL: Refresh orders from server to get updated states BEFORE navigating
+            // CRITICAL: Refresh orders from server to get updated states BEFORE navigating (OPTIMIZADO)
             console.log('🔄 [POSViewMobile] Refreshing orders from server to get updated states...');
             try {
                 await refreshOrdersFromServer();
                 console.log('✅ [POSViewMobile] Orders refreshed with updated states from server');
 
-                // Small delay to ensure UI updates
-                await new Promise(resolve => setTimeout(resolve, 500));
+                // ELIMINADO: Delay innecesario - la UI se actualiza automáticamente
             } catch (refreshErr) {
                 console.warn('⚠️ [POSViewMobile] Failed to refresh orders after submit:', refreshErr);
             }
@@ -2102,7 +2226,8 @@ const POSViewMobile = () => {
                         flex: 1,
                         overflowY: 'auto',
                         p: 1,
-                        pb: isMobile ? 'calc(80px + env(safe-area-inset-bottom, 0px))' : 1 // Extra padding for mobile buttons
+                        // ZONA SEGURA CRÍTICA: Espacio generoso para que los botones NUNCA tapen contenido
+                        pb: isMobile ? 'calc(160px + env(safe-area-inset-bottom, 0px))' : 'calc(180px + 16px)' // Zona segura amplia
                     }}>
                         <List sx={{ py: 0 }}>
                             {orders.map((order, index) => (
@@ -2300,7 +2425,17 @@ const POSViewMobile = () => {
 
                     {/* Cart Summary - pinned at bottom of cart panel (desktop only) */}
                     {!isMobile && (
-                        <Paper sx={{ p: 2, mt: 1, bgcolor: 'background.paper', flexShrink: 0, borderTop: (theme) => `1px solid ${theme.palette.divider}` }} elevation={2}>
+                        <Paper sx={{
+                            p: 2,
+                            mt: 1,
+                            bgcolor: 'background.paper',
+                            flexShrink: 0,
+                            borderTop: (theme) => `1px solid ${theme.palette.divider}`,
+                            position: 'sticky',
+                            bottom: 0,
+                            zIndex: 10,
+                            boxShadow: '0 -2px 8px rgba(0,0,0,0.1)'
+                        }} elevation={2}>
                             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                                 <Typography variant="h6" sx={{ fontSize: { xs: '1.1rem', sm: '1rem' } }}>Total del Pedido</Typography>
                                 <Typography variant="h4" color="primary.main" fontWeight="bold" sx={{ fontSize: { xs: '1.6rem', sm: '1.4rem' } }}>
@@ -2549,13 +2684,19 @@ const POSViewMobile = () => {
                 </Toolbar>
             </AppBar>
 
-            {/* Content Area: restaurant style layout */}
+            {/* Content Area: restaurant style layout - CORREGIDO para botones fijos */}
             {!terminalReady ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', p: 4 }}>
                     <CircularProgress />
                 </Box>
             ) : (
-                <Box sx={{ flex: 1, overflow: 'hidden', p: { xs: 0, sm: 1 } }}>
+                <Box sx={{
+                    flex: 1,
+                    overflow: 'hidden',
+                    p: { xs: 0, sm: 1 },
+                    // ZONA SEGURA CRÍTICA: Padding bottom en mobile para espacio de botones fijos
+                    pb: isMobile ? 'calc(100px + env(safe-area-inset-bottom, 0px))' : { xs: 0, sm: 1 }
+                }}>
                     {isMobile ? (
                         // Mobile: two separate screens (Menu or Carrito), selected via state or Acciones menu
                         activeTab === 1 ? (
@@ -2591,22 +2732,24 @@ const POSViewMobile = () => {
                 </Box>
             )}
 
-            {/* Sticky Bottom Action Bar + Actions Menu (mobile only) */}
+            {/* Sticky Bottom Action Bar + Actions Menu (mobile only) - MEJORADO */}
             {isMobile && (
                 <>
-                    <Paper elevation={6} sx={{
-                        position: 'sticky',
+                    <Paper elevation={8} sx={{
+                        position: 'fixed', // CORREGIDO: Cambiado de sticky a fixed para mejor control
                         bottom: 0,
                         left: 0,
                         right: 0,
+                        zIndex: 1000, // CORREGIDO: z-index alto para garantizar visibilidad
                         borderRadius: 0,
-                        backdropFilter: 'blur(10px)',
-                        bgcolor: 'rgba(255,255,255,0.8)',
+                        backdropFilter: 'blur(15px)',
+                        bgcolor: theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.9)' : 'rgba(255,255,255,0.95)', // Mejor contraste
+                        borderTop: `2px solid ${theme.palette.primary.main}`, // Borde superior para visibilidad
                         px: { xs: 1, sm: 2 },
-                        pt: 1,
-                        pb: 'calc(8px + env(safe-area-inset-bottom, 0px))'
+                        pt: 1.5, // CORREGIDO: Más padding top
+                        pb: 'calc(12px + env(safe-area-inset-bottom, 0px))' // CORREGIDO: Más padding bottom
                     }}>
-                        <Grid container spacing={1} alignItems="center">
+                        <Grid container spacing={1.5} alignItems="center"> {/* CORREGIDO: Más espacio entre botones */}
                             <Grid item xs={6}>
                                 <Button
                                     variant="contained"
@@ -2617,9 +2760,11 @@ const POSViewMobile = () => {
                                     color="success"
                                     size="large"
                                     sx={{
-                                        fontSize: { xs: '0.8rem', sm: '1rem' },
-                                        fontWeight: 600,
-                                        minHeight: { xs: '44px', sm: '48px' }
+                                        fontSize: { xs: '0.9rem', sm: '1rem' }, // CORREGIDO: Texto más legible
+                                        fontWeight: 700, // CORREGIDO: Más bold para visibilidad
+                                        minHeight: { xs: '50px', sm: '52px' }, // CORREGIDO: Botones más altos
+                                        borderRadius: 2, // CORREGIDO: Bordes redondeados
+                                        boxShadow: 3 // CORREGIDO: Sombra para visibilidad
                                     }}
                                 >
                                     {LABEL_SUBMIT}
@@ -2633,9 +2778,12 @@ const POSViewMobile = () => {
                                     fullWidth
                                     size="large"
                                     sx={{
-                                        fontSize: { xs: '0.8rem', sm: '1rem' },
-                                        fontWeight: 600,
-                                        minHeight: { xs: '44px', sm: '48px' }
+                                        fontSize: { xs: '0.9rem', sm: '1rem' }, // CORREGIDO: Texto más legible
+                                        fontWeight: 700, // CORREGIDO: Más bold para visibilidad
+                                        minHeight: { xs: '50px', sm: '52px' }, // CORREGIDO: Botones más altos
+                                        borderRadius: 2, // CORREGIDO: Bordes redondeados
+                                        borderWidth: 2, // CORREGIDO: Borde más grueso
+                                        '&:hover': { borderWidth: 2 } // Mantener borde grueso en hover
                                     }}
                                 >
                                     + Acciones
@@ -2831,6 +2979,10 @@ const POSViewMobile = () => {
                 onAddToOrder={handleAddToOrder}
                 showOrderTags={true}
             />
+
+            {/* DEBUG: Modal state logging */}
+            {productModalOpen && console.log('🔄 [MODAL STATE] ProductDetailsModal is OPEN with product:', selectedProduct?.name)}
+            {!productModalOpen && console.log('🔄 [MODAL STATE] ProductDetailsModal is CLOSED')}
 
             {/* Payment Dialog */}
             <PaymentDialog
