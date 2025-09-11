@@ -230,3 +230,5 @@
 2025-09-11 15:32:43.210 [INFO] 🟢 [s1pbfvgo] 200 GET /internal-api/order-tags/1878/Normal - 8ms {"requestId":"s1pbfvgo","method":"GET","url":"/internal-api/order-tags/1878/Normal","status":200,"duration":8,"slow":false}
 2025-09-11 15:32:43.215 [INFO] 🟦 [15bnwspa] GET /internal-api/menu-items {"requestId":"15bnwspa","method":"GET","url":"/internal-api/menu-items","ip":"127.0.0.1","hasAuth":true}
 2025-09-11 15:32:43.226 [ERROR] 🔴 [15bnwspa] 500 GET /internal-api/menu-items - 11ms {"requestId":"15bnwspa","method":"GET","url":"/internal-api/menu-items","status":500,"duration":11,"slow":false}
+2025-09-11 15:35:03.106 [INFO] 🟦 [kt2km0eq] POST /internal-api/validate-admin {"requestId":"kt2km0eq","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-11 15:35:03.157 [INFO] 🟢 [kt2km0eq] 200 POST /internal-api/validate-admin - 52ms {"requestId":"kt2km0eq","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":52,"slow":false}
