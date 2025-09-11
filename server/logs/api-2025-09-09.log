@@ -1,0 +1,167 @@
+2025-09-09 08:49:04.483 [INFO] 🟦 [bcjdz8nv] POST /internal-api/validate-admin {"requestId":"bcjdz8nv","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 08:49:04.670 [INFO] 🟢 [bcjdz8nv] 200 POST /internal-api/validate-admin - 204ms {"requestId":"bcjdz8nv","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":204,"slow":false}
+2025-09-09 08:49:11.861 [INFO] 🟦 [ttdlziub] POST /internal-api/validate-admin {"requestId":"ttdlziub","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 08:49:11.868 [INFO] 🟢 [ttdlziub] 200 POST /internal-api/validate-admin - 6ms {"requestId":"ttdlziub","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":6,"slow":false}
+2025-09-09 08:49:29.300 [INFO] 🟦 [yt2gja1r] POST /internal-api/validate-admin {"requestId":"yt2gja1r","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 08:49:29.314 [INFO] 🟢 [yt2gja1r] 200 POST /internal-api/validate-admin - 14ms {"requestId":"yt2gja1r","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":14,"slow":false}
+2025-09-09 11:28:47.602 [INFO] 🟦 [li25t8a3] POST /internal-api/validate-admin {"requestId":"li25t8a3","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 11:28:47.843 [INFO] 🟢 [li25t8a3] 200 POST /internal-api/validate-admin - 268ms {"requestId":"li25t8a3","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":268,"slow":false}
+2025-09-09 11:36:48.102 [INFO] 🟦 [jcutsm9u] POST /internal-api/validate-admin {"requestId":"jcutsm9u","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 11:36:48.350 [INFO] 🟢 [jcutsm9u] 200 POST /internal-api/validate-admin - 276ms {"requestId":"jcutsm9u","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":276,"slow":false}
+2025-09-09 11:37:14.856 [INFO] 🟦 [z30frfry] POST /internal-api/validate-admin {"requestId":"z30frfry","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 11:37:14.867 [INFO] 🟢 [z30frfry] 200 POST /internal-api/validate-admin - 7ms {"requestId":"z30frfry","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":7,"slow":false}
+2025-09-09 11:37:39.056 [INFO] 🟦 [3fzgii93] POST /internal-api/validate-admin {"requestId":"3fzgii93","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 11:37:39.066 [INFO] 🟢 [3fzgii93] 200 POST /internal-api/validate-admin - 11ms {"requestId":"3fzgii93","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":11,"slow":false}
+2025-09-09 11:39:10.104 [INFO] 🟦 [ki74bzc8] POST /internal-api/validate-admin {"requestId":"ki74bzc8","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 11:39:10.142 [INFO] 🟢 [ki74bzc8] 200 POST /internal-api/validate-admin - 38ms {"requestId":"ki74bzc8","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":38,"slow":false}
+2025-09-09 11:39:14.655 [INFO] 🟦 [iw7op6zv] POST /internal-api/validate-admin {"requestId":"iw7op6zv","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 11:39:14.660 [INFO] 🟢 [iw7op6zv] 200 POST /internal-api/validate-admin - 5ms {"requestId":"iw7op6zv","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":5,"slow":false}
+2025-09-09 11:40:32.794 [INFO] 🟦 [vzii6x0v] POST /internal-api/validate-admin {"requestId":"vzii6x0v","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 11:40:32.818 [INFO] 🟢 [vzii6x0v] 200 POST /internal-api/validate-admin - 25ms {"requestId":"vzii6x0v","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":25,"slow":false}
+2025-09-09 11:40:54.217 [INFO] 🟦 [t4u6ne4p] POST /internal-api/validate-admin {"requestId":"t4u6ne4p","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 11:40:54.221 [INFO] 🟢 [t4u6ne4p] 200 POST /internal-api/validate-admin - 3ms {"requestId":"t4u6ne4p","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":3,"slow":false}
+2025-09-09 11:40:55.548 [INFO] 🟦 [p5bto1xx] POST /internal-api/validate-admin {"requestId":"p5bto1xx","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 11:40:55.550 [INFO] 🟢 [p5bto1xx] 200 POST /internal-api/validate-admin - 3ms {"requestId":"p5bto1xx","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":3,"slow":false}
+2025-09-09 11:41:04.683 [INFO] 🟦 [8mch3cd6] POST /internal-api/validate-admin {"requestId":"8mch3cd6","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 11:41:04.691 [INFO] 🟢 [8mch3cd6] 200 POST /internal-api/validate-admin - 9ms {"requestId":"8mch3cd6","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":9,"slow":false}
+2025-09-09 11:41:07.555 [INFO] 🟦 [q6prmwpd] POST /internal-api/validate-admin {"requestId":"q6prmwpd","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 11:41:07.564 [INFO] 🟢 [q6prmwpd] 200 POST /internal-api/validate-admin - 8ms {"requestId":"q6prmwpd","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":8,"slow":false}
+2025-09-09 11:43:10.805 [INFO] 🟦 [kt0w34ij] POST /internal-api/validate-admin {"requestId":"kt0w34ij","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 11:43:10.835 [INFO] 🟢 [kt0w34ij] 200 POST /internal-api/validate-admin - 31ms {"requestId":"kt0w34ij","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":31,"slow":false}
+2025-09-09 11:43:32.553 [INFO] 🟦 [wivk2c57] POST /internal-api/validate-admin {"requestId":"wivk2c57","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 11:43:32.560 [INFO] 🟢 [wivk2c57] 200 POST /internal-api/validate-admin - 7ms {"requestId":"wivk2c57","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":7,"slow":false}
+2025-09-09 11:43:47.352 [INFO] 🟦 [m2k1eo46] POST /internal-api/validate-admin {"requestId":"m2k1eo46","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 11:43:47.358 [INFO] 🟢 [m2k1eo46] 200 POST /internal-api/validate-admin - 6ms {"requestId":"m2k1eo46","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":6,"slow":false}
+2025-09-09 11:43:56.825 [INFO] 🟦 [7xrnkgom] POST /internal-api/validate-admin {"requestId":"7xrnkgom","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 11:43:56.835 [INFO] 🟢 [7xrnkgom] 200 POST /internal-api/validate-admin - 9ms {"requestId":"7xrnkgom","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":9,"slow":false}
+2025-09-09 11:45:24.994 [INFO] 🟦 [n89nsqwh] POST /internal-api/validate-admin {"requestId":"n89nsqwh","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 11:45:25.026 [INFO] 🟢 [n89nsqwh] 200 POST /internal-api/validate-admin - 32ms {"requestId":"n89nsqwh","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":32,"slow":false}
+2025-09-09 11:59:07.603 [INFO] 🟦 [g75wevxa] POST /internal-api/validate-admin {"requestId":"g75wevxa","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 11:59:07.765 [INFO] 🟢 [g75wevxa] 200 POST /internal-api/validate-admin - 183ms {"requestId":"g75wevxa","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":183,"slow":false}
+2025-09-09 12:02:47.536 [INFO] 🟦 [bac79fmd] POST /internal-api/validate-admin {"requestId":"bac79fmd","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 12:02:47.770 [INFO] 🟢 [bac79fmd] 200 POST /internal-api/validate-admin - 254ms {"requestId":"bac79fmd","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":254,"slow":false}
+2025-09-09 12:04:37.991 [INFO] 🟦 [dz7oesx3] POST /internal-api/validate-admin {"requestId":"dz7oesx3","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 12:04:38.032 [INFO] 🟢 [dz7oesx3] 200 POST /internal-api/validate-admin - 42ms {"requestId":"dz7oesx3","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":42,"slow":false}
+2025-09-09 12:07:36.966 [INFO] 🟦 [y1tgkbao] POST /internal-api/validate-admin {"requestId":"y1tgkbao","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 12:07:37.030 [INFO] 🟢 [y1tgkbao] 200 POST /internal-api/validate-admin - 65ms {"requestId":"y1tgkbao","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":65,"slow":false}
+2025-09-09 12:13:39.089 [INFO] 🟦 [44fk9z7e] POST /internal-api/validate-admin {"requestId":"44fk9z7e","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 12:13:39.282 [INFO] 🟢 [44fk9z7e] 200 POST /internal-api/validate-admin - 213ms {"requestId":"44fk9z7e","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":213,"slow":false}
+2025-09-09 12:13:48.472 [INFO] 🟦 [x5alvjtt] POST /internal-api/validate-admin {"requestId":"x5alvjtt","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 12:13:48.485 [INFO] 🟢 [x5alvjtt] 200 POST /internal-api/validate-admin - 14ms {"requestId":"x5alvjtt","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":14,"slow":false}
+2025-09-09 12:14:01.039 [INFO] 🟦 [li8it5hb] POST /internal-api/validate-admin {"requestId":"li8it5hb","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 12:14:01.048 [INFO] 🟢 [li8it5hb] 200 POST /internal-api/validate-admin - 9ms {"requestId":"li8it5hb","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":9,"slow":false}
+2025-09-09 12:14:02.604 [INFO] 🟦 [jrudx7l4] POST /internal-api/validate-admin {"requestId":"jrudx7l4","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 12:14:02.612 [INFO] 🟢 [jrudx7l4] 200 POST /internal-api/validate-admin - 9ms {"requestId":"jrudx7l4","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":9,"slow":false}
+2025-09-09 12:14:35.830 [INFO] 🟦 [xcejgjax] POST /internal-api/validate-admin {"requestId":"xcejgjax","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 12:14:35.856 [INFO] 🟢 [xcejgjax] 200 POST /internal-api/validate-admin - 27ms {"requestId":"xcejgjax","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":27,"slow":false}
+2025-09-09 12:14:45.422 [INFO] 🟦 [j60jspnv] POST /internal-api/validate-admin {"requestId":"j60jspnv","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 12:14:45.433 [INFO] 🟢 [j60jspnv] 200 POST /internal-api/validate-admin - 11ms {"requestId":"j60jspnv","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":11,"slow":false}
+2025-09-09 12:14:47.542 [INFO] 🟦 [9p3zxjnh] POST /internal-api/validate-admin {"requestId":"9p3zxjnh","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 12:14:47.553 [INFO] 🟢 [9p3zxjnh] 200 POST /internal-api/validate-admin - 11ms {"requestId":"9p3zxjnh","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":11,"slow":false}
+2025-09-09 12:15:04.723 [INFO] 🟦 [fp0a7rb0] POST /internal-api/validate-admin {"requestId":"fp0a7rb0","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 12:15:04.729 [INFO] 🟢 [fp0a7rb0] 200 POST /internal-api/validate-admin - 7ms {"requestId":"fp0a7rb0","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":7,"slow":false}
+2025-09-09 12:15:34.704 [INFO] 🟦 [9zsj7c5a] POST /internal-api/validate-admin {"requestId":"9zsj7c5a","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 12:15:34.712 [INFO] 🟢 [9zsj7c5a] 200 POST /internal-api/validate-admin - 9ms {"requestId":"9zsj7c5a","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":9,"slow":false}
+2025-09-09 12:16:03.364 [INFO] 🟦 [ov6wg27p] POST /internal-api/validate-admin {"requestId":"ov6wg27p","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 12:16:03.372 [INFO] 🟢 [ov6wg27p] 200 POST /internal-api/validate-admin - 9ms {"requestId":"ov6wg27p","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":9,"slow":false}
+2025-09-09 12:16:15.629 [INFO] 🟦 [hb7qa3s0] POST /internal-api/validate-admin {"requestId":"hb7qa3s0","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 12:16:15.633 [INFO] 🟢 [hb7qa3s0] 200 POST /internal-api/validate-admin - 4ms {"requestId":"hb7qa3s0","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":4,"slow":false}
+2025-09-09 12:16:19.313 [INFO] 🟦 [8ejntsw4] POST /internal-api/validate-admin {"requestId":"8ejntsw4","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 12:16:19.317 [INFO] 🟢 [8ejntsw4] 200 POST /internal-api/validate-admin - 5ms {"requestId":"8ejntsw4","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":5,"slow":false}
+2025-09-09 12:16:21.954 [INFO] 🟦 [0zl0o4ey] POST /internal-api/validate-admin {"requestId":"0zl0o4ey","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 12:16:21.958 [INFO] 🟢 [0zl0o4ey] 200 POST /internal-api/validate-admin - 4ms {"requestId":"0zl0o4ey","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":4,"slow":false}
+2025-09-09 12:17:40.391 [INFO] 🟦 [aiyo1731] POST /internal-api/validate-admin {"requestId":"aiyo1731","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 12:17:40.429 [INFO] 🟢 [aiyo1731] 200 POST /internal-api/validate-admin - 38ms {"requestId":"aiyo1731","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":38,"slow":false}
+2025-09-09 12:17:44.420 [INFO] 🟦 [thvdaf6d] POST /internal-api/validate-admin {"requestId":"thvdaf6d","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 12:17:44.426 [INFO] 🟢 [thvdaf6d] 200 POST /internal-api/validate-admin - 5ms {"requestId":"thvdaf6d","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":5,"slow":false}
+2025-09-09 12:31:00.464 [INFO] 🟦 [jnhfk9dk] POST /internal-api/validate-admin {"requestId":"jnhfk9dk","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 12:31:00.682 [INFO] 🟢 [jnhfk9dk] 200 POST /internal-api/validate-admin - 244ms {"requestId":"jnhfk9dk","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":244,"slow":false}
+2025-09-09 12:31:16.036 [INFO] 🟦 [s8hn5ak5] POST /internal-api/validate-admin {"requestId":"s8hn5ak5","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 12:31:16.059 [INFO] 🟢 [s8hn5ak5] 200 POST /internal-api/validate-admin - 24ms {"requestId":"s8hn5ak5","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":24,"slow":false}
+2025-09-09 12:31:32.228 [INFO] 🟦 [9au3u9ms] POST /internal-api/validate-admin {"requestId":"9au3u9ms","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 12:31:32.241 [INFO] 🟢 [9au3u9ms] 200 POST /internal-api/validate-admin - 14ms {"requestId":"9au3u9ms","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":14,"slow":false}
+2025-09-09 12:36:37.005 [INFO] 🟦 [p54zwslx] POST /internal-api/validate-admin {"requestId":"p54zwslx","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 12:36:37.233 [INFO] 🟢 [p54zwslx] 200 POST /internal-api/validate-admin - 264ms {"requestId":"p54zwslx","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":264,"slow":false}
+2025-09-09 12:42:52.948 [INFO] 🟦 [dm6m10d5] POST /internal-api/validate-admin {"requestId":"dm6m10d5","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 12:42:53.175 [INFO] 🟢 [dm6m10d5] 200 POST /internal-api/validate-admin - 251ms {"requestId":"dm6m10d5","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":251,"slow":false}
+2025-09-09 12:43:38.016 [INFO] 🟦 [28mofkj4] POST /internal-api/validate-admin {"requestId":"28mofkj4","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 12:43:38.074 [INFO] 🟢 [28mofkj4] 200 POST /internal-api/validate-admin - 58ms {"requestId":"28mofkj4","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":58,"slow":false}
+2025-09-09 12:43:38.406 [INFO] 🟦 [xhmplt10] POST /internal-api/validate-admin {"requestId":"xhmplt10","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 12:43:38.410 [INFO] 🟢 [xhmplt10] 200 POST /internal-api/validate-admin - 4ms {"requestId":"xhmplt10","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":4,"slow":false}
+2025-09-09 12:43:48.707 [INFO] 🟦 [9qcg8m9h] POST /internal-api/validate-admin {"requestId":"9qcg8m9h","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 12:43:48.719 [INFO] 🟢 [9qcg8m9h] 200 POST /internal-api/validate-admin - 13ms {"requestId":"9qcg8m9h","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":13,"slow":false}
+2025-09-09 13:38:32.583 [INFO] 🟦 [oxukfjxz] POST /internal-api/validate-admin {"requestId":"oxukfjxz","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 13:38:32.912 [INFO] 🟢 [oxukfjxz] 200 POST /internal-api/validate-admin - 351ms {"requestId":"oxukfjxz","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":351,"slow":false}
+2025-09-09 13:38:49.812 [INFO] 🟦 [dq7mx5oc] POST /internal-api/validate-admin {"requestId":"dq7mx5oc","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 13:38:49.819 [INFO] 🟢 [dq7mx5oc] 200 POST /internal-api/validate-admin - 8ms {"requestId":"dq7mx5oc","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":8,"slow":false}
+2025-09-09 13:39:22.071 [INFO] 🟦 [b9pc4nsr] POST /internal-api/validate-admin {"requestId":"b9pc4nsr","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 13:39:22.116 [INFO] 🟢 [b9pc4nsr] 200 POST /internal-api/validate-admin - 45ms {"requestId":"b9pc4nsr","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":45,"slow":false}
+2025-09-09 13:39:29.329 [INFO] 🟦 [6bxj72hc] POST /internal-api/validate-admin {"requestId":"6bxj72hc","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 13:39:29.336 [INFO] 🟢 [6bxj72hc] 200 POST /internal-api/validate-admin - 6ms {"requestId":"6bxj72hc","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":6,"slow":false}
+2025-09-09 13:40:19.941 [INFO] 🟦 [l0i16hpz] GET /health {"requestId":"l0i16hpz","method":"GET","url":"/health","ip":"127.0.0.1","hasAuth":false}
+2025-09-09 13:40:19.943 [INFO] 🟢 [l0i16hpz] 200 GET /health - 3ms {"requestId":"l0i16hpz","method":"GET","url":"/health","status":200,"duration":3,"slow":false}
+2025-09-09 13:40:19.958 [INFO] 🟦 [l06qz4xw] GET /api/menu {"requestId":"l06qz4xw","method":"GET","url":"/api/menu","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 13:40:19.976 [WARN] 🟡 [l06qz4xw] 404 GET /api/menu - 18ms {"requestId":"l06qz4xw","method":"GET","url":"/api/menu","status":404,"duration":18,"slow":false}
+2025-09-09 13:50:23.263 [INFO] 🟦 [ru2epck5] POST /internal-api/validate-admin {"requestId":"ru2epck5","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 13:50:23.489 [INFO] 🟢 [ru2epck5] 200 POST /internal-api/validate-admin - 250ms {"requestId":"ru2epck5","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":250,"slow":false}
+2025-09-09 13:50:38.881 [INFO] 🟦 [12ag1d78] POST /internal-api/validate-admin {"requestId":"12ag1d78","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 13:50:38.888 [INFO] 🟢 [12ag1d78] 200 POST /internal-api/validate-admin - 8ms {"requestId":"12ag1d78","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":8,"slow":false}
+2025-09-09 13:51:06.658 [INFO] 🟦 [uck0u586] POST /internal-api/validate-admin {"requestId":"uck0u586","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 13:51:06.668 [INFO] 🟢 [uck0u586] 200 POST /internal-api/validate-admin - 10ms {"requestId":"uck0u586","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":10,"slow":false}
+2025-09-09 14:00:09.532 [INFO] 🟦 [g29ilbom] POST /internal-api/validate-admin {"requestId":"g29ilbom","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 14:00:09.927 [INFO] 🟢 [g29ilbom] 200 POST /internal-api/validate-admin - 417ms {"requestId":"g29ilbom","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":417,"slow":false}
+2025-09-09 14:01:53.852 [INFO] 🟦 [qk1xwshr] POST /internal-api/validate-admin {"requestId":"qk1xwshr","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 14:01:53.960 [INFO] 🟢 [qk1xwshr] 200 POST /internal-api/validate-admin - 108ms {"requestId":"qk1xwshr","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":108,"slow":false}
+2025-09-09 14:02:05.422 [INFO] 🟦 [lgdegryh] POST /internal-api/validate-admin {"requestId":"lgdegryh","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 14:02:05.427 [INFO] 🟢 [lgdegryh] 200 POST /internal-api/validate-admin - 5ms {"requestId":"lgdegryh","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":5,"slow":false}
+2025-09-09 14:06:33.206 [INFO] 🟦 [ioa8tmfy] POST /internal-api/validate-admin {"requestId":"ioa8tmfy","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 14:06:33.388 [INFO] 🟢 [ioa8tmfy] 200 POST /internal-api/validate-admin - 199ms {"requestId":"ioa8tmfy","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":199,"slow":false}
+2025-09-09 14:06:40.344 [INFO] 🟦 [d4vdnsh9] POST /internal-api/validate-admin {"requestId":"d4vdnsh9","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 14:06:40.363 [INFO] 🟢 [d4vdnsh9] 200 POST /internal-api/validate-admin - 19ms {"requestId":"d4vdnsh9","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":19,"slow":false}
+2025-09-09 14:10:55.208 [INFO] 🟦 [t89cxovv] POST /internal-api/validate-admin {"requestId":"t89cxovv","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 14:10:55.438 [INFO] 🟢 [t89cxovv] 200 POST /internal-api/validate-admin - 253ms {"requestId":"t89cxovv","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":253,"slow":false}
+2025-09-09 14:11:01.521 [INFO] 🟦 [1p1hnfc9] POST /internal-api/validate-admin {"requestId":"1p1hnfc9","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 14:11:01.527 [INFO] 🟢 [1p1hnfc9] 200 POST /internal-api/validate-admin - 6ms {"requestId":"1p1hnfc9","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":6,"slow":false}
+2025-09-09 14:11:11.669 [INFO] 🟦 [raqi6bh3] POST /internal-api/validate-admin {"requestId":"raqi6bh3","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 14:11:11.682 [INFO] 🟢 [raqi6bh3] 200 POST /internal-api/validate-admin - 14ms {"requestId":"raqi6bh3","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":14,"slow":false}
+2025-09-09 14:12:17.604 [INFO] 🟦 [7zvakv1d] POST /internal-api/validate-admin {"requestId":"7zvakv1d","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 14:12:17.666 [INFO] 🟢 [7zvakv1d] 200 POST /internal-api/validate-admin - 63ms {"requestId":"7zvakv1d","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":63,"slow":false}
+2025-09-09 14:12:22.353 [INFO] 🟦 [eim81q7b] POST /internal-api/validate-admin {"requestId":"eim81q7b","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 14:12:22.359 [INFO] 🟢 [eim81q7b] 200 POST /internal-api/validate-admin - 7ms {"requestId":"eim81q7b","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":7,"slow":false}
+2025-09-09 14:24:25.818 [INFO] 🟦 [gwkmlkzr] POST /internal-api/validate-admin {"requestId":"gwkmlkzr","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 14:24:26.043 [INFO] 🟢 [gwkmlkzr] 200 POST /internal-api/validate-admin - 248ms {"requestId":"gwkmlkzr","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":248,"slow":false}
+2025-09-09 14:28:58.660 [INFO] 🟦 [ttjzlrtb] POST /internal-api/validate-admin {"requestId":"ttjzlrtb","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 14:28:58.878 [INFO] 🟢 [ttjzlrtb] 200 POST /internal-api/validate-admin - 239ms {"requestId":"ttjzlrtb","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":239,"slow":false}
+2025-09-09 14:29:06.314 [INFO] 🟦 [o1h5hvw8] POST /internal-api/validate-admin {"requestId":"o1h5hvw8","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 14:29:06.321 [INFO] 🟢 [o1h5hvw8] 200 POST /internal-api/validate-admin - 8ms {"requestId":"o1h5hvw8","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":8,"slow":false}
+2025-09-09 14:29:09.334 [INFO] 🟦 [mhjlwrqi] POST /internal-api/validate-admin {"requestId":"mhjlwrqi","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 14:29:09.339 [INFO] 🟢 [mhjlwrqi] 200 POST /internal-api/validate-admin - 5ms {"requestId":"mhjlwrqi","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":5,"slow":false}
+2025-09-09 14:56:48.746 [INFO] 🟦 [os3lwubp] POST /internal-api/validate-admin {"requestId":"os3lwubp","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 14:56:48.965 [INFO] 🟢 [os3lwubp] 200 POST /internal-api/validate-admin - 241ms {"requestId":"os3lwubp","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":241,"slow":false}
+2025-09-09 14:57:46.891 [INFO] 🟦 [bcb4c3uf] POST /internal-api/validate-admin {"requestId":"bcb4c3uf","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 14:57:46.966 [INFO] 🟢 [bcb4c3uf] 200 POST /internal-api/validate-admin - 75ms {"requestId":"bcb4c3uf","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":75,"slow":false}
+2025-09-09 15:20:35.045 [INFO] 🟦 [t0cke33z] POST /internal-api/validate-admin {"requestId":"t0cke33z","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 15:20:35.286 [INFO] 🟢 [t0cke33z] 200 POST /internal-api/validate-admin - 261ms {"requestId":"t0cke33z","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":261,"slow":false}
+2025-09-09 16:21:17.707 [INFO] 🟦 [1nghmm44] POST /internal-api/validate-admin {"requestId":"1nghmm44","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 16:21:17.941 [INFO] 🟢 [1nghmm44] 200 POST /internal-api/validate-admin - 254ms {"requestId":"1nghmm44","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":254,"slow":false}
+2025-09-09 17:47:52.820 [INFO] Server stopped at 2025-09-09T23:47:52.791Z
+2025-09-09 17:48:00.967 [INFO] ================================================== START SESSION ==================================================
+2025-09-09 17:48:00.969 [INFO] Server started at 2025-09-09T23:48:00.969Z
+2025-09-09 17:48:00.970 [INFO] Log directory: C:\PMPOS\pmpos\server\logs
+2025-09-09 21:03:59.919 [INFO] Server stopped at 2025-09-10T03:03:59.908Z
+2025-09-09 21:04:07.403 [INFO] ================================================== START SESSION ==================================================
+2025-09-09 21:04:07.408 [INFO] Server started at 2025-09-10T03:04:07.405Z
+2025-09-09 21:04:07.409 [INFO] Log directory: C:\PMPOS\pmpos\server\logs
+2025-09-09 21:20:11.073 [INFO] 🟦 [r2pcfb9c] POST /internal-api/validate-admin {"requestId":"r2pcfb9c","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 21:20:17.163 [INFO] 🟢 [r2pcfb9c] 200 POST /internal-api/validate-admin - 6100ms {"requestId":"r2pcfb9c","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":6100,"slow":true}
+2025-09-09 21:20:17.164 [WARN] ⚠️  [r2pcfb9c] SLOW API REQUEST: 6100ms for POST /internal-api/validate-admin {"requestId":"r2pcfb9c","method":"POST","url":"/internal-api/validate-admin","duration":6100,"slow":true}
+2025-09-09 21:22:11.610 [INFO] 🟦 [nqrpkadt] POST /internal-api/validate-admin {"requestId":"nqrpkadt","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 21:22:11.666 [INFO] 🟢 [nqrpkadt] 200 POST /internal-api/validate-admin - 58ms {"requestId":"nqrpkadt","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":58,"slow":false}
+2025-09-09 21:22:21.817 [INFO] 🟦 [e3n7g4nf] POST /internal-api/validate-admin {"requestId":"e3n7g4nf","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 21:22:21.832 [INFO] 🟢 [e3n7g4nf] 200 POST /internal-api/validate-admin - 15ms {"requestId":"e3n7g4nf","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":15,"slow":false}
+2025-09-09 21:25:00.007 [INFO] 🟦 [m7yustsm] POST /internal-api/validate-admin {"requestId":"m7yustsm","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 21:25:00.045 [INFO] 🟢 [m7yustsm] 200 POST /internal-api/validate-admin - 38ms {"requestId":"m7yustsm","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":38,"slow":false}
+2025-09-09 21:25:07.842 [INFO] 🟦 [4fxwrrjk] POST /internal-api/validate-admin {"requestId":"4fxwrrjk","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 21:25:07.849 [INFO] 🟢 [4fxwrrjk] 200 POST /internal-api/validate-admin - 7ms {"requestId":"4fxwrrjk","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":7,"slow":false}
+2025-09-09 21:28:35.586 [INFO] 🟦 [9dturm7p] POST /internal-api/validate-admin {"requestId":"9dturm7p","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-09-09 21:28:35.620 [INFO] 🟢 [9dturm7p] 200 POST /internal-api/validate-admin - 34ms {"requestId":"9dturm7p","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":34,"slow":false}

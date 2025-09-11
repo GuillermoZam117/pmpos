@@ -1,0 +1,370 @@
+# Flujo Definitivo: **Pedido Nuevo + Etiquetas** (Tickets Abiertos / No Pagados)
+
+> **Objetivo:** Crear un ticket nuevo, agregar productos y aplicar etiquetas de orden (Order Tags) mapeadas en SambaPOS, verificando y cerrando el ticket.
+>
+> **Convenciones:**
+>
+> * `terminalId` es el hash retornado por `registerTerminal` (no confundir con el **nombre** del terminal).
+> * `ticketId` cuando se use se envía como **String**.
+> * Nombres de grupos/tags deben coincidir **exactamente** como en SambaPOS.
+
+---
+
+## 1) Registrar terminal
+
+**Payload**
+
+```graphql
+mutation {
+  registerTerminal(
+    ticketType: "COMEDOR"
+    terminal: "SERVIDOR"
+    department: "MESAS"
+    user: "CAJERO"
+  )
+}
+```
+
+**Response**
+
+```json
+{
+  "data": {
+    "registerTerminal": "bZR5OnHI3kyPnrsqbehUrg"
+  },
+  "errors": null
+}
+```
+
+---
+
+## 2) Crear ticket nuevo
+
+**Payload**
+
+```graphql
+mutation {
+  createTerminalTicket(terminalId: "bZR5OnHI3kyPnrsqbehUrg") {
+    uid
+    date
+    number
+    totalAmount
+  }
+}
+```
+
+**Response**
+
+```json
+{
+  "data": {
+    "createTerminalTicket": {
+      "uid": "BZi4MMHgA0yTiGBsAMwA6w",
+      "date": "2025-09-10T00:47:06.1917103Z",
+      "number": "",
+      "totalAmount": 0
+    }
+  },
+  "errors": null
+}
+```
+
+---
+
+## 3) Añadir pedido al ticket
+
+**Payload**
+
+```graphql
+mutation {
+  addOrderToTerminalTicket(
+    terminalId: "bZR5OnHI3kyPnrsqbehUrg"
+    productName: "CUARTO POLLO"
+    portion: "Normal"
+    quantity: 3
+  ) { totalAmount }
+}
+```
+
+**Response**
+
+```json
+{
+  "data": { "addOrderToTerminalTicket": { "totalAmount": 195 } },
+  "errors": null
+}
+```
+
+---
+
+## 4) Asignar mesa al terminal ticket
+
+**Payload**
+
+```graphql
+mutation {
+  changeEntityOfTerminalTicket(
+    terminalId: "bZR5OnHI3kyPnrsqbehUrg",
+    type: "Mesas",
+    name: "6"
+  ) {
+    id
+    entities { name type }
+  }
+}
+```
+
+---
+
+## 5) Obtener detalles de órdenes del ticket
+
+**Payload**
+
+```graphql
+query {
+  getTerminalTicket(terminalId: "bZR5OnHI3kyPnrsqbehUrg") {
+    id number totalAmount
+    orders { uid name productId portion quantity price }
+  }
+}
+```
+
+**Response**
+
+```json
+{
+  "data": {
+    "getTerminalTicket": {
+      "id": 0,
+      "number": "",
+      "totalAmount": 195,
+      "orders": [
+        {
+          "uid": "jeicV69A4U6lBrrI7xl8nQ",
+          "name": "CUARTO POLLO",
+          "productId": "1781",
+          "portion": "Normal",
+          "quantity": 3,
+          "price": 65
+        }
+      ]
+    }
+  },
+  "errors": null
+}
+```
+
+---
+
+## 6) Obtener **Order Tag Groups** para el producto
+
+> Para consultar grupos de tags por **producto** se usa el **nombre del terminal** (no el `terminalId`).
+
+**Payload**
+
+```graphql
+query {
+  getOrderTagGroups(productId: 1783, terminal: "SERVIDOR") {
+    name
+    maxSelection
+    requiredSelection
+    tags { name price }
+  }
+}
+```
+
+**Response (ejemplo)**
+
+```json
+{
+  "data": {
+    "getOrderTagGroups": [
+      {
+        "name": "SABORES SALSAS POLLO",
+        "tags": [
+          { "name": "ADOBADO", "price": 0 },
+          { "name": "DIABLA", "price": 0 },
+          { "name": "TERIYAKI", "price": 0 },
+          { "name": "PIÑA", "price": 0 },
+          { "name": "MOJO DE AJO", "price": 0 },
+          { "name": "CHIMI CHURRI", "price": 0 },
+          { "name": "SPICY BBQ", "price": 0 },
+          { "name": "HABANERO", "price": 0 },
+          { "name": "CHIPOTLE", "price": 0 },
+          { "name": "BBQ", "price": 0 },
+          { "name": "TAMARINDO", "price": 0 },
+          { "name": "JALAPEÑO", "price": 0 },
+          { "name": "CACAHUATE", "price": 0 },
+          { "name": "SPICY TERIYAKI", "price": 0 }
+        ]
+      },
+      {
+        "name": "PARA LLEVAR",
+        "tags": [
+          { "name": "PARA LLEVAR", "price": 0 },
+          { "name": "CONTINUACION", "price": 0 }
+        ]
+      }
+    ]
+  },
+  "errors": null
+}
+```
+
+---
+
+## 7) Etiquetar pedido (por `orderUid`)
+
+> Algunos builds no aplican `orderTags` en `addOrderToTerminalTicket`. La forma **robusta** es **actualizar la orden por `orderUid`**.
+
+**Payload**
+
+```graphql
+mutation {
+  updateOrderOfTerminalTicket(
+    terminalId: "bZR5OnHI3kyPnrsqbehUrg"
+    orderUid: "OwtuNGh_z0CStzb9lhnfrA"
+    orderTags: [
+      { tagName: "SABORES SALSAS POLLO", tag: "ADOBADO",     quantity: 1, price: 0 },
+      { tagName: "PARA LLEVAR",          tag: "PARA LLEVAR", quantity: 1, price: 0 }
+    ]
+  ) {
+    id
+    totalAmount
+    orders {
+      uid name portion quantity price
+      tags { tagName tag price quantity }
+    }
+  }
+}
+```
+
+**Response**
+
+```json
+{
+  "data": {
+    "updateOrderOfTerminalTicket": {
+      "id": 0,
+      "totalAmount": 405,
+      "orders": [
+        {
+          "uid": "jeicV69A4U6lBrrI7xl8nQ",
+          "name": "CUARTO POLLO",
+          "portion": "Normal",
+          "quantity": 3,
+          "price": 65,
+          "tags": []
+        },
+        {
+          "uid": "OwtuNGh_z0CStzb9lhnfrA",
+          "name": "POLLO",
+          "portion": "Normal",
+          "quantity": 1,
+          "price": 210,
+          "tags": [
+            { "tagName": "SABORES SALSAS POLLO", "tag": "ADOBADO",   "price": 0, "quantity": 1 },
+            { "tagName": "PARA LLEVAR",          "tag": "PARA LLEVAR", "price": 0, "quantity": 1 }
+          ]
+        }
+      ]
+    }
+  },
+  "errors": null
+}
+```
+
+---
+
+## 8) Verificar etiquetas aplicadas
+
+**Payload**
+
+```graphql
+query {
+  getTerminalTicket(terminalId: "bZR5OnHI3kyPnrsqbehUrg") {
+    id number totalAmount remainingAmount
+    orders {
+      uid name portion quantity price
+      tags { tagName tag price quantity }
+      states { stateName state stateValue }
+    }
+  }
+}
+```
+
+**Response (ejemplo)**
+
+```json
+{
+  "data": {
+    "getTerminalTicket": {
+      "id": 0,
+      "number": "",
+      "totalAmount": 405,
+      "remainingAmount": 405,
+      "orders": [
+        {
+          "uid": "jeicV69A4U6lBrrI7xl8nQ",
+          "name": "CUARTO POLLO",
+          "portion": "Normal",
+          "quantity": 3,
+          "price": 65,
+          "tags": [],
+          "states": [
+            { "stateName": "KDStatus", "state": "CNoImpreso", "stateValue": "" },
+            { "stateName": "Status",   "state": "Nuevo",      "stateValue": "" }
+          ]
+        },
+        {
+          "uid": "OwtuNGh_z0CStzb9lhnfrA",
+          "name": "POLLO",
+          "portion": "Normal",
+          "quantity": 1,
+          "price": 210,
+          "tags": [
+            { "tagName": "SABORES SALSAS POLLO", "tag": "ADOBADO",   "price": 0, "quantity": 1 },
+            { "tagName": "PARA LLEVAR",          "tag": "PARA LLEVAR", "price": 0, "quantity": 1 }
+          ],
+          "states": [
+            { "stateName": "KDStatus", "state": "CNoImpreso", "stateValue": "" },
+            { "stateName": "Status",   "state": "Nuevo",      "stateValue": "" }
+          ]
+        }
+      ]
+    }
+  },
+  "errors": null
+}
+```
+
+---
+
+## 9) Cerrar ticket
+
+**Payload**
+
+```graphql
+mutation {
+  closeTerminalTicket(terminalId: "bZR5OnHI3kyPnrsqbehUrg")
+}
+```
+
+**Response**
+
+```json
+{
+  "data": { "closeTerminalTicket": null },
+  "errors": null
+}
+```
+
+---
+
+## Tips & Troubleshooting
+
+* Si `orderTags` no surte efecto en `addOrderToTerminalTicket`, usa el **paso 7** (actualizar por `orderUid`).
+* Para descubrir tags válidos **por orden** (respetando mapas/reglas), usa `getOrderTagsForTerminalTicketOrder(terminalId, orderUid)` si tu build lo expone.
+* Nombres exactos (grupo y tag) y porción deben coincidir.
+* `getOrderTagGroups(productId, terminal: <NOMBRE>)` usa **nombre de terminal**; mutaciones de Terminal usan **terminalId**.
+* Si `getTerminalTicket` regresa `null`, el `terminalId` no tiene ticket activo o pertenece a otro usuario.

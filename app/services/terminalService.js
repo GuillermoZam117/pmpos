@@ -3,8 +3,8 @@
  * No local fabricated terminal IDs. On failure, registration returns null.
  */
 
-import { registerTerminalAsync } from '../queries';
 import Debug from 'debug';
+import { graphqlSimple, gqlEscape } from './graphqlService';
 
 const debug = Debug('pmpos:terminal');
 
@@ -28,7 +28,7 @@ class TerminalService {
                 this._terminalsByUser = new Map(Object.entries(terminals));
                 Object.keys(terminals).forEach(u => this._serverRegisteredUsers.add(u));
                 debug('✅ Loaded terminals from storage:', terminals);
-                
+
                 // If we have stored terminals, also check for current user in localStorage
                 try {
                     const userData = localStorage.getItem('user');
@@ -64,7 +64,7 @@ class TerminalService {
         const oldUser = this._currentUser;
         this._currentUser = userName;
         debug('👤 Current user changed from', oldUser, 'to:', userName);
-        
+
         // If setting to same user that already has terminal, nothing to do
         if (userName && oldUser === userName && this.getTerminalId(userName)) {
             debug('✅ User unchanged and has terminal, no action needed');
@@ -73,7 +73,7 @@ class TerminalService {
 
     getTerminalId(userName = null) {
         const user = userName || this._currentUser;
-        
+
         // Enhanced debugging for terminal ID retrieval
         debug('🔍 getTerminalId called:', {
             requestedUser: userName,
@@ -81,36 +81,20 @@ class TerminalService {
             effectiveUser: user,
             hasUser: !!user
         });
-        
+
         if (!user) {
             debug('❌ getTerminalId: No user specified');
             return null;
         }
 
+        // ONLY look in _terminalsByUser - respects "one terminal per user" principle
         const terminalId = this._terminalsByUser.get(user);
         if (terminalId) {
-            debug('✅ getTerminalId: Found in _terminalsByUser:', terminalId);
+            debug('✅ getTerminalId: Found terminal for user:', { user, terminalId });
             return terminalId;
         }
 
-        if (typeof window !== 'undefined') {
-            try {
-                if (window.currentTerminalId) {
-                    debug('✅ getTerminalId: Found in window.currentTerminalId:', window.currentTerminalId);
-                    return window.currentTerminalId;
-                }
-                const legacy = localStorage.getItem('currentTerminalId') || localStorage.getItem('pmpos_terminal_id');
-                if (legacy) {
-                    debug('✅ getTerminalId: Found in localStorage:', legacy);
-                    return legacy;
-                }
-                
-                debug('❌ getTerminalId: No terminal ID found in any storage location');
-            } catch (e) {
-                debug('❌ Error reading legacy terminalId from storage:', e);
-            }
-        }
-
+        debug('❌ getTerminalId: No terminal found for user:', user);
         return null;
     }
 
@@ -119,20 +103,13 @@ class TerminalService {
         const user = userName || this._currentUser;
         if (!user) return;
 
+        // Store terminal ID for this specific user
         this._terminalsByUser.set(user, id);
         this.saveTerminals();
 
-        try {
-            if (typeof window !== 'undefined') {
-                window.currentTerminalId = id;
-                localStorage.setItem('currentTerminalId', id);
-                localStorage.setItem('pmpos_terminal_id', id);
-            }
-        } catch (e) {
-            debug('❌ Error saving legacy terminalId keys:', e);
-        }
-
+        // Mark user as server-registered
         this._serverRegisteredUsers.add(user);
+
         debug('✅ Terminal ID set for user', user + ':', id);
     }
 
@@ -172,7 +149,7 @@ class TerminalService {
             if (terminalId) {
                 this.setTerminalId(terminalId, userName);
                 debug('✅ Terminal registration successful:', terminalId);
-                
+
                 // Notify listeners about successful registration
                 try {
                     this._onRegisteredCallbacks.forEach(cb => {
@@ -201,49 +178,65 @@ class TerminalService {
     }
 
     async _performRegistration(user) {
-        // Registrar una sola vez; los 3 reintentos con backoff ocurren dentro de registerTerminalAsync
+        // Registrar terminal usando los parámetros correctos según documentación real
         try {
-            const result = await registerTerminalAsync(user);
-            return result || null;
+            const query = `mutation { 
+                registerTerminal(
+                    ticketType: "COMEDOR",
+                    terminal: "SERVIDOR",
+                    department: "MESAS",
+                    user: "${gqlEscape(user || 'CAJERO')}"
+                )
+            }`;
+
+            const result = await graphqlSimple(query);
+
+            if (result?.registerTerminal) {
+                // La documentación no especifica que retorna, así que asumimos que retorna el terminalId
+                const terminalId = result.registerTerminal;
+                debug('✅ Terminal registered successfully:', terminalId);
+                return terminalId;
+            } else {
+                debug('❌ Terminal registration failed - no ID returned');
+                return null;
+            }
         } catch (error) {
-            debug('❌ Terminal registration error (no outer retries):', error?.message || error);
+            debug('❌ Terminal registration error:', error?.message || error);
             return null;
         }
-    }
-    
-    _isRetryableError(error) {
+    } _isRetryableError(error) {
         if (!error) return false;
-        
+
         const errorMsg = error.message || error.toString();
         const errorCode = error.code || error.status;
-        
+
         // Network errors that should be retried
         const retryablePatterns = [
             'network',
             'timeout',
             'ECONNREFUSED',
-            'ENOTFOUND', 
+            'ENOTFOUND',
             'ETIMEDOUT',
             'fetch',
             'Failed to fetch',
             'NetworkError'
         ];
-        
+
         // HTTP status codes that should be retried
         const retryableStatusCodes = [408, 429, 500, 502, 503, 504];
-        
+
         // Check error message patterns
-        const hasRetryablePattern = retryablePatterns.some(pattern => 
+        const hasRetryablePattern = retryablePatterns.some(pattern =>
             errorMsg.toLowerCase().includes(pattern.toLowerCase())
         );
-        
+
         // Check status codes
         const hasRetryableStatus = retryableStatusCodes.includes(errorCode);
-        
+
         const shouldRetry = hasRetryablePattern || hasRetryableStatus;
-        
+
         debug(`🔍 Error analysis - Message: "${errorMsg}", Code: ${errorCode}, Retryable: ${shouldRetry}`);
-        
+
         return shouldRetry;
     }
 
@@ -256,22 +249,37 @@ class TerminalService {
     clearTerminal(userName = null) {
         const user = userName || this._currentUser;
         if (!user) return;
+
+        // Clear terminal for specific user only
         this._terminalsByUser.delete(user);
+        this._serverRegisteredUsers.delete(user);
         this.saveTerminals();
+
+        // Clear registration state
         this._registrationPromise = null;
         this._registrationInFlight = false;
-        if (typeof window !== 'undefined') {
-            localStorage.removeItem('pmpos_terminal_id');
-            localStorage.removeItem('currentTerminalId');
-            delete window.currentTerminalId;
-        }
+
+        debug('✅ Terminal cleared for user:', user);
     }
 
     clearAllTerminals() {
         this._terminalsByUser.clear();
+        this._serverRegisteredUsers.clear();
         this.saveTerminals();
         this._currentUser = null;
-        this._serverRegisteredUsers.clear();
+
+        // Clear all legacy storage
+        if (typeof window !== 'undefined') {
+            try {
+                localStorage.removeItem('pmpos_terminal_id');
+                localStorage.removeItem('currentTerminalId');
+                delete window.currentTerminalId;
+            } catch (e) {
+                debug('❌ Error clearing legacy storage:', e);
+            }
+        }
+
+        debug('✅ All terminals cleared');
     }
 
     isRegistered() {
@@ -286,6 +294,16 @@ class TerminalService {
     async register(user) {
         const userName = typeof user === 'string' ? user : user?.name || user?.userName;
         return await this.ensureTerminalRegistered(userName);
+    }
+
+    // Debug helper - get current terminals state
+    getTerminalsState() {
+        return {
+            currentUser: this._currentUser,
+            terminalsByUser: Object.fromEntries(this._terminalsByUser),
+            serverRegisteredUsers: Array.from(this._serverRegisteredUsers),
+            registrationInFlight: this._registrationInFlight
+        };
     }
 }
 

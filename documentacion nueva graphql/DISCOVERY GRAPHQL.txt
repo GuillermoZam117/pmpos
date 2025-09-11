@@ -1,0 +1,543 @@
+#### Proceso para CREAR UN NUEVO TICKET 
+### 1. Registrar Terminal 
+mutation {
+  registerTerminal(
+    ticketType: "COMEDOR",
+    terminal: "SERVIDOR",
+    department: "MESAS",
+    user: "CAJERO"
+  )
+}
+
+### 2. Crear Ticket Terminal 
+mutation CreateTerminalTicket {
+  createTerminalTicket(terminalId: "lvVWgQcGYUu6f3Lam3BmvA") {
+    uid
+    totalAmount
+  }
+}
+
+
+### 3.  Añadir ordenes al ticket terminal 
+#pollo
+mutation AddPOLLO {
+  addOrderToTerminalTicket(
+    terminalId: "lvVWgQcGYUu6f3Lam3BmvA"
+    productName: "POLLO"
+    portion: "Normal"
+    quantity: 1
+  ) { totalAmount }
+}
+
+#papas
+mutation AddPAPAS {
+  addOrderToTerminalTicket(
+    terminalId: "lvVWgQcGYUu6f3Lam3BmvA"
+    productName: "PAPAS AL AJILLO"
+    portion: "ORD"
+    quantity: 1
+  ) { totalAmount }
+}
+
+### 4. Asignar mesa a terminal ticket 
+mutation {
+  changeEntityOfTerminalTicket(
+    terminalId: "lvVWgQcGYUu6f3Lam3BmvA",
+    type: "Mesas",
+    name: "12"
+  ) {
+    id
+    entities { name type }
+  }
+}
+
+### 5. verificacion de mesa añadida al ticket 
+query {
+  getTerminalTicket(terminalId: "lvVWgQcGYUu6f3Lam3BmvA") {
+    id
+    entities { name type }
+  }
+}
+
+
+### 6.  Ver ordenes del ticket terminal 
+
+query { 
+		getTerminalTicket(terminalId: "lvVWgQcGYUu6f3Lam3BmvA")
+		{ 
+			id 
+			orders 
+				{ uid } } 
+		}  
+		
+		
+### Imprimir factura (OPCIONAL PARA EL FLUJO DE NUEVO TICKET) ( Ejecutar comando de uaotmatizacion con foco en ticket uid) 
+
+mutation { 
+          executeAutomationCommandForTerminalTicket(terminalId: "lvVWgQcGYUu6f3Lam3BmvA",
+													name: "Imprimir factura",
+													value: "") 
+														{ id }
+		}
+
+
+### 7. Añadir comentarios a pedidos antes de cerrar ticket (OPCIONAL EL USUARIO PUEDE O NO PUEDE INGRESAR COMENTARIOS A UN PEDIDO )
+
+mutation { executeAutomationCommandForTerminalTicket(
+														terminalId: "W6yjzeD8pk28J49lh1MReA",
+														name: "TagOrder",
+														value: "Comentario desde GraphiQL",
+														
+														orderUid: "-DLIb_sKeUyNIPluRCYF5A")
+															{ id }
+															}
+		
+		
+### 8. Cerrar ticket terminal (imprimir comando y enviar pedido a cocina)  (AQUI FINALIZA EL CICLO DE CREACION DE NUEVO TICKET, DONDE ENVIAMOS LOS PEDIDOS A COCINA, LO CERRAMOS Y SE CAMBIAN DE ESTADO TICKET, ORDENES Y ENTIDAD)
+		mutation {
+  closeTerminalTicket(terminalId: "lvVWgQcGYUu6f3Lam3BmvA")
+}
+
+### Quitar registro de terminal (al cerrar el servidor o el logueo del usuario) 
+
+mutation {
+  unregisterTerminal(terminalId: "lvVWgQcGYUu6f3Lam3BmvA")
+}
+
+### Cancelar pedido (antes de cerrar el ticket o enviarlo a cocina 
+
+mutation {
+            executeAutomationCommandForTerminalTicket(terminalId: "lvVWgQcGYUu6f3Lam3BmvA",
+																   orderUid: "9OzgPtIgm0a-6pgWg7v8Fg",
+																   name: "Predeterminado Cancelar los pedidos",
+                                                                   value: ""
+																   ) 
+																	{ id } 
+																   } 
+																   
+																  
+### *** Comandos para tickets cerrados ***
+
+### Obtener detalles de ticket por ticket id 
+
+query {
+			getTicket(id: 27202) 
+			{
+				id number date totalAmount entities  { name type }
+				orders { uid productId quantity price portion }
+				}                                                                                                              
+				}
+
+### Ejecutar trabajo de impresion en ticket cerrado 
+				
+mutation {                                                                                                     
+			executePrintJob(                                                                                               
+				name: "Imprimir factura CAJA",
+				ticketId: 27200,
+				copies: 1,
+				terminal: "SERVIDOR",
+				department: "MESAS",
+				user: "GUILLERMO ZAMBRANO",)
+}
+
+
+### Reabrir ticket en terminal ticket (requiere registrar nueva terminal para pasarlo a esa terminal y operar
+
+# 1. 
+mutation {
+  registerTerminal(
+    ticketType: "COMEDOR",
+    terminal: "SERVIDOR",
+    department: "MESAS",
+    user: "CAJERO"
+  )
+}
+
+# 2. 
+mutation {
+            loadTerminalTicket(
+			terminalId: "HPKz9bZXEk6Le04kmgaTeQ",
+			ticketId: "27202"
+			) { id
+					date
+          totalAmount
+					tags {
+					  tagName
+					  tag
+					}
+          payments {
+            name
+            amount
+          }
+          calculations {
+            name
+            calculationAmount
+          }
+					states {
+					  stateName
+					  state
+					}
+
+ }
+			} 
+			
+### Ejecutar anular comando de orden (sobre el ticket cargado), usando el uid que mostraste 
+# 1. Registrar nueva terminal o tener el terminal id a la mano 
+
+mutation {
+  registerTerminal(
+    ticketType: "COMEDOR",
+    terminal: "SERVIDOR",
+    department: "MESAS",
+    user: "CAJERO"
+  )
+}
+
+# 2. Reabrir ticket en terminal 
+
+mutation {
+            loadTerminalTicket(
+			terminalId: "HPKz9bZXEk6Le04kmgaTeQ",
+			ticketId: "27202"
+			) { id
+					date
+          totalAmount
+					tags {
+					  tagName
+					  tag
+					}
+          payments {
+            name
+            amount
+          }
+          calculations {
+            name
+            calculationAmount
+          }
+					states {
+					  stateName
+					  state
+					}
+
+ }
+			} 
+				
+
+# 3. Cancelar requiere order uid y terminal id 
+mutation {
+            executeAutomationCommandForTerminalTicket(
+			terminalId: "lvVWgQcGYUu6f3Lam3BmvA",
+			orderUid: "pGu4_HQ5aEe4g6CCbIp_Tg",
+			name: "Void",			# o "Predeterminado Cancelar los pedidos", etc.                                    
+			value: "") 
+				{ id }
+			}
+# 4. Cerrar el ticket para finalizar proceso 
+mutation {
+  closeTerminalTicket(terminalId: "HPKz9bZXEk6Le04kmgaTeQ")
+}			
+
+### Cargar terminal ticket cerrado 
+
+mutation {
+            loadTerminalTicket(
+			terminalId: "HPKz9bZXEk6Le04kmgaTeQ",
+			ticketId: "27202"
+			) { id
+					date
+          totalAmount
+					tags {
+					  tagName
+					  tag
+					}
+          payments {
+            name
+            amount
+          }
+          calculations {
+            name
+            calculationAmount
+          }
+					states {
+					  stateName
+					  state
+					}
+
+ }
+			} 
+				
+				
+### Ver detalles de ticket por ticket id 
+
+
+### Comandos para tickets cerrados 
+
+query {
+			getTicket(id: 27202) 
+			{
+				id number date totalAmount states {
+				  stateName
+				  state
+				} payments {
+				  name
+				  amount
+				} calculations {
+				  name
+				  calculationAmount
+				} tags {
+				  tagName
+				  tag
+				} totalAmount remainingAmount {
+				  stateName
+				  state
+				} entities   { name type }
+				orders { uid states {
+				  stateName
+				  state
+				  stateValue
+				} productId quantity price portion }
+				}                                                                                                              
+				}
+        
+### Ejecutar trabajo de impresion 
+
+mutation {                                                                                                     
+			executePrintJob(                                                                                               
+				name: "Imprimir factura CAJA",
+				ticketId: 27202,
+				copies: 1,
+				terminal: "SERVIDOR",
+				department: "MESAS",
+				user: "GUILLERMO ZAMBRANO",) {
+			  name
+			}
+}
+
+### Agregar comentarios configurados en sambapos a pedidos en nuevos tickets 
+## 1. Registrar terminal 
+mutation {
+  registerTerminal(
+    ticketType: "COMEDOR",
+    terminal: "SERVIDOR",
+    department: "MESAS",
+    user: "CAJERO"
+  )
+}
+
+## 2. Crear Ticket Terminal 
+mutation CreateTerminalTicket {
+  createTerminalTicket(terminalId: "Y7ONrOEnmk2RTHhiF53mfA") {
+    uid
+    totalAmount
+  }
+}
+
+## 3.  Añadir ordenes al ticket terminal 
+#pollo
+mutation AddPOLLO {
+  addOrderToTerminalTicket(
+    terminalId: "Y7ONrOEnmk2RTHhiF53mfA"
+    productName: "POLLO"
+    portion: "Normal"
+    quantity: 1
+  ) { totalAmount }
+}
+#papas
+mutation AddPAPAS {
+  addOrderToTerminalTicket(
+    terminalId: "Y7ONrOEnmk2RTHhiF53mfA"
+    productName: "PAPAS AL AJILLO"
+    portion: "ORD"
+    quantity: 1
+  ) { totalAmount }
+}
+
+## 4. Asignar mesa a terminal ticket 
+mutation {
+  changeEntityOfTerminalTicket(
+    terminalId: "Y7ONrOEnmk2RTHhiF53mfA",
+    type: "Mesas",
+    name: "12"
+  ) {
+    id
+    entities { name type }
+  }
+}
+		
+## 5. Obtener detalles del ticket y ordenes para obtener order uid y nombre y nombre de porcion 
+query {
+  getTerminalTicket(terminalId: "Y7ONrOEnmk2RTHhiF53mfA") {
+    id
+    orders {
+      uid
+      name
+      portion
+      quantity
+    }
+  }
+}
+## 6a Obtener todas las etiquetas para el producto 
+query {
+  getOrderTagGroups(
+    productName: "POLLO"
+    terminal: "SERVIDOR"
+    department: "MESAS"
+    ticketType: "COMEDOR"
+    user: "graphiql"
+    hidden: false
+  ) {
+    name
+    tags { name price }
+  }
+}
+
+## 6b obtener colores de las etiquetas de producto (para ui frontend) 
+query { getOrderTagColors { name value } }
+
+## 6c etiquetar pedido con etiquetas de sambapos configuradas 
+mutation {
+  updateOrderOfTerminalTicket(
+    terminalId: "Y7ONrOEnmk2RTHhiF53mfA",
+    orderUid: "zBRu_hl0G0inxjMBKyGs2Q",
+    orderTags: [{ tagName: "SABORES SALSAS POLLO", tag: "ADOBADO" }]
+  ) {
+    id
+    orders { uid name portion tags { tagName tag } }
+  }
+}
+
+## 7 y fin cerrar ticket 
+		mutation {
+  closeTerminalTicket(terminalId: "Y7ONrOEnmk2RTHhiF53mfA")
+}
+		
+				
+### Agregar pedidos a ticket cerrado 
+
+# 1. Registrar nueva terminal o tener el terminal id a la mano 
+
+mutation {
+  registerTerminal(
+    ticketType: "COMEDOR",
+    terminal: "SERVIDOR",
+    department: "MESAS",
+    user: "CAJERO"
+  )
+}
+
+# 2. Reabrir ticket en terminal 
+
+mutation {
+            loadTerminalTicket(
+			terminalId: "HPKz9bZXEk6Le04kmgaTeQ",
+			ticketId: "27202"
+			) { id
+					date
+          totalAmount
+					tags {
+					  tagName
+					  tag
+					}
+          payments {
+            name
+            amount
+          }
+          calculations {
+            name
+            calculationAmount
+          }
+					states {
+					  stateName
+					  state
+					}
+
+ }
+			} 
+				
+
+
+# 3. Añadir pedidos al ticket 
+#pollo
+mutation AddPOLLO {
+  addOrderToTerminalTicket(
+    terminalId: "HPKz9bZXEk6Le04kmgaTeQ"
+    productName: "POLLO"
+    portion: "Normal"
+    quantity: 1
+  ) { id totalAmount }
+}
+
+#papas
+mutation AddPAPAS {
+  addOrderToTerminalTicket(
+    terminalId: "HPKz9bZXEk6Le04kmgaTeQ"
+    productName: "PAPAS AL AJILLO"
+    portion: "ORD"
+    quantity: 1
+  ) { totalAmount }
+}
+
+4. Cerrar ticket 
+
+mutation {
+  closeTerminalTicket(terminalId: "HPKz9bZXEk6Le04kmgaTeQ")
+}
+
+
+			
+### Aplicar cortesias comando de orden (sobre el ticket cargado), usando el uid que mostraste 
+# 1. Registrar nueva terminal o tener el terminal id a la mano 
+
+mutation {
+  registerTerminal(
+    ticketType: "COMEDOR",
+    terminal: "SERVIDOR",
+    department: "MESAS",
+    user: "CAJERO"
+  )
+}
+
+# 2. Reabrir ticket en terminal 
+
+mutation {
+            loadTerminalTicket(
+			terminalId: "HPKz9bZXEk6Le04kmgaTeQ",
+			ticketId: "27202"
+			) { id
+					date
+          totalAmount
+					tags {
+					  tagName
+					  tag
+					}
+          payments {
+            name
+            amount
+          }
+          calculations {
+            name
+            calculationAmount
+          }
+					states {
+					  stateName
+					  state
+					}
+
+ }
+			} 
+				
+
+# 3. Cancelar requiere order uid y terminal id 
+mutation {
+            executeAutomationCommandForTerminalTicket(
+			terminalId: "HPKz9bZXEk6Le04kmgaTeQ",
+			orderUid: "H2NreojUnU6h7gFsSIxAoQ",
+			name: "Regalo",			# o "Predeterminado regalar los pedidos", etc.                                    
+			value: "Graphql regalo") 
+				{ id }
+			}			
+
+# 4. Cerrar el ticket para finalizar proceso 
+mutation {
+  closeTerminalTicket(terminalId: "HPKz9bZXEk6Le04kmgaTeQ")
+}			

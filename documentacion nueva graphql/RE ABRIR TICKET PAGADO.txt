@@ -1,0 +1,213 @@
+# Flujo: **Reabrir un Ticket Pagado** en SambaPOS vía GraphQL
+
+> **Objetivo**: Reabrir un ticket ya pagado/cerrado para poder agregar nuevas órdenes y volver a cerrar.
+>
+> **Notas**:
+>
+> * En algunas instalaciones, antes de reabrir hay que **cancelar pagos** con un Automation Command.
+> * Los nombres de los **Automation Commands** varían por configuración (ej.: *Reopen Closed Ticket*, *Reabrir Ticket*, *Cancel Payments*).
+> * En tu build, `ticketId` se pasa como **String** (con comillas) y las operaciones de Terminal son **por usuario** (aisladas por `terminalId`).
+
+---
+
+## 0) Autenticación (header)
+
+En tu cliente GraphQL agrega el header:
+
+```json
+{
+  "Authorization": "Bearer <ACCESS_TOKEN>"
+}
+```
+
+---
+
+## 1) (Opcional) Registrar nueva terminal
+
+```graphql
+mutation {
+  registerTerminal(
+    ticketType: "COMEDOR"
+    terminal: "SERVIDOR"
+    department: "MESAS"
+    user: "CAJERO"
+  )
+}
+```
+
+> **Salida**: guarda el `terminalId` devuelto.
+
+---
+
+## 2) Cargar el ticket **cerrado** en la terminal
+
+> ⚠️ `ticketId` como **String**
+
+```graphql
+mutation {
+  loadTerminalTicket(
+    terminalId: "<TERMINAL_ID>"
+    ticketId: "<TICKET_ID>"
+  ) {
+    id
+    number
+    totalAmount
+    states { stateName state }
+    payments { name amount }
+  }
+}
+```
+
+---
+
+## 3) Reabrir el ticket (Automation Command)
+
+> Usa el nombre que exista en tu mapeo; te dejamos dos variantes comunes:
+
+### 3A) Variante EN: *Reopen Closed Ticket*
+
+```graphql
+mutation {
+  executeAutomationCommandForTerminalTicket(
+    terminalId: "<TERMINAL_ID>"
+    name: "Reopen Closed Ticket"
+    value: ""
+  ) { id }
+}
+```
+
+### 3B) Variante ES: *Reabrir Ticket*
+
+```graphql
+mutation {
+  executeAutomationCommandForTerminalTicket(
+    terminalId: "<TERMINAL_ID>"
+    name: "Reabrir Ticket"
+    value: ""
+  ) { id }
+}
+```
+
+### (Si tu flujo lo exige) Cancelar pagos antes de reabrir
+
+```graphql
+mutation {
+  executeAutomationCommandForTerminalTicket(
+    terminalId: "<TERMINAL_ID>"
+    name: "Cancel Payments"  # o "Cancelar Pagos", "Remove Payments"
+    value: ""
+  ) { id }
+}
+```
+
+---
+
+## 4) Verificar que ya quedó **abierto**
+
+```graphql
+query {
+  getTerminalTicket(terminalId: "<TERMINAL_ID>") {
+    id number totalAmount remainingAmount
+    states { stateName state }
+    payments { name amount }
+  }
+}
+```
+
+---
+
+## 5) Agregar orden(es) al ticket reabierto
+
+> Recomendado usar **productId** para evitar errores de coincidencia por nombre.
+
+```graphql
+mutation {
+  addOrderToTerminalTicket(
+    terminalId: "<TERMINAL_ID>"
+    productId: 1781         # Ej.: CUARTO POLLO
+    portion: "Normal"
+    quantity: 1
+  ) { totalAmount }
+}
+```
+
+*(Opcional) Confirmar porciones por nombre antes:*
+
+```graphql
+query {
+  getProduct(name: "CUARTO POLLO") { id name portions { name price } }
+}
+```
+
+---
+
+## 6) Verificación completa del ticket en la terminal
+
+```graphql
+query {
+  getTerminalTicket(terminalId: "<TERMINAL_ID>") {
+    id type number date totalAmount remainingAmount
+    payments { name amount }
+    calculations { name calculationAmount }
+    orders {
+      uid name productId quantity price portion priceTag
+      states { stateName state stateValue }
+    }
+  }
+}
+```
+
+---
+
+## 7) (Opcional) Registrar pago(s)
+
+```graphql
+mutation {
+  executePayment(
+    terminalId: "<TERMINAL_ID>"
+    paymentTypeName: "Efectivo"
+    amount: 999.00  # o el remainingAmount exacto
+  )
+}
+```
+
+---
+
+## 8) Cerrar el ticket
+
+```graphql
+mutation {
+  closeTerminalTicket(terminalId: "<TERMINAL_ID>")
+}
+```
+
+---
+
+## Solución de problemas (rápida)
+
+* **`null` en `getTerminalTicket`**: el `terminalId` no tiene ticket cargado, o es de otro usuario.
+* **`NullReferenceException` en `loadTerminalTicket`**: enviar `ticketId` como **String**.
+* **`Product not found`** al agregar orden: usa `productId` y porción válida (verificar con `getProduct`).
+* Si algún *Automation Command* no existe, ajusta `name:` al que tengas configurado en SambaPOS.
+
+---
+
+## Variables rápidas (sugeridas)
+
+Reemplaza los placeholders por tus valores:
+
+* `<TERMINAL_ID>`: el ID devuelto por `registerTerminal`.
+* `<TICKET_ID>`: el **ID numérico** del ticket, pasado como **String**.
+* `productId`: usa IDs reales de tu menú (p. ej. 1781 para "CUARTO POLLO").
+
+---
+
+> **Checklist**
+>
+> 1. Registrar/capturar `terminalId` ✔
+> 2. `loadTerminalTicket` con `ticketId` como String ✔
+> 3. Ejecutar Automation Command para reabrir ✔
+> 4. Verificar estados/pagos ✔
+> 5. Agregar órdenes ✔
+> 6. Pagar (opcional) ✔
+> 7. Cerrar ✔

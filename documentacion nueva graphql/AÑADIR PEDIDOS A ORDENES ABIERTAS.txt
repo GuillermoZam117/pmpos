@@ -1,0 +1,345 @@
+# Flujo: **Pedidos en Tickets Abiertos y No Pagados** (SambaPOS GraphQL)
+
+> Objetivo: operar sobre **tickets abiertos (no pagados)** para **agregar pedidos** y **cerrar**.
+>
+> Notas:
+>
+> * `ticketId` se envía como **String**.
+> * Las operaciones `Terminal...` requieren un `terminalId` **registrado para el usuario** actual.
+
+---
+
+## 0) Traer tickets **abiertos** (no pagados)
+
+**Payload**
+
+```graphql
+query {
+  getTickets(isClosed: false, orderBy: date) {
+    id
+    number
+    date
+    states { stateName state }
+    totalAmount
+    remainingAmount
+    payments { name amount }
+    entities { type name }
+    orders {
+      id
+      uid
+      menuItemName
+      date
+      portion
+      states { stateName state stateValue }
+      quantity
+      price
+      priceTag
+    }
+    states { stateName state }
+  }
+}
+```
+
+**Response (ejemplo)**
+
+```json
+{
+  "data": {
+    "getTickets": [
+      {
+        "id": 27436,
+        "number": "27458",
+        "date": "2025-09-10T00:07:29.237Z",
+        "states": [ { "stateName": "Estado", "state": "No Pagado" } ],
+        "totalAmount": 195,
+        "remainingAmount": 195,
+        "payments": [],
+        "entities": [ { "type": "Mesas", "name": "1" } ],
+        "orders": [
+          {
+            "id": 67532,
+            "uid": "d_QXxM8OGkSnoCn3AES-nw",
+            "date": "2025-09-10T00:07:33.3466667Z",
+            "portion": "Normal",
+            "states": [
+              { "stateName": "KDStatus", "state": "BImpreso", "stateValue": "" },
+              { "stateName": "Status", "state": "Enviado", "stateValue": "" }
+            ],
+            "quantity": 1,
+            "price": 45,
+            "priceTag": ""
+          },
+          {
+            "id": 67533,
+            "uid": "o5ln5NdJfE-1ZiHYxAi1Hw",
+            "date": "2025-09-10T00:07:33.3466667Z",
+            "portion": "Normal",
+            "states": [
+              { "stateName": "KDStatus", "state": "CImpreso", "stateValue": "" },
+              { "stateName": "Status", "state": "Enviado", "stateValue": "" }
+            ],
+            "quantity": 1,
+            "price": 150,
+            "priceTag": ""
+          }
+        ]
+      }
+    ]
+  },
+  "errors": null
+}
+```
+
+---
+
+## 1) Registrar **terminal**
+
+**Payload**
+
+```graphql
+mutation {
+  registerTerminal(
+    ticketType: "COMEDOR"
+    terminal: "SERVIDOR"
+    department: "MESAS"
+    user: "CAJERO"
+  )
+}
+```
+
+**Response (ejemplo)**
+
+```json
+{
+  "data": {
+    "registerTerminal": "L3gjgQmYyU67OYXgxjJx0w"
+  },
+  "errors": null
+}
+```
+
+> Guarda este **terminalId** para los siguientes pasos.
+
+---
+
+## 2) Cargar el **ticket abierto** en el terminal (usar `ticketId` como String)
+
+**Payload**
+
+```graphql
+mutation {
+  loadTerminalTicket(
+    terminalId: "L3gjgQmYyU67OYXgxjJx0w"
+    ticketId: "27436"
+  ) {
+    id
+    number
+    totalAmount
+    orders {
+      uid
+      name
+      productId
+      quantity
+      price
+      portion
+      states { stateName state stateValue }
+    }
+  }
+}
+```
+
+**Response (ejemplo)**
+
+```json
+{
+  "data": {
+    "loadTerminalTicket": {
+      "id": 27436,
+      "number": "27458",
+      "totalAmount": 195,
+      "orders": [
+        {
+          "uid": "d_QXxM8OGkSnoCn3AES-nw",
+          "name": "CAFE AMERICANO",
+          "productId": "1878",
+          "quantity": 1,
+          "price": 45,
+          "portion": "Normal",
+          "states": [
+            { "stateName": "KDStatus", "state": "BImpreso", "stateValue": "" },
+            { "stateName": "Status", "state": "Enviado", "stateValue": "" }
+          ]
+        },
+        {
+          "uid": "o5ln5NdJfE-1ZiHYxAi1Hw",
+          "name": "PIZZA HAWIIANA",
+          "productId": "1882",
+          "quantity": 1,
+          "price": 150,
+          "portion": "Normal",
+          "states": [
+            { "stateName": "KDStatus", "state": "CImpreso", "stateValue": "" },
+            { "stateName": "Status", "state": "Enviado", "stateValue": "" }
+          ]
+        }
+      ]
+    }
+  },
+  "errors": null
+}
+```
+
+---
+
+## 3) **Agregar pedido** al ticket abierto
+
+> Puedes usar `productName` **exacto** o, preferentemente, `productId` para evitar errores.
+
+**Payload (por nombre)**
+
+```graphql
+mutation {
+  addOrderToTerminalTicket(
+    terminalId: "L3gjgQmYyU67OYXgxjJx0w"
+    productName: "CUARTO POLLO"
+    portion: "Normal"
+    quantity: 1
+  ) { totalAmount }
+}
+```
+
+**Response (ejemplo)**
+
+```json
+{
+  "data": {
+    "addOrderToTerminalTicket": { "totalAmount": 260 }
+  },
+  "errors": null
+}
+```
+
+*(Alternativa por `productId`)*
+
+```graphql
+mutation {
+  addOrderToTerminalTicket(
+    terminalId: "L3gjgQmYyU67OYXgxjJx0w"
+    productId: 1781
+    portion: "Normal"
+    quantity: 1
+  ) { totalAmount }
+}
+```
+
+---
+
+## 4) **Cerrar** el ticket (cuando termines de agregar productos)
+
+**Payload**
+
+```graphql
+mutation {
+  closeTerminalTicket(terminalId: "L3gjgQmYyU67OYXgxjJx0w")
+}
+```
+
+**Response (ejemplo)**
+
+```json
+{
+  "data": { "closeTerminalTicket": "" },
+  "errors": null
+}
+```
+
+---
+
+## 4a) (Opcional) Verificación de la orden agregada
+
+**Payload**
+
+```graphql
+mutation {
+  loadTerminalTicket(
+    terminalId: "L3gjgQmYyU67OYXgxjJx0w"
+    ticketId: "27436"
+  ) {
+    id
+    number
+    states { stateName state }
+    totalAmount
+    orders {
+      uid
+      name
+      productId
+      quantity
+      price
+      portion
+      states { stateName state stateValue }
+    }
+  }
+}
+```
+
+**Response (ejemplo)**
+
+```json
+{
+  "data": {
+    "loadTerminalTicket": {
+      "id": 27436,
+      "number": "27458",
+      "states": [ { "stateName": "Estado", "state": "No Pagado" } ],
+      "totalAmount": 260,
+      "orders": [
+        {
+          "uid": "d_QXxM8OGkSnoCn3AES-nw",
+          "name": "CAFE AMERICANO",
+          "productId": "1878",
+          "quantity": 1,
+          "price": 45,
+          "portion": "Normal",
+          "states": [
+            { "stateName": "KDStatus", "state": "BImpreso", "stateValue": "" },
+            { "stateName": "Status", "state": "Enviado", "stateValue": "" }
+          ]
+        },
+        {
+          "uid": "o5ln5NdJfE-1ZiHYxAi1Hw",
+          "name": "PIZZA HAWIIANA",
+          "productId": "1882",
+          "quantity": 1,
+          "price": 150,
+          "portion": "Normal",
+          "states": [
+            { "stateName": "KDStatus", "state": "CImpreso", "stateValue": "" },
+            { "stateName": "Status", "state": "Enviado", "stateValue": "" }
+          ]
+        },
+        {
+          "uid": "KSrnUu3r1kivQORb5_IE4w",
+          "name": "CUARTO POLLO",
+          "productId": "1781",
+          "quantity": 1,
+          "price": 65,
+          "portion": "Normal",
+          "states": [
+            { "stateName": "KDStatus", "state": "CImpreso", "stateValue": "" },
+            { "stateName": "Status", "state": "Enviado", "stateValue": "" }
+          ]
+        }
+      ]
+    }
+  },
+  "errors": null
+}
+```
+
+---
+
+## Tips rápidos
+
+* Si `addOrderToTerminalTicket` falla con *Product not found*, confirma el **nombre exacto** o usa `productId`.
+* Si `getTerminalTicket` regresa `null`, crea el ticket o vuelve a cargarse con `loadTerminalTicket` (asegura el `terminalId` correcto y mismo usuario).
+* Para más detalle de estados/pagos antes del cierre, usa la consulta completa de `getTerminalTicket`.

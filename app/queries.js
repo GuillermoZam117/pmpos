@@ -11,14 +11,13 @@ import './services/orderTagPreload';
 import Debug from 'debug';
 import { loggedFetch, loggedGraphQL } from './utils/requestLogger';
 import { tokenService } from './services/tokenService';
+import { gql as gqlExec, graphqlRequest as gqlRequest, gqlEscape as svcGqlEscape } from './services/graphqlService';
+import { GET_OPEN_TICKETS, GET_ENTITY_SCREEN_ITEMS } from './graphql/queries';
 
 const debug = Debug('pmpos:queries');
 
-// Escape values for inline GraphQL strings
-const gqlEscape = (s) => String(s)
-    .replace(/\\/g, '\\\\')
-    .replace(/\"/g, '"')
-    .replace(/"/g, '\\"');
+// Use escape from unified GraphQL service
+const gqlEscape = svcGqlEscape;
 
 // Optional header injection for internal read-service (dev-only / internal nets)
 const SEND_INTERNAL_KEY = process.env.REACT_APP_SEND_INTERNAL_KEY === 'true';
@@ -32,29 +31,30 @@ const withInternalHeaders = (base = {}) => {
     return base;
 };
 
-// Centralized fetch that retries once on 401 by refreshing tokens
-const fetchWithAuthRetry = async (url, makeRequestOptions) => {
-    // makeRequestOptions: () => ({ method, headers, body }) freshly built with current token
-    const doRequest = async () => {
-        const token = await getToken();
-        const opts = makeRequestOptions(token);
-        opts.headers = { ...opts.headers, 'Authorization': `Bearer ${token}` };
-        return await fetch(url, opts);
-    };
-
-    let response = await doRequest();
-    if (response.status === 401) {
-        console.warn('🔄 Auth 401 detected. Clearing tokens and retrying with fresh token...');
-        try {
-            tokenService.clearTokens();
-            await tokenService.requestNewTokens();
-        } catch (e) {
-            console.error('❌ Failed to refresh tokens after 401:', e.message);
-            return response;
-        }
-        response = await doRequest();
+// GraphQL compatibility shim: adapt existing codepaths to unified executor
+const fetchWithAuthRetry = async (_url, makeRequestOptions) => {
+    try {
+        const opts = makeRequestOptions('');
+        const body = typeof opts.body === 'string' ? JSON.parse(opts.body) : opts.body;
+        const query = body?.query;
+        const variables = body?.variables;
+        const data = variables ? await gqlRequest(query, variables) : await gqlExec(query);
+        return {
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            json: async () => ({ data }),
+            text: async () => JSON.stringify({ data })
+        };
+    } catch (e) {
+        return {
+            ok: false,
+            status: 500,
+            statusText: 'Error',
+            json: async () => ({ errors: [{ message: e.message }] }),
+            text: async () => e.message
+        };
     }
-    return response;
 };
 
 // Helper para obtener token - UNIFIED approach
@@ -91,30 +91,12 @@ const getToken = async () => {
 };
 
 // Helper para hacer requests JSON
-export async function postJSON(url, body) {
-    const token = await getToken();
-
-    if (!token) {
-        throw new Error('No token available');
-    }
-
-    // Use logged fetch for structured logging
-    const response = await loggedFetch(resolveGqlUrl(appconfig()), {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(body)
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${data.message || 'Request failed'}`);
-    }
-
-    return data;
+export async function postJSON(_url, body) {
+    // Route GraphQL posts to unified executor and return { data } to preserve call sites
+    const data = body?.variables
+        ? await gqlRequest(body.query, body.variables)
+        : await gqlExec(body.query);
+    return { data };
 }
 
 // -----------------------------
@@ -134,13 +116,8 @@ export async function fetchActiveTickets() {
             debug('❌ active-tickets SQL failed and GraphQL fallback disabled:', err.message);
             throw err; // Important: don't overwrite with []
         }
-        const config = appconfig();
-        const query = `query { getTickets(isClosed: false) { id uid number totalAmount remainingAmount entities { type name } orders { id name quantity price } states { stateName state } user { name } } }`;
-        const result = await loggedGraphQL(config.GQLurl, {
-            query,
-            headers: { 'Authorization': `Bearer ${await getToken()}` }
-        });
-        return result.data?.getTickets || [];
+        const result = await gqlExec(GET_OPEN_TICKETS);
+        return result?.getTickets || [];
     }
 }
 
@@ -158,10 +135,9 @@ export async function fetchTicketDetails(ticketId) {
             debug('❌ ticket details SQL failed and GraphQL fallback disabled:', err.message);
             return null;
         }
-        const config = appconfig();
         const query = `query GetTicket($ticketId: String!) { ticket(id: $ticketId) { id uid number date totalAmount remainingAmount entities { name type } orders { id uid productId name caption quantity price portion orderTags priceTag calculatePrice locked tags { tag tagName price quantity } states { stateName state stateValue } } states { stateName state } tags { tagName tag } } }`;
-        const result = await postJSON(config.GQLurl, { query, variables: { ticketId } });
-        return result.data?.ticket || null;
+        const result = await gqlRequest(query, { ticketId });
+        return result?.ticket || null;
     }
 }
 
@@ -231,10 +207,8 @@ export async function fetchTables() {
             debug('❌ tables SQL failed and GraphQL fallback disabled:', err.message);
             return [];
         }
-        const config = appconfig();
-        const query = `query { getEntityScreenItems(name: \"MESAS\") { id name caption color labelColor state customData } }`;
-        const result = await postJSON(config.GQLurl, { query });
-        return result.data?.getEntityScreenItems || [];
+        const result = await gqlRequest(GET_ENTITY_SCREEN_ITEMS, { name: 'MESAS' });
+        return result?.getEntityScreenItems || [];
     }
 }
 
@@ -278,21 +252,8 @@ export const getRealNames = async () => {
     }`;
 
     try {
-        const responseData = await loggedGraphQL(config.GQLurl, {
-            query,
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        return responseData;
-
-        const data = await response.json();
-        console.log('Real SambaPOS names:', data);
-
-        if (data.errors) {
-            console.error('GraphQL errors:', data.errors);
-            return null;
-        }
-
-        return data.data;
+        const data = await gqlExec(query);
+        return data;
     } catch (error) {
         console.error('Failed to get real names:', error);
         return null;
@@ -493,7 +454,18 @@ export const addOrderToTerminalTicketAsync = async (terminalId, orderPayload) =>
         const productName = orderPayload.productName || orderPayload.name;
         const portion = orderPayload.portion || 'Normal';
         const quantity = parseInt(orderPayload.quantity || 1, 10);
+
+        // Validate inputs
+        if (!productName) {
+            throw new Error('Product name is required');
+        }
+        if (isNaN(quantity) || quantity <= 0) {
+            throw new Error(`Invalid quantity: ${orderPayload.quantity}`);
+        }
+
         const inline = `mutation { addOrderToTerminalTicket(terminalId: "${gqlEscape(currentTerminalId)}", productName: "${gqlEscape(productName)}", quantity: ${quantity}, portion: "${gqlEscape(portion)}") { totalAmount remainingAmount } }`;
+
+        debug('🔍 GraphQL mutation:', inline);
 
         const response = await fetchWithAuthRetry(resolveGqlUrl(config), (token) => ({
             method: 'POST',
@@ -504,7 +476,17 @@ export const addOrderToTerminalTicketAsync = async (terminalId, orderPayload) =>
             body: JSON.stringify({ query: inline })
         }));
 
-        return await response.json();
+        debug('🌐 Response status:', response.status);
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            debug('❌ HTTP Error Response:', errorText);
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+
+        const result = await response.json();
+        debug('📥 GraphQL Response:', result);
+        return result;
     };
 
     try {
@@ -771,7 +753,7 @@ export const closeTerminalTicket = async () => {
 // ============================================
 
 export const getTableTickets = async (tableId) => {
-    debug('📋 Getting tickets for table:', tableId);
+    debug('📋 Getting ALL tickets (open and closed) for table:', tableId);
 
     if (!tableId) {
         throw new Error('Table ID is required');
@@ -780,56 +762,86 @@ export const getTableTickets = async (tableId) => {
     const token = await ensureAuthenticated();
     const config = appconfig();
 
-    // Use the same reliable approach as getActiveTickets - get all open tickets and filter by table entity
-    const inline = `query { getTickets(isClosed: false) { 
-        id uid number totalAmount remainingAmount orderStates
-        entities { name type } 
-        orders { id uid productId name quantity price portion
-            states { stateName state stateValue }
-        } 
-        states { stateName state }
-    } }`;
+    // Get BOTH open and closed tickets for complete picture
+    const queries = [
+        // Query for open tickets
+        `query { getTickets(isClosed: false) { 
+            id uid number totalAmount remainingAmount orderStates
+            entities { name type } 
+            orders { id uid productId name quantity price portion
+                states { stateName state stateValue }
+            } 
+            states { stateName state }
+        } }`,
+        // Query for recent closed tickets (last 24 hours)
+        `query { getTickets(isClosed: true, limit: 50) { 
+            id uid number totalAmount remainingAmount orderStates
+            entities { name type } 
+            orders { id uid productId name quantity price portion
+                states { stateName state stateValue }
+            } 
+            states { stateName state }
+        } }`
+    ];
 
-    try {
-        const response = await fetchWithAuthRetry(resolveGqlUrl(config), (token) => ({
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ query: inline })
-        }));
+    let allRelevantTickets = [];
 
-        const data = await response.json();
+    for (const queryString of queries) {
+        try {
+            const response = await fetchWithAuthRetry(resolveGqlUrl(config), (token) => ({
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ query: queryString })
+            }));
 
-        if (data.errors) {
-            console.error('🚨 GraphQL errors getting tickets:', data.errors);
-            throw new Error(`Get tickets failed: ${data.errors.map(e => e.message).join(', ')}`);
+            const data = await response.json();
+
+            if (data.errors) {
+                debug('⚠️ GraphQL errors getting tickets:', data.errors);
+                continue; // Try next query
+            }
+
+            const tickets = data.data?.getTickets || [];
+            allRelevantTickets.push(...tickets);
+        } catch (error) {
+            debug('❌ Error in ticket query:', error);
+            continue; // Try next query
         }
-
-        const allTickets = data.data?.getTickets || [];
-
-        // Filter tickets for the specific table (same logic as getTicketForMesa)
-        const tableTickets = allTickets.filter(ticket => {
-            if (!ticket.entities || ticket.entities.length === 0) return false;
-
-            return ticket.entities.some(entity => {
-                // Check both string and number formats
-                const entityName = entity.name;
-                return entityName === String(tableId) ||
-                    entityName === `Mesa ${tableId}` ||
-                    entityName === String(tableId).padStart(2, '0') ||
-                    (entity.type === 'Table' && entityName.includes(String(tableId)));
-            });
-        });
-
-        debug(`✅ Table tickets retrieved: ${tableTickets.length} tickets for table ${tableId}`, tableTickets);
-        return tableTickets;
-
-    } catch (error) {
-        debug('❌ Failed to get table tickets:', error);
-        throw error;
     }
+
+    // Remove duplicates based on ticket ID
+    const uniqueTickets = allRelevantTickets.filter((ticket, index, arr) =>
+        index === arr.findIndex(t => t.id === ticket.id)
+    );
+
+    // Filter tickets for the specific table
+    const tableTickets = uniqueTickets.filter(ticket => {
+        if (!ticket.entities || ticket.entities.length === 0) return false;
+
+        return ticket.entities.some(entity => {
+            // Check both string and number formats
+            const entityName = entity.name;
+            return entityName === String(tableId) ||
+                entityName === `Mesa ${tableId}` ||
+                entityName === `Table ${tableId}` ||
+                entityName === String(tableId).padStart(2, '0') ||
+                parseInt(entityName) === parseInt(tableId) ||
+                (entity.type === 'Table' && entityName.includes(String(tableId)));
+        });
+    });
+
+    debug(`✅ Table tickets retrieved: ${tableTickets.length} tickets for table ${tableId}`,
+        tableTickets.map(t => ({
+            id: t.id,
+            orders: t.orders?.length || 0,
+            remainingAmount: t.remainingAmount,
+            isPaid: isTicketPaid(t),
+            orderStates: t.orderStates
+        })));
+    return tableTickets;
 };
 
 export const loadTerminalTicketById = async (terminalId, ticketId) => {
@@ -924,7 +936,7 @@ export const loadTerminalTicketForTable = async (terminalId, tableId) => {
     }
 };
 
-export const ensureTicketForTable = async (tableId) => {
+export const ensureTicketForTable = async (tableId, existingTickets = null) => {
     debug('🎯 Ensuring ticket for table using correct SambaPOS flow:', tableId);
 
     if (!tableId) {
@@ -933,76 +945,183 @@ export const ensureTicketForTable = async (tableId) => {
 
     // Define the main operation
     const performEnsureTicket = async (terminalId) => {
-        // Step 1: Check if there are existing closed tickets for this table
-        debug('🔍 Checking for existing tickets on table:', tableId);
-        const existingTickets = await getTableTickets(tableId);
+        // Step 1: Use provided tickets or fetch them directly
+        let ticketsToCheck = existingTickets;
+        if (!ticketsToCheck) {
+            debug('🔍 No tickets provided, fetching from API for table:', tableId);
+            ticketsToCheck = await getTableTickets(tableId);
+        } else {
+            debug('🔍 Using provided tickets for table check:', tableId);
+            // Filter provided tickets for this specific table
+            ticketsToCheck = ticketsToCheck.filter(ticket => {
+                if (!ticket.entities || ticket.entities.length === 0) return false;
 
-        // Look for closed tickets with products
-        const closedTicketsWithProducts = existingTickets.filter(ticket => {
+                return ticket.entities.some(entity => {
+                    const entityName = entity.name;
+                    return entityName === String(tableId) ||
+                        entityName === `Mesa ${tableId}` ||
+                        entityName === `Table ${tableId}` ||
+                        entityName === String(tableId).padStart(2, '0') ||
+                        parseInt(entityName) === parseInt(tableId) ||
+                        (entity.type === 'Table' && entityName.includes(String(tableId)));
+                });
+            });
+        }
+
+        debug('📊 Found tickets for table:', ticketsToCheck.length, ticketsToCheck.map(t => ({ id: t.id, hasProducts: !!t.orders?.length, isPaid: isTicketPaid(t), orderStates: t.orderStates })));
+
+        // Look for ACTIVE tickets (not paid) with products or valid order states
+        const ticketsWithContent = ticketsToCheck.filter(ticket => {
             const hasProducts = ticket.orders && ticket.orders.length > 0;
-            const hasValidStatus = ticket.orderStates && ticket.orderStates !== '{}';
-            return hasProducts || hasValidStatus;
+            const hasValidStatus = ticket.orderStates && ticket.orderStates !== '{}' && ticket.orderStates !== null;
+            const isPaid = isTicketPaid(ticket);
+
+            debug('🔍 Filtering ticket:', {
+                id: ticket.id,
+                hasProducts,
+                hasValidStatus,
+                isPaid,
+                remainingAmount: ticket.remainingAmount,
+                willUse: (hasProducts || hasValidStatus) && !isPaid
+            });
+
+            // Only use tickets that have content AND are not paid
+            return (hasProducts || hasValidStatus) && !isPaid;
         });
 
-        if (closedTicketsWithProducts.length > 0) {
-            // FLOW FOR EXISTING TICKET: Load the most recent closed ticket
-            const latestTicket = closedTicketsWithProducts.sort((a, b) => b.id - a.id)[0];
-            debug('📦 Found existing ticket, loading:', latestTicket.id);
+        // Sort by ID descending to get the most recent ACTIVE ticket
+        const sortedTickets = ticketsWithContent.sort((a, b) => b.id - a.id);
 
-            // Use loadTerminalTicket(terminalId, ticketId) as per your documentation
-            const loadedTicket = await loadTerminalTicketById(terminalId, String(latestTicket.id));
-            return { ticket: loadedTicket };
+        if (sortedTickets.length > 0) {
+            // FLOW FOR EXISTING ACTIVE TICKET: Load the most recent UNPAID ticket
+            const latestTicket = sortedTickets[0];
+            debug('📦 Found existing ACTIVE ticket for occupied table, loading:', latestTicket.id);
 
-        } else {
-            // FLOW FOR NEW TICKET: Follow the complete creation process
-            debug('✨ No existing tickets found, creating new ticket with complete flow');
-
-            // Step 1: Create terminal ticket (without tableId as per your documentation)
-            const newTicket = await createTerminalTicketAsync(terminalId);
-            debug('✅ Step 1 - Terminal ticket created:', newTicket);
-
-            // Step 2: Assign table to the ticket using changeEntityOfTerminalTicket
-            await changeEntityOfTerminalTicketAsync(terminalId, tableId);
-            debug('✅ Step 2 - Table assigned to ticket');
-
-            // Step 3: Get the current ticket to return the updated data
-            const currentTicket = await getTerminalTicket();
-            debug('✅ Step 3 - Retrieved updated ticket:', currentTicket);
-
-            return { ticket: currentTicket };
+            try {
+                // Use loadTerminalTicket to load existing ticket into terminal
+                const loadedTicket = await loadTerminalTicketById(terminalId, String(latestTicket.id));
+                debug('✅ Successfully loaded existing ACTIVE ticket:', loadedTicket?.id);
+                return { ticket: loadedTicket };
+            } catch (loadError) {
+                debug('❌ Failed to load existing ticket:', loadError);
+                // If loading fails, create a new ticket as fallback
+                debug('🔄 Creating new ticket as fallback...');
+            }
         }
+
+        // FLOW FOR NEW TICKET: Follow the complete creation process
+        debug('✨ Creating new ticket with complete flow');
+
+        // Step 1: Create terminal ticket (without tableId as per your documentation)
+        const newTicket = await createTerminalTicketAsync(terminalId);
+        debug('✅ Step 1 - Terminal ticket created:', newTicket);
+
+        // Step 2: Assign table to the ticket using changeEntityOfTerminalTicket
+        await changeEntityOfTerminalTicketAsync(terminalId, tableId);
+        debug('✅ Step 2 - Table assigned to ticket');
+
+        // Step 3: Get the current ticket to return the updated data
+        const currentTicket = await getTerminalTicket();
+        debug('✅ Step 3 - Retrieved updated ticket:', currentTicket);
+
+        return { ticket: currentTicket };
     };
 
     // Execute with terminal error handling
     return await handleTerminalError(performEnsureTicket, 'ensureTicketForTable');
 };// Helper function to determine order status (moved from POSViewMobile.jsx)
-function determineOrderStatus(orderStatesJson) {
-    if (!orderStatesJson) return 'NUEVO';
+function determineOrderStatus(orderStatesJson, statesArray = null) {
+    console.log('🔍 [queries.determineOrderStatus] Input:', { orderStatesJson, statesArray });
 
+    if (!orderStatesJson && (!statesArray || !Array.isArray(statesArray))) {
+        console.log('🔍 [queries.determineOrderStatus] No orderStates provided, returning NUEVO');
+        return 'NUEVO';
+    }
+
+    // Handle GraphQL states array format first (newer format)
+    if (statesArray && Array.isArray(statesArray)) {
+        console.log('🔍 [queries.determineOrderStatus] Processing states array:', statesArray);
+        try {
+            for (const state of statesArray) {
+                if (state && typeof state === 'object' && state.stateName?.toLowerCase() === 'status') {
+                    const stateValue = state.state?.toLowerCase();
+                    console.log('🔍 [queries.determineOrderStatus] Found status state:', stateValue);
+
+                    switch (stateValue) {
+                        case 'enviado':
+                        case 'sent':
+                        case 'submitted':
+                            console.log('🔍 [queries.determineOrderStatus] Returning ENVIADO for states array');
+                            return 'ENVIADO';
+                        case 'preparando':
+                        case 'preparing':
+                            return 'PREPARANDO';
+                        case 'listo':
+                        case 'ready':
+                            return 'LISTO';
+                        case 'servido':
+                        case 'served':
+                            return 'SERVIDO';
+                        case 'cancelado':
+                        case 'cancelled':
+                            return 'CANCELADO';
+                        case 'anulado':
+                        case 'void':
+                            return 'ANULADO';
+                        case 'nuevo':
+                        case 'new':
+                            return 'NUEVO';
+                        default:
+                            console.log('🔍 [queries.determineOrderStatus] Unknown state in array:', stateValue);
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('❌ [queries.determineOrderStatus] Error processing states array:', e);
+        }
+    }
+
+    // Fallback to legacy JSON string format
     try {
-        // Parse the JSON string
-        const parsed = typeof orderStatesJson === 'string' ? JSON.parse(orderStatesJson) : orderStatesJson;
+        if (orderStatesJson) {
+            // Parse the JSON string
+            const parsed = typeof orderStatesJson === 'string' ? JSON.parse(orderStatesJson) : orderStatesJson;
+            console.log('🔍 [queries.determineOrderStatus] Parsed legacy states:', parsed);
 
-        // Handle the format {"S":"Submitted"} or similar
-        if (parsed && typeof parsed === 'object') {
-            const stateValues = Object.values(parsed);
-            if (stateValues.length > 0) {
-                const status = stateValues[0];
-                // Map SambaPOS states to our display states
-                switch (status?.toLowerCase()) {
-                    case 'submitted': return 'ENVIADO';
-                    case 'preparing': return 'PREPARANDO';
-                    case 'ready': return 'LISTO';
-                    case 'served': return 'SERVIDO';
-                    case 'cancelled': return 'CANCELADO';
-                    default: return status || 'NUEVO';
+            // Handle the format {"S":"Submitted"} or similar
+            if (parsed && typeof parsed === 'object') {
+                const stateValues = Object.values(parsed);
+                console.log('🔍 [queries.determineOrderStatus] Legacy state values:', stateValues);
+                if (stateValues.length > 0) {
+                    const status = stateValues[0];
+                    console.log('🔍 [queries.determineOrderStatus] Raw legacy status:', status);
+                    // Map SambaPOS states to our display states
+                    switch (status?.toLowerCase()) {
+                        case 'submitted':
+                            console.log('🔍 [queries.determineOrderStatus] Returning ENVIADO for submitted');
+                            return 'ENVIADO';
+                        case 'enviado':
+                            console.log('🔍 [queries.determineOrderStatus] Returning ENVIADO for enviado');
+                            return 'ENVIADO';
+                        case 'preparing': return 'PREPARANDO';
+                        case 'ready': return 'LISTO';
+                        case 'served': return 'SERVIDO';
+                        case 'cancelled': return 'CANCELADO';
+                        case 'void': return 'ANULADO';
+                        case 'new': return 'NUEVO';
+                        default:
+                            console.log('🔍 [queries.determineOrderStatus] Unknown legacy status:', status || 'NUEVO');
+                            return status || 'NUEVO';
+                    }
                 }
             }
         }
     } catch (e) {
-        debug('❌ Error parsing order states:', e);
+        console.error('❌ [queries.determineOrderStatus] Error parsing legacy order states:', e);
+        debug('❌ Error parsing legacy order states:', e);
     }
 
+    console.log('🔍 [queries.determineOrderStatus] Fallback to NUEVO');
     return 'NUEVO';
 }
 
@@ -1400,7 +1519,8 @@ export const changeEntityOfTerminalTicketAsync = async (terminalId, tableName) =
     const performChangeEntity = async (currentTerminalId) => {
         const token = await ensureAuthenticated();
         const cfg = appconfig();
-        const type = cfg.entityTypeName;
+        // Use fixed "Mesas" type as per documentation (not cfg.entityTypeName)
+        const type = "Mesas";
 
         const exec = async (query) => {
             const res = await fetchWithAuthRetry(resolveGqlUrl(cfg), (token) => ({
@@ -2060,8 +2180,8 @@ export const debugTicketQueries = async (terminalId) => {
 // Cache y throttling para getAllOpenTickets para evitar consultas excesivas
 let _lastTicketsCall = 0;
 let _cachedTicketsResult = null;
-const TICKETS_CACHE_TTL = 8000; // 8 segundos de cache interno
-const MIN_CALL_INTERVAL = 3000; // Mínimo 3 segundos entre llamadas
+const TICKETS_CACHE_TTL = 12000; // 12 segundos de cache interno (increased from 8s)
+const MIN_CALL_INTERVAL = 5000; // Mínimo 5 segundos entre llamadas (increased from 3s)
 
 /**
  * Gets ALL open tickets from any user - Used for mesa occupancy detection
@@ -2368,7 +2488,12 @@ const isTicketPaid = (ticket) => {
     // Check explicit closed flag first
     if (ticket.isClosed === true) {
         result = true;
-    } else if (Array.isArray(ticket.states)) {
+    }
+    // CRITICAL FIX: Check remainingAmount first - this is the most reliable indicator
+    else if (ticket.remainingAmount !== undefined && ticket.remainingAmount === 0) {
+        result = true;
+    }
+    else if (Array.isArray(ticket.states)) {
         // Check states for paid/closed status
         result = ticket.states.some(s => {
             const n = (s.stateName || '').toString().toLowerCase();
@@ -2391,6 +2516,18 @@ const isTicketPaid = (ticket) => {
         result,
         timestamp: Date.now()
     });
+
+    // Special debugging for specific tickets
+    if (ticket.id === 27445 || (ticket.entities && ticket.entities.some(e => e.name === '1'))) {
+        console.log('🚨 [isTicketPaid] SPECIAL DEBUG for Mesa 1/Ticket 27445:', {
+            ticketId: ticket.id,
+            isClosed: ticket.isClosed,
+            remainingAmount: ticket.remainingAmount,
+            states: ticket.states,
+            result: result,
+            cacheKey: cacheKey
+        });
+    }
 
     // Clean up old cache entries periodically
     if (ticketPaidCache.size > 1000) {
@@ -2429,6 +2566,11 @@ export const getMesaStatus = (mesaNumber, allTickets) => {
             states: firstTicket.states,
             isPaidCheck: isTicketPaid(firstTicket)
         });
+
+        // Special debugging for mesa 1
+        if (mesaStr === '1') {
+            console.log('🚨 SPECIAL DEBUG Mesa 1 - Full ticket data:', JSON.stringify(firstTicket, null, 2));
+        }
     }
 
     // consider only unpaid tickets for mesa
@@ -2557,7 +2699,7 @@ export const getTicketById = async (ticketId) => {
     const token = await ensureAuthenticated();
     const cfg = appconfig();
     const id = typeof ticketId === 'string' ? ticketId : String(ticketId);
-    const query = `query { getTicket(id: ${id}) { id number date totalAmount remainingAmount entities { name type } orders { uid productId quantity price portion } } }`;
+    const query = `query { getTicket(id: ${id}) { id number date totalAmount remainingAmount entities { name type } orders { uid productId quantity price portion OrderStates orderStates states { stateName state } } } }`;
     const response = await fetchWithAuthRetry(resolveGqlUrl(cfg), (token) => ({
         method: 'POST',
         headers: {
@@ -2929,3 +3071,26 @@ export const modifyExistingTicketFlow = async ({
     // Run via generic terminal error handler for extra safety
     return await handleTerminalError(run, 'modifyExistingTicketFlow');
 };
+
+// ===== TEMPORARY DEBUG FUNCTIONS =====
+// Function to force cache clear and data reload - can be called from browser console
+window.debugClearActiveTicketsCache = async function () {
+    console.log('🧹 [DEBUG] Clearing active tickets cache and forcing reload...');
+
+    // Import cache service
+    const { cacheService } = await import('./services/cacheService');
+
+    // Clear the cache
+    cacheService.clearActiveTickets();
+    console.log('✅ [DEBUG] Active tickets cache cleared');
+
+    // Force reload
+    const { dataManager } = await import('./services/dataManager');
+    const freshTickets = await dataManager.loadActiveTickets();
+    console.log('✅ [DEBUG] Fresh tickets loaded:', freshTickets.length);
+
+    return freshTickets;
+};
+
+console.log('🛠️ [DEBUG] Cache clearing function available: window.debugClearActiveTicketsCache()');
+

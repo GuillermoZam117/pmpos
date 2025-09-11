@@ -8,6 +8,8 @@ import networkHealthService from './networkHealthService';
 import cacheService from './cacheService';
 import menuService from './menuService';
 import orderTagService from './orderTagService';
+import productOrderTagsIndex from './productOrderTagsIndex';
+import requestDeduplicationService from './requestDeduplicationService';
 import './orderTagPreload';
 import Debug from 'debug';
 
@@ -78,6 +80,18 @@ class DataManager {
                 orderTagService.preload(menu, 4).catch(() => { });
             } catch (e) {
                 debug('⚠️ order tags preload failed to start:', e?.message || e);
+            }
+
+            // Step 1.5: Build productOrderTagsIndex for fast Order Tags lookup
+            debug('🏷️ Step 1.5: Building product order tags index...');
+            try {
+                // Build index asynchronously to avoid blocking initialization
+                productOrderTagsIndex.build(false).catch(err => {
+                    debug('⚠️ productOrderTagsIndex build failed:', err);
+                });
+                debug('✅ Product order tags index build started');
+            } catch (e) {
+                debug('⚠️ productOrderTagsIndex build failed to start:', e?.message || e);
             }
 
             // Step 2: Load Tables (Semi-static Cache - Level 2)
@@ -272,7 +286,34 @@ class DataManager {
      * This is called when TableView loads to show real-time ticket status
      */
     async getActiveTickets(forceRefresh = false) {
-        debug('🎫 Loading active tickets...', { forceRefresh });
+        // Use request deduplication to prevent concurrent calls
+        const cacheKey = `getActiveTickets_${forceRefresh}`;
+
+        return await requestDeduplicationService.execute(
+            cacheKey,
+            async () => {
+                debug('🎫 Loading active tickets...', { forceRefresh });
+
+                // Check cache first (Level 3 - Dynamic with short TTL)
+                if (!forceRefresh) {
+                    const cachedTickets = cacheService.getActiveTickets();
+                    if (cachedTickets) {
+                        debug('✅ Using cached active tickets');
+                        return cachedTickets;
+                    }
+                }
+
+                return await this._loadActiveTicketsFromServer();
+            },
+            2000 // Minimum 2 seconds between requests
+        );
+    }
+
+    /**
+     * Internal method to load active tickets from server
+     * Separated for better organization and testing
+     */
+    async _loadActiveTicketsFromServer() {
 
         // Check cache first (Level 3 - Dynamic with short TTL)
         if (!forceRefresh) {
@@ -282,7 +323,13 @@ class DataManager {
                 return cachedTickets;
             }
         }
+    }
 
+    /**
+     * Internal method to load active tickets from server
+     * Separated for better organization and testing
+     */
+    async _loadActiveTicketsFromServer() {
         try {
             const token = await tokenService.getValidAccessToken();
             const config = appconfig();
@@ -316,11 +363,18 @@ class DataManager {
                             name
                             quantity
                             price
+                            OrderStates
+                            orderStates
+                            states {
+                                stateName
+                                state
+                            }
                         }
                     }
                 }
             `;
 
+            console.log('🔄 [loadActiveTickets] STARTING - about to fetch from server...');
             debug('📡 Fetching active tickets from server...');
             const response = await fetch(config.GQLurl, {
                 method: 'POST',
@@ -344,19 +398,83 @@ class DataManager {
             }
 
             const tickets = data.data?.tickets || [];
-            debug(`✅ Loaded ${tickets.length} active tickets from server`);
+
+            // Special debugging for multiple mesas and tickets of interest
+            const debugTickets = tickets.filter(ticket =>
+                ticket.id === 27445 || ticket.id === 27374 || // Specific ticket IDs
+                (ticket.entities && ticket.entities.some(e =>
+                    (e.name === '1' || e.name === '17') && e.type && e.type.toLowerCase().includes('mesa')
+                ))
+            );
+
+            if (debugTickets.length > 0) {
+                console.log('🚨 [dataManager] SPECIAL DEBUG - Target tickets before filtering:',
+                    debugTickets.map(t => ({
+                        id: t.id,
+                        remainingAmount: t.remainingAmount,
+                        totalAmount: t.totalAmount,
+                        isClosed: t.isClosed,
+                        entities: t.entities,
+                        states: t.states
+                    }))
+                );
+            } else {
+                console.log('🚨 [dataManager] SPECIAL DEBUG - NO target tickets found in response. Total tickets:', tickets.length);
+
+                // Show a sample of all tickets for debugging
+                if (tickets.length > 0) {
+                    console.log('🚨 [dataManager] Sample of all tickets:',
+                        tickets.slice(0, 3).map(t => ({
+                            id: t.id,
+                            remainingAmount: t.remainingAmount,
+                            entities: t.entities?.map(e => ({ name: e.name, type: e.type }))
+                        }))
+                    );
+                }
+            }
+
+            // Filter out paid tickets (remainingAmount = 0) to prevent them from showing on free tables
+            const activeTickets = tickets.filter(ticket => {
+                const isActive = ticket.remainingAmount > 0;
+
+                // Special logging for target tickets (Mesa 1, 17, and specific ticket IDs)
+                if (ticket.id === 27445 || ticket.id === 27374 ||
+                    (ticket.entities && ticket.entities.some(e =>
+                        (e.name === '1' || e.name === '17') && e.type && e.type.toLowerCase().includes('mesa')
+                    ))) {
+                    console.log('🚨 [dataManager] Target ticket filter check:', {
+                        id: ticket.id,
+                        mesa: ticket.entities?.find(e => e.type?.toLowerCase().includes('mesa'))?.name,
+                        remainingAmount: ticket.remainingAmount,
+                        isActive: isActive,
+                        willBeFiltered: !isActive
+                    });
+                }
+
+                if (!isActive && ticket.remainingAmount === 0) {
+                    debug('💳 Filtering out paid ticket:', {
+                        id: ticket.id,
+                        number: ticket.number,
+                        totalAmount: ticket.totalAmount,
+                        remainingAmount: ticket.remainingAmount
+                    });
+                }
+                return isActive;
+            });
+
+            debug(`✅ Loaded ${tickets.length} tickets from server, ${activeTickets.length} active (unpaid) tickets after filtering`);
 
             // Cache active tickets with short TTL (10 seconds)
-            cacheService.setActiveTickets(tickets, 10 * 1000);
+            cacheService.setActiveTickets(activeTickets, 10 * 1000);
 
             // Emit event for components to update
             if (typeof window !== 'undefined') {
                 window.dispatchEvent(new CustomEvent('dataManagerRefresh', {
-                    detail: { type: 'tickets', count: tickets.length }
+                    detail: { type: 'tickets', count: activeTickets.length }
                 }));
             }
 
-            return tickets;
+            return activeTickets;
 
         } catch (error) {
             debug('❌ Error loading active tickets:', error);
@@ -1123,7 +1241,7 @@ class DataManager {
 
             const now = Date.now();
             const timeSinceActivity = now - this._lastSignalRActivity;
-            const signalRIsHealthy = this._signalRConnected && timeSinceActivity < 60000; // 60s threshold (increased from 30s)
+            const signalRIsHealthy = this._signalRConnected && timeSinceActivity < 90000; // 90s threshold (increased from 60s)
 
             if (signalRIsHealthy) {
                 // SignalR is working fine, no need to poll
@@ -1138,12 +1256,12 @@ class DataManager {
                 debug('⚠️ Backup polling failed:', err.message);
             });
 
-            // Refresh tables every cycle (every 30s) to detect state changes like CUENTA
+            // Refresh tables every cycle (every 45s) to detect state changes like CUENTA
             this.loadTables(true).catch(err => {
                 debug('⚠️ Backup table refresh failed:', err.message);
             });
 
-        }, 30000); // Check every 30 seconds (reduced from 15s to prevent server overload)
+        }, 45000); // Check every 45 seconds (increased from 30s to prevent server overload)
     }
 
     /**

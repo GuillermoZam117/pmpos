@@ -1,0 +1,5 @@
+} catch (error) {
+            debug('❌ Menu loading failed:', error.message);
+            this.error = error;
+            throw new Error(`Error al cargar menu: ${error.message}`);
+        } finally

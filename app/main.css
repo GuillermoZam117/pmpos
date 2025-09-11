@@ -10,6 +10,24 @@ body {
   scrollbar-width: thin;
 }
 
+/* Animación pulse para banner de cambio */
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.7);
+  }
+
+  70% {
+    transform: scale(1.02);
+    box-shadow: 0 0 0 10px rgba(244, 67, 54, 0);
+  }
+
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(244, 67, 54, 0);
+  }
+}
+
 /* Dark theme styles */
 body[data-theme="dark"] {
   background-color: #0f0f0f;
@@ -57,32 +75,32 @@ body[data-theme="light"]::-webkit-scrollbar-thumb:hover {
   background: #2563eb;
 }
 
-#app{
+#app {
   height: 100vh;
-  -moz-user-select: none; 
-  -webkit-user-select: none; 
-  -ms-user-select:none; 
-  user-select:none;
-  -o-user-select:none;
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -o-user-select: none;
   /* Agregar soporte para notch */
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
-.mainBody{
+.mainBody {
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow-y:auto;
+  overflow-y: auto;
 }
 
 @media (min-width: 480px) {
-    .mainBody{
-      flex-direction: row-reverse;
-    }
-	}
+  .mainBody {
+    flex-direction: row-reverse;
+  }
+}
 
 
-.mainDiv{
+.mainDiv {
   display: flex;
   height: 100%;
   flex-direction: column;
@@ -90,41 +108,41 @@ body[data-theme="light"]::-webkit-scrollbar-thumb:hover {
 }
 
 .menu {
-  flex:1;
+  flex: 1;
   display: flex;
   flex-direction: column;
-  margin:4px 0px;
+  margin: 4px 0px;
 }
 
 @media (min-width: 480px) {
-    .menu{
-      width: 40%;
-      flex-direction: row;
-    }
-	}
+  .menu {
+    width: 40%;
+    flex-direction: row;
+  }
+}
 
 @media (min-width: 640px) {
-    .menu{
-      width: 50%;
-      margin-left: 10px;
-    }
-	}
+  .menu {
+    width: 50%;
+    margin-left: 10px;
+  }
+}
 
-  @media (min-width: 800px) {
-    .menu{
-      flex:1.3;
-    }
-	}
+@media (min-width: 800px) {
+  .menu {
+    flex: 1.3;
+  }
+}
 
-.orders{
-  flex:1;
+.orders {
+  flex: 1;
   overflow-x: hidden;
   overflow-y: auto;
   margin: 4px 0px;
 }
 
-.myTickets{
-  flex:1;
+.myTickets {
+  flex: 1;
   overflow-x: hidden;
   overflow-y: auto;
   margin: 4px 0px;
@@ -132,19 +150,19 @@ body[data-theme="light"]::-webkit-scrollbar-thumb:hover {
   -webkit-transform: translateZ(0);
 }
 
-.myListTicketNumber{
+.myListTicketNumber {
   font-weight: bold;
-  flex:1;
+  flex: 1;
   margin-right: 30px;
 }
 
-.myListEntity{
-  flex:1 1 50%;
+.myListEntity {
+  flex: 1 1 50%;
 }
 
-.myListRemaining{
+.myListRemaining {
   flex: 1 1 30%;
-  font-size:1.1em;
+  font-size: 1.1em;
   text-align: right;
 }
 
@@ -155,48 +173,48 @@ body[data-theme="light"]::-webkit-scrollbar-thumb:hover {
 }
 
 @media (min-width: 480px) {
-    .categories{
-      width: 50%;
-      white-space: normal;
-      display: flex;
-      flex-direction: column;
-    }
-	}
+  .categories {
+    width: 50%;
+    white-space: normal;
+    display: flex;
+    flex-direction: column;
+  }
+}
 
-  @media (min-width: 640px) {
-    .categories{
-      width: 40%;
-    }
-	}
+@media (min-width: 640px) {
+  .categories {
+    width: 40%;
+  }
+}
 
-  @media (min-width: 800px) {
-    .categories{
-      width: 30%;
-    }
-	}
+@media (min-width: 800px) {
+  .categories {
+    width: 30%;
+  }
+}
 
-.categoryButton{
+.categoryButton {
   margin: 4px;
   flex: 1;
 }
 
-.menuItems{
+.menuItems {
   display: flex;
-  flex-wrap : wrap;
+  flex-wrap: wrap;
   overflow-y: auto;
   margin: 1px;
-  flex:1;
+  flex: 1;
 }
 
-.commands{
-  padding:0px;
+.commands {
+  padding: 0px;
 }
 
-.commandButton{
-  margin:4px;
+.commandButton {
+  margin: 4px;
 }
 
-.totals{
+.totals {
   margin: 5px;
 }
 
@@ -207,13 +225,13 @@ body[data-theme="light"]::-webkit-scrollbar-thumb:hover {
   display: flex;
 }
 
-.flexButton p{
-    margin: 0;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    margin-right: -50%;
-    transform: translate(-50%, -50%);
+.flexButton p {
+  margin: 0;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin-right: -50%;
+  transform: translate(-50%, -50%);
 }
 
 /*.menuButton p{
@@ -225,41 +243,41 @@ body[data-theme="light"]::-webkit-scrollbar-thumb:hover {
     transform: translate(-50%, -50%);
 }*/
 
-.orderContent{
+.orderContent {
   margin: 6px 0;
 }
 
-.order{
+.order {
   display: flex;
 }
 
-.orderQuantity{
+.orderQuantity {
   width: 10%;
 }
 
-.orderName{
+.orderName {
   width: 90%;
 }
 
-.orderPrice{
+.orderPrice {
   width: 30%;
   text-align: right;
 }
 
-.orderPriceTag{
+.orderPriceTag {
   font-size: 0.65em;
-  margin: 0px 5px; 
+  margin: 0px 5px;
 }
 
-.selectedOrderTags{
+.selectedOrderTags {
   margin-top: 8px;
   display: flex;
   flex-wrap: wrap;
   line-height: initial;
-  font-size:initial;
+  font-size: initial;
 }
 
-.selectedOrderTag{
+.selectedOrderTag {
   margin: 3px;
   padding: 6px 12px;
   border-radius: 8px;
@@ -283,20 +301,18 @@ body[data-theme="light"] .selectedOrderTag {
   border: 1px solid #94a3b8;
 }
 
-.orderTagSection{
+.orderTagSection {
   margin-right: 2px;
   margin-left: 2px;
 }
 
-.ticketTotal{
-  
-}
+.ticketTotal {}
 
-.ticketTotalLabel{
+.ticketTotalLabel {
   flex-grow: 1;
 }
 
-.ticketTags{
+.ticketTags {
   padding: 8px 16px;
   font-size: 0.75em;
   border-radius: 8px;
@@ -317,40 +333,40 @@ body[data-theme="light"] .ticketTags {
   border: 1px solid rgba(37, 99, 235, 0.3);
 }
 
-.totals{
+.totals {
   padding: 0 5px;
   display: flex;
   font-size: 2em;
-  font-weight: bold;  
+  font-weight: bold;
 }
 
-.portions{
-  margin-top:15px;
+.portions {
+  margin-top: 15px;
   display: flex;
   flex-wrap: wrap;
 }
 
-.portionButton{
+.portionButton {
   flex: 1 1 10%;
   margin: 4px;
   display: flex;
 }
 
-.orderTagGroup{
+.orderTagGroup {
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
 }
 
-.orderTagButton p{
+.orderTagButton p {
   line-height: 2rem;
 }
 
-.ticketTag{
+.ticketTag {
   margin: 4px;
 }
 
-.entityList{
+.entityList {
   display: flex;
   flex-wrap: wrap;
   overflow-y: auto;
@@ -362,10 +378,10 @@ body[data-theme="light"] .ticketTags {
 }
 
 .buttonContent p {
-    word-break: normal;
-    white-space: normal;
-    line-height: 2rem;
-    font-size: 1.1em;
+  word-break: normal;
+  white-space: normal;
+  line-height: 2rem;
+  font-size: 1.1em;
 }
 
 @media (min-width: 800px) {

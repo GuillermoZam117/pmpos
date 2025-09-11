@@ -49,7 +49,7 @@ const TerminalStatus = ({ showManualRegistration = true, compact = false }) => {
         const networkInterval = setInterval(() => {
             const status = networkHealthService.getSambaPOSStatus();
             setNetworkStatus(status);
-        }, 10000); // Check network status every 10 seconds (reduced from 5s)
+        }, 15000); // Check network status every 15 seconds (reduced from 10s)
 
         // Listen for terminal registration events
         const cleanup = terminalService.onRegistered((user, terminalId) => {

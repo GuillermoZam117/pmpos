@@ -1,7 +1,6 @@
-import { createGraphQLClient, queries } from '../utils/graphqlClient';
+import { graphqlSimple } from '../services/graphqlService';
 import { appconfig, TOKEN_CONFIG } from '../config';
 import * as types from '../constants/ActionTypes';
-import { authenticate } from '../queries';
 import Debug from 'debug';
 import { createAction } from 'redux-actions';
 import { tokenService } from '../services/tokenService';
@@ -35,28 +34,28 @@ export const authActions = {
 // Add this near your other action creators
 export const checkTokenStatus = () => (dispatch) => {
     console.group('🔍 Token Status Check');
-    
+
     const token = localStorage.getItem('access_token');
     const expiry = localStorage.getItem('token_expiry');
-    
+
     console.log('Storage Status:', {
         token: token ? '✅ Present' : '❌ Missing',
         expiry: expiry ? '✅ Present' : '❌ Missing'
     });
-    
+
     if (token && expiry) {
         const expiryDate = new Date(expiry);
         const now = new Date();
-        
+
         console.log('Token Details:', {
             expiryDate,
             timeRemaining: (expiryDate - now) / 1000 / 60 / 60, // hours
             isValid: expiryDate > now
         });
     }
-    
+
     console.groupEnd();
-    
+
     return {
         type: 'TOKEN_STATUS_CHECK',
         payload: {
@@ -70,12 +69,12 @@ export const checkTokenStatus = () => (dispatch) => {
 export const login = (pin) => async (dispatch) => {
     console.group('🔑 Login Attempt');
     console.time('Login Duration');
-    
+
     try {
         dispatch({ type: AUTH_ACTIONS.LOGIN_REQUEST });
-        
+
         const result = await tokenService.authenticate(pin);
-        
+
         if (result.success) {
             await dispatch({
                 type: AUTH_ACTIONS.LOGIN_SUCCESS,
@@ -85,9 +84,9 @@ export const login = (pin) => async (dispatch) => {
                     tokenExpiry: result.tokenExpiry
                 }
             });
-            
+
             console.log('✅ Login successful:', result.user.name);
-            
+
             // Set current user and register terminal (BLOCKING - required for session)
             terminalService.setCurrentUser(result.user.name);
             console.log('🖥️ Registering terminal for session...');
@@ -102,7 +101,7 @@ export const login = (pin) => async (dispatch) => {
                 console.warn('⚠️ Terminal registration failed - continuing without terminal:', e?.message || e);
                 // Continue without terminal - app can still function
             }
-            
+
             console.timeEnd('Login Duration');
             console.groupEnd();
 
@@ -118,7 +117,7 @@ export const login = (pin) => async (dispatch) => {
 
             return true;
         }
-        
+
         throw new Error('Authentication failed');
 
     } catch (error) {
@@ -135,7 +134,7 @@ export const login = (pin) => async (dispatch) => {
 
 export const refreshToken = () => async (dispatch) => {
     dispatch(authActions.tokenRefresh());
-    
+
     try {
         console.log('🔄 Refreshing token...');
         const token = await tokenService.refreshToken();
@@ -149,57 +148,57 @@ export const refreshToken = () => async (dispatch) => {
 };
 
 export const authenticateWithPin = (pin) => async (dispatch) => {
-  console.group('🔑 Login Attempt');
-  console.time('Login Duration');
-  
-  try {
-    const result = await tokenService.authenticate(pin);
-    if (result.success) {
-      dispatch({
-        type: AUTH_ACTIONS.LOGIN_SUCCESS,
-        payload: {
-          user: result.user,
-          token: result.token,
-          tokenExpiry: result.tokenExpiry
+    console.group('🔑 Login Attempt');
+    console.time('Login Duration');
+
+    try {
+        const result = await tokenService.authenticate(pin);
+        if (result.success) {
+            dispatch({
+                type: AUTH_ACTIONS.LOGIN_SUCCESS,
+                payload: {
+                    user: result.user,
+                    token: result.token,
+                    tokenExpiry: result.tokenExpiry
+                }
+            });
+            console.log('✅ Login successful:', result.user?.name);
+
+            // Set current user and register terminal (BLOCKING - required for session)
+            terminalService.setCurrentUser(result.user.name);
+            console.log('🖥️ Registering terminal for session...');
+            try {
+                const terminalId = await terminalService.ensureTerminalRegistered(result.user.name);
+                if (terminalId) {
+                    console.log('✅ Terminal registered for session:', terminalId);
+                } else {
+                    console.warn('⚠️ Terminal registration returned null - continuing without terminal');
+                }
+            } catch (e) {
+                console.warn('⚠️ Terminal registration failed - continuing without terminal:', e?.message || e);
+                // Continue without terminal - app can still function
+            }
+
+            console.timeEnd('Login Duration');
+            console.groupEnd();
+            return true;
         }
-      });
-      console.log('✅ Login successful:', result.user?.name);
-      
-      // Set current user and register terminal (BLOCKING - required for session)
-      terminalService.setCurrentUser(result.user.name);
-      console.log('🖥️ Registering terminal for session...');
-      try {
-        const terminalId = await terminalService.ensureTerminalRegistered(result.user.name);
-        if (terminalId) {
-          console.log('✅ Terminal registered for session:', terminalId);
-        } else {
-          console.warn('⚠️ Terminal registration returned null - continuing without terminal');
-        }
-      } catch (e) {
-        console.warn('⚠️ Terminal registration failed - continuing without terminal:', e?.message || e);
-        // Continue without terminal - app can still function
-      }
-      
-      console.timeEnd('Login Duration');
-      console.groupEnd();
-      return true;
+    } catch (error) {
+        dispatch({
+            type: AUTH_ACTIONS.LOGIN_FAILURE,
+            error: error.message
+        });
+        console.error('❌ Login failed:', error);
     }
-  } catch (error) {
-    dispatch({
-      type: AUTH_ACTIONS.LOGIN_FAILURE,
-      error: error.message
-    });
-    console.error('❌ Login failed:', error);
-  }
-  console.timeEnd('Login Duration');
-  console.groupEnd();
-  return false;
+    console.timeEnd('Login Duration');
+    console.groupEnd();
+    return false;
 };
 
 export const loginWithPin = (pin) => async (dispatch) => {
     const settings = appconfig();
     dispatch(authActions.loginRequest());
-    
+
     try {
         // Step 1: Get token first
         const tokenResponse = await fetch(settings.authUrl, {
@@ -221,7 +220,7 @@ export const loginWithPin = (pin) => async (dispatch) => {
 
         const tokenData = await tokenResponse.json();
         const token = tokenData.access_token;
-        
+
         // Store token immediately
         localStorage.setItem('access_token', token);
 
@@ -275,7 +274,7 @@ export const loginWithPin = (pin) => async (dispatch) => {
             console.warn('User role lookup failed; defaulting to Mesero:', e?.message || e);
         }
 
-        try { localStorage.setItem('pmpos_user_role', userRole); } catch {}
+        try { localStorage.setItem('pmpos_user_role', userRole); } catch { }
 
         // Normalize to the 'login' reducer API
         dispatch({
@@ -314,13 +313,13 @@ export const initiateTokenRefresh = () => async (dispatch) => {
     console.group('🔄 Token Refresh Flow');
     console.time('Token Refresh Duration');
     console.log('📝 Starting token refresh...');
-    
+
     dispatch(authActions.tokenRefresh());
-    
+
     try {
         const config = appconfig();
         const startTime = performance.now();
-        
+
         console.log('🔧 Config used:', {
             authUrl: config.authUrl,
             username: config.userName,
@@ -354,7 +353,7 @@ export const initiateTokenRefresh = () => async (dispatch) => {
 
         console.timeEnd('Token Refresh Duration');
         console.groupEnd();
-        
+
         return data;
     } catch (error) {
         console.error('❌ Token refresh error:', error);
@@ -366,10 +365,10 @@ export const initiateTokenRefresh = () => async (dispatch) => {
 
 export const initializeAuth = () => async (dispatch) => {
     debug('Starting auth initialization');
-    
+
     try {
         const token = localStorage.getItem('access_token');
-        
+
         if (!token) {
             debug('No token found');
             return;
@@ -377,12 +376,12 @@ export const initializeAuth = () => async (dispatch) => {
 
         debug('Found existing token, validating...');
         // Validate token and dispatch appropriate actions
-        
+
         dispatch({
             type: 'AUTH_INITIALIZED',
             payload: { token }
         });
-        
+
         debug('Auth initialization complete');
     } catch (error) {
         debug('Auth initialization failed:', error);
@@ -392,19 +391,19 @@ export const initializeAuth = () => async (dispatch) => {
 
 export const logout = () => async (dispatch) => {
     debug('🔓 Iniciando logout...');
-    
+
     try {
         // Clear auth state (both legacy and current reducers)
         dispatch({ type: 'LOGOUT' });
         dispatch({ type: AUTH_ACTIONS.LOGOUT });
-        
+
         // Clear user data but KEEP token for performance
         // tokenService.clearAuthentication(); // Removed to maintain token
-        
+
         // DON'T clear terminal registration - let it persist for the session
         // Only clear current user reference
         terminalService.setCurrentUser(null);
-        
+
         // Navigation will be handled by component
         debug('✅ Logout exitoso');
         return true;
@@ -426,7 +425,7 @@ const initialState = {
 export default function authReducer(state = initialState, action) {
     switch (action.type) {
         // ...existing cases...
-        
+
         case AUTH_ACTIONS.TOKEN_REFRESH_SUCCESS:
             return {
                 ...state,
@@ -434,7 +433,7 @@ export default function authReducer(state = initialState, action) {
                 tokenExpiry: action.payload.expiry,
                 loading: false
             };
-            
+
         default:
             return state;
     }

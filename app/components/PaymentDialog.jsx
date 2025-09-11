@@ -1,532 +1,1050 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     Dialog,
-    DialogTitle,
     DialogContent,
     DialogActions,
     Button,
+    Box,
+    Typography,
+    Tab,
+    Tabs,
     TextField,
     Grid,
-    Typography,
-    Box,
+    IconButton,
     Divider,
+    Chip,
     Card,
     CardContent,
-    Alert,
-    Chip,
-    FormControl,
-    InputLabel,
-    Select,
-    MenuItem,
-    IconButton,
-    InputAdornment
+    useTheme,
+    useMediaQuery,
+    Paper,
+    Stack,
+    Fade
 } from '@mui/material';
 import {
-    AttachMoney as MoneyIcon,
-    CreditCard as CardIcon,
-    AccountBalance as BankIcon,
-    Percent as PercentIcon,
-    Add as AddIcon,
-    Remove as RemoveIcon
+    LocalAtm,
+    CreditCard,
+    AccountBalance,
+    Receipt,
+    Percent,
+    Close,
+    Payment,
+    Assessment,
+    AttachMoney,
+    MonetizationOn
 } from '@mui/icons-material';
 import { paymentService } from '../services/paymentService';
-import { formatMXN, isValidAmount, calculateChange } from '../utils/currencyFormatter';
-import Debug from 'debug';
+import { terminalService } from '../services/terminalService';
+import { formatMXN } from '../utils/currencyFormatter';
 
-const debug = Debug('pmpos:payment-dialog');
+// Tab panel component
+function TabPanel({ children, value, index, ...other }) {
+    return (
+        <div
+            role="tabpanel"
+            hidden={value !== index}
+            id={`payment-tabpanel-${index}`}
+            aria-labelledby={`payment-tab-${index}`}
+            {...other}
+        >
+            {value === index && (
+                <Fade in={value === index}>
+                    <Box>
+                        {children}
+                    </Box>
+                </Fade>
+            )}
+        </div>
+    );
+}
 
-const PaymentDialog = ({ 
-    open, 
-    onClose, 
-    ticket, 
-    terminalId,
-    onPaymentSuccess,
-    onError 
+const PaymentDialog = ({
+    open,
+    onClose,
+    ticket,
+    onPaymentSuccess = () => { },
+    onPaymentError = () => { }
 }) => {
-    // Estados principales
-    const [paymentTypes, setPaymentTypes] = useState([]);
-    const [selectedPaymentType, setSelectedPaymentType] = useState('');
-    const [paymentAmount, setPaymentAmount] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-    
-    // Estados para descuentos y propinas
-    const [showDiscountSection, setShowDiscountSection] = useState(false);
-    const [discountType, setDiscountType] = useState('percentage');
-    const [discountValue, setDiscountValue] = useState('');
-    const [showTipSection, setShowTipSection] = useState(false);
-    const [tipAmount, setTipAmount] = useState('');
-    
-    // Cálculos
-    const [calculations, setCalculations] = useState([]);
-    const [currentTotal, setCurrentTotal] = useState(0);
-    const [remainingAmount, setRemainingAmount] = useState(0);
-    const [change, setChange] = useState(0);
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
-    // Cargar datos iniciales
+    // Tab states
+    const [currentTab, setCurrentTab] = useState(0);
+
+    // Payment states
+    const [selectedPaymentType, setSelectedPaymentType] = useState('Efectivo');
+    const [amount, setAmount] = useState('');
+    const [processing, setProcessing] = useState(false);
+    const [errors, setErrors] = useState({});
+
+    // Propina states
+    const [propinaType, setPropinaType] = useState('none'); // 'none', 'percentage', 'amount'
+    const [propinaPercentage, setPropinaPercentage] = useState(15);
+    const [propinaAmount, setPropinaAmount] = useState('');
+    const [customPropinaPercentage, setCustomPropinaPercentage] = useState('');
+
+    // Descuento states
+    const [descuentoType, setDescuentoType] = useState('none'); // 'none', 'percentage', 'amount'
+    const [descuentoPercentage, setDescuentoPercentage] = useState(10);
+    const [descuentoAmount, setDescuentoAmount] = useState('');
+    const [customDescuentoPercentage, setCustomDescuentoPercentage] = useState('');
+    const [descuentoReason, setDescuentoReason] = useState('');
+
+    // Payment type options
+    const paymentTypes = [
+        {
+            value: 'Efectivo',
+            label: 'Efectivo',
+            icon: LocalAtm,
+            color: 'success',
+            description: 'Pago en efectivo'
+        },
+        {
+            value: 'Tarjeta de Crédito',
+            label: 'Crédito',
+            icon: CreditCard,
+            color: 'primary',
+            description: 'Tarjeta de crédito'
+        },
+        {
+            value: 'Tarjeta de Débito',
+            label: 'Débito',
+            icon: CreditCard,
+            color: 'secondary',
+            description: 'Tarjeta de débito'
+        },
+        {
+            value: 'Transferencia',
+            label: 'Transferencia',
+            icon: AccountBalance,
+            color: 'info',
+            description: 'Transferencia bancaria'
+        }
+    ];
+
+    // Quick percentage options
+    const quickTipPercentages = [10, 15, 18, 20];
+    const quickDiscountPercentages = [5, 10, 15, 20];
+
+    // Calculate totals
+    const baseAmount = ticket?.remainingAmount || ticket?.totalAmount || 0;
+
+    const calculatedPropinaAmount = useMemo(() => {
+        if (propinaType === 'percentage') {
+            const percentage = customPropinaPercentage ?
+                parseFloat(customPropinaPercentage) : propinaPercentage;
+            return baseAmount * (percentage / 100);
+        } else if (propinaType === 'amount') {
+            return parseFloat(propinaAmount) || 0;
+        }
+        return 0;
+    }, [propinaType, propinaPercentage, propinaAmount, customPropinaPercentage, baseAmount]);
+
+    const calculatedDescuentoAmount = useMemo(() => {
+        if (descuentoType === 'percentage') {
+            const percentage = customDescuentoPercentage ?
+                parseFloat(customDescuentoPercentage) : descuentoPercentage;
+            return baseAmount * (percentage / 100);
+        } else if (descuentoType === 'amount') {
+            return parseFloat(descuentoAmount) || 0;
+        }
+        return 0;
+    }, [descuentoType, descuentoPercentage, descuentoAmount, customDescuentoPercentage, baseAmount]);
+
+    const finalAmount = baseAmount + calculatedPropinaAmount - calculatedDescuentoAmount;
+
+    // Initialize amount when dialog opens
     useEffect(() => {
         if (open && ticket) {
-            loadPaymentTypes();
-            initializeAmounts();
+            setAmount(finalAmount.toString());
         }
-    }, [open, ticket]);
+    }, [open, ticket, finalAmount]);
 
-    // Actualizar cálculos cuando cambia el monto de pago
+    // Update amount when calculations change
     useEffect(() => {
-        if (paymentAmount && remainingAmount && isValidAmount(paymentAmount)) {
-            try {
-                const validation = paymentService.validatePayment(paymentAmount, remainingAmount);
-                setChange(validation.change);
-                setError('');
-            } catch (err) {
-                setError(err.message);
-                setChange(0);
-            }
-        } else {
-            setChange(0);
-        }
-    }, [paymentAmount, remainingAmount]);
+        setAmount(finalAmount.toString());
+    }, [finalAmount]);
 
-    const loadPaymentTypes = async () => {
-        try {
-            const types = await paymentService.getPaymentTypes();
-            setPaymentTypes(types);
-            if (types.length > 0) {
-                setSelectedPaymentType(types[0].name);
-            }
-        } catch (error) {
-            debug('❌ Error loading payment types:', error);
-            setError('Error al cargar tipos de pago');
+    // Reset form when dialog closes
+    useEffect(() => {
+        if (!open) {
+            setCurrentTab(0);
+            setSelectedPaymentType('Efectivo');
+            setAmount('');
+            setProcessing(false);
+            setErrors({});
+            setPropinaType('none');
+            setPropinaPercentage(15);
+            setPropinaAmount('');
+            setCustomPropinaPercentage('');
+            setDescuentoType('none');
+            setDescuentoPercentage(10);
+            setDescuentoAmount('');
+            setCustomDescuentoPercentage('');
+            setDescuentoReason('');
         }
+    }, [open]);
+
+    const handleTabChange = (event, newValue) => {
+        setCurrentTab(newValue);
     };
 
-    const initializeAmounts = () => {
-        const total = parseFloat(ticket?.totalAmount || 0);
-        const remaining = parseFloat(ticket?.remainingAmount || total);
-        
-        setCurrentTotal(total);
-        setRemainingAmount(remaining);
-        setPaymentAmount(remaining.toString());
-    };
+    const validateForm = () => {
+        const newErrors = {};
 
-    const handleRecalculate = async () => {
-        if (!terminalId) return;
-        
-        setLoading(true);
-        try {
-            const result = await paymentService.recalculateTicket(terminalId, true);
-            if (result.success) {
-                setCurrentTotal(parseFloat(result.ticket.totalAmount));
-                setRemainingAmount(parseFloat(result.ticket.remainingAmount));
-                setPaymentAmount(result.ticket.remainingAmount.toString());
-            }
-        } catch (error) {
-            debug('❌ Error recalculating:', error);
-            setError('Error al recalcular ticket');
-        } finally {
-            setLoading(false);
+        if (!amount || parseFloat(amount) <= 0) {
+            newErrors.amount = 'El monto debe ser mayor a cero';
         }
-    };
 
-    const handleApplyDiscount = async () => {
-        if (!discountValue || !terminalId) return;
-        
-        setLoading(true);
-        try {
-            const result = await paymentService.applyDiscount(
-                terminalId, 
-                discountType, 
-                parseFloat(discountValue)
-            );
-            
-            if (result.success) {
-                setCalculations(prev => [...prev, {
-                    type: 'discount',
-                    description: `Descuento ${discountType === 'percentage' ? discountValue + '%' : '$' + discountValue}`,
-                    amount: discountType === 'percentage' 
-                        ? -(currentTotal * parseFloat(discountValue) / 100)
-                        : -Math.abs(parseFloat(discountValue))
-                }]);
-                
-                setCurrentTotal(parseFloat(result.ticket.totalAmount));
-                setRemainingAmount(parseFloat(result.ticket.remainingAmount));
-                setPaymentAmount(result.ticket.remainingAmount.toString());
-                setDiscountValue('');
-                setShowDiscountSection(false);
-            }
-        } catch (error) {
-            debug('❌ Error applying discount:', error);
-            setError('Error al aplicar descuento');
-        } finally {
-            setLoading(false);
+        if (parseFloat(amount) > finalAmount && selectedPaymentType !== 'EFECTIVO') {
+            newErrors.amount = 'El monto no puede ser mayor al total para este tipo de pago';
         }
-    };
 
-    const handleApplyTip = async () => {
-        if (!tipAmount || !terminalId) return;
-        
-        setLoading(true);
-        try {
-            const result = await paymentService.applyTip(terminalId, parseFloat(tipAmount));
-            
-            if (result.success) {
-                setCalculations(prev => [...prev, {
-                    type: 'tip',
-                    description: `Propina $${tipAmount}`,
-                    amount: parseFloat(tipAmount)
-                }]);
-                
-                setCurrentTotal(parseFloat(result.ticket.totalAmount));
-                setRemainingAmount(parseFloat(result.ticket.remainingAmount));
-                setPaymentAmount(result.ticket.remainingAmount.toString());
-                setTipAmount('');
-                setShowTipSection(false);
-            }
-        } catch (error) {
-            debug('❌ Error applying tip:', error);
-            setError('Error al aplicar propina');
-        } finally {
-            setLoading(false);
+        if (descuentoType !== 'none' && !descuentoReason.trim()) {
+            newErrors.descuentoReason = 'Debe proporcionar una razón para el descuento';
         }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
     };
 
     const handlePayment = async () => {
-        // Validación detallada
-        if (!terminalId) {
-            setError('❌ Terminal no encontrado');
-            return;
-        }
-        
-        if (!selectedPaymentType) {
-            setError('❌ Por favor seleccione un tipo de pago');
-            return;
-        }
-        
-        if (!paymentAmount || paymentAmount <= 0) {
-            setError('❌ Por favor ingrese un monto válido mayor a $0');
-            return;
-        }
-        
-        if (!isValidAmount(paymentAmount)) {
-            setError('❌ El monto ingresado no es válido');
+        if (!validateForm()) {
             return;
         }
 
-        setLoading(true);
-        setError(''); // Limpiar errores previos
+        // Validate required fields before calling the service
+        if (!selectedPaymentType) {
+            onPaymentError('Seleccione un método de pago');
+            return;
+        }
+
+        const paymentAmount = parseFloat(amount);
+        if (!paymentAmount || paymentAmount <= 0) {
+            onPaymentError('El monto debe ser mayor que cero');
+            return;
+        }
+
+        // Get terminal ID from terminalService or try to register terminal
+        let terminalId = terminalService.getTerminalId();
+        console.log('Initial terminalId from service:', terminalId);
+        console.log('Terminal service state:', terminalService.getTerminalsState());
+
+        if (!terminalId) {
+            console.log('No terminal ID found, attempting to register terminal...');
+
+            // Try to get current user and register terminal
+            const userData = localStorage.getItem('user');
+            console.log('User data from localStorage:', userData);
+
+            if (userData) {
+                try {
+                    const user = JSON.parse(userData);
+                    const userName = user?.name || user?.userName || 'CAJERO';
+                    console.log('Parsed user:', user, 'userName:', userName);
+
+                    console.log('Calling terminalService.register with userName:', userName);
+                    terminalId = await terminalService.register(userName);
+                    console.log('Terminal registration result:', terminalId);
+
+                    if (!terminalId) {
+                        throw new Error('No se pudo registrar el terminal - el servicio retornó null/undefined');
+                    }
+                } catch (regError) {
+                    console.error('Error registering terminal:', regError);
+                    throw new Error('Error al registrar terminal: ' + regError.message);
+                }
+            } else {
+                // Fallback: try to register with a default user
+                console.log('No user data in localStorage, trying with default user CAJERO');
+                try {
+                    terminalId = await terminalService.register('CAJERO');
+                    console.log('Default terminal registration result:', terminalId);
+                    if (!terminalId) {
+                        throw new Error('No se pudo registrar terminal con usuario por defecto');
+                    }
+                } catch (defaultRegError) {
+                    console.error('Error registering with default user:', defaultRegError);
+                    throw new Error('No se encontró información del usuario y no se pudo registrar terminal por defecto: ' + defaultRegError.message);
+                }
+            }
+        }
+
+        console.log('Final terminalId to use:', terminalId);
+
+        console.log('Payment data before service call:', {
+            terminalId,
+            paymentType: selectedPaymentType,
+            amount: paymentAmount,
+            ticket: ticket,
+            terminalIdType: typeof terminalId,
+            paymentTypeType: typeof selectedPaymentType,
+            amountType: typeof paymentAmount,
+            terminalIdValue: terminalId,
+            paymentTypeValue: selectedPaymentType,
+            amountValue: paymentAmount
+        });
+
+        setProcessing(true);
+
         try {
-            const result = await paymentService.payTicket(
+            // Validate the parameters before calling the service
+            if (!terminalId) {
+                throw new Error('Terminal ID no está disponible');
+            }
+            if (!selectedPaymentType) {
+                throw new Error('Método de pago no seleccionado');
+            }
+            if (!paymentAmount || paymentAmount <= 0) {
+                throw new Error('Monto de pago inválido');
+            }
+
+            console.log('Calling payTerminalTicket with:', {
+                terminalId: terminalId,
+                paymentTypeName: selectedPaymentType,
+                amount: paymentAmount
+            });
+
+            // Use the actual method from paymentService
+            const result = await paymentService.payTerminalTicket(
                 terminalId,
                 selectedPaymentType,
-                parseFloat(paymentAmount)
+                paymentAmount
             );
 
-            if (result.success) {
-                debug('✅ Payment successful:', result);
-                if (onPaymentSuccess) {
-                    onPaymentSuccess(result.ticket, {
-                        paymentType: selectedPaymentType,
-                        amount: parseFloat(paymentAmount),
-                        change: change
-                    });
+            if (result) {
+                console.log('Payment result from service:', result);
+
+                // Check if the ticket is fully paid (remainingAmount is 0 or very close to 0)
+                const remainingAmount = result.remainingAmount || 0;
+                const isFullyPaid = remainingAmount <= 0.01; // Allow for small rounding differences
+
+                console.log('Remaining amount after payment:', remainingAmount, 'Is fully paid:', isFullyPaid);
+
+                // If fully paid, close the ticket automatically
+                if (isFullyPaid) {
+                    console.log('💳 Ticket fully paid, closing ticket...');
+                    try {
+                        await paymentService.closeTerminalTicket(terminalId);
+                        console.log('✅ Ticket closed successfully');
+                    } catch (closeError) {
+                        console.error('❌ Failed to close ticket:', closeError);
+                        // Don't fail the entire payment if closing fails, just warn
+                        onPaymentError(`Pago exitoso pero error al cerrar ticket: ${closeError.message}`);
+                        return;
+                    }
                 }
-                handleClose();
+
+                // Create the expected payment result structure
+                const paymentResult = {
+                    paymentType: selectedPaymentType,
+                    amount: paymentAmount,
+                    change: selectedPaymentType === 'Efectivo' ? Math.max(0, paymentAmount - finalAmount) : 0,
+                    success: true,
+                    terminalId: terminalId,
+                    ticketClosed: isFullyPaid,
+                    remainingAmount: remainingAmount,
+                    originalResult: result
+                };
+
+                console.log('Calling onPaymentSuccess with:', paymentResult);
+                onPaymentSuccess(paymentResult);
+                onClose();
+            } else {
+                onPaymentError('Error al procesar el pago');
             }
         } catch (error) {
-            debug('❌ Payment failed:', error);
-            setError(error.message);
-            if (onError) {
-                onError(error);
-            }
+            console.error('Payment error:', error);
+            onPaymentError(error.message || 'Error al procesar el pago');
         } finally {
-            setLoading(false);
+            setProcessing(false);
         }
+    }; const handleQuickTipPercentage = (percentage) => {
+        setPropinaType('percentage');
+        setPropinaPercentage(percentage);
+        setCustomPropinaPercentage('');
     };
 
-    const handleClose = () => {
-        // Limpiar estados
-        setPaymentAmount('');
-        setSelectedPaymentType('');
-        setError('');
-        setCalculations([]);
-        setDiscountValue('');
-        setTipAmount('');
-        setShowDiscountSection(false);
-        setShowTipSection(false);
-        setChange(0);
-        
-        if (onClose) {
-            onClose();
-        }
+    const handleQuickDiscountPercentage = (percentage) => {
+        setDescuentoType('percentage');
+        setDescuentoPercentage(percentage);
+        setCustomDescuentoPercentage('');
     };
 
-    const getPaymentTypeIcon = (typeName) => {
-        const lowerName = typeName.toLowerCase();
-        if (lowerName.includes('efectivo')) return <MoneyIcon />;
-        if (lowerName.includes('tarjeta')) return <CardIcon />;
-        if (lowerName.includes('transferencia')) return <BankIcon />;
-        return <MoneyIcon />;
+    const resetPropina = () => {
+        setPropinaType('none');
+        setPropinaPercentage(15);
+        setPropinaAmount('');
+        setCustomPropinaPercentage('');
     };
 
-    const formatCurrency = (amount) => {
-        return formatMXN(amount);
+    const resetDescuento = () => {
+        setDescuentoType('none');
+        setDescuentoPercentage(10);
+        setDescuentoAmount('');
+        setCustomDescuentoPercentage('');
+        setDescuentoReason('');
     };
+
+    if (!ticket) return null;
 
     return (
-        <Dialog 
-            open={open} 
-            onClose={handleClose}
-            maxWidth="md"
+        <Dialog
+            open={open}
+            onClose={onClose}
+            maxWidth="sm"
             fullWidth
+            fullScreen={isMobile}
+            PaperProps={{
+                sx: {
+                    borderRadius: isMobile ? 0 : 3,
+                    background: theme.palette.mode === 'dark'
+                        ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(51, 65, 85, 0.95) 100%)'
+                        : 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.95) 100%)',
+                    backdropFilter: 'blur(20px)',
+                    border: `1px solid ${theme.palette.divider}`,
+                    boxShadow: theme.palette.mode === 'dark'
+                        ? '0 25px 50px -12px rgba(0, 0, 0, 0.8)'
+                        : '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+                }
+            }}
         >
-            <DialogTitle>
-                <Box>
-                    <Typography variant="h5" component="div">
-                        💳 Procesar Pago
-                    </Typography>
-                    <Typography variant="subtitle2" color="text.secondary">
-                        Ticket: {ticket?.ticketNumber || 'N/A'}
+            {/* Header */}
+            <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                p: 3,
+                pb: 1
+            }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Payment color="primary" />
+                    <Typography variant="h5" fontWeight="bold" color="text.primary">
+                        Procesar Pago
                     </Typography>
                 </Box>
-            </DialogTitle>
+                <IconButton
+                    onClick={onClose}
+                    size="small"
+                    sx={{
+                        borderRadius: 2,
+                        '&:hover': {
+                            backgroundColor: 'action.hover',
+                            transform: 'scale(1.1)'
+                        }
+                    }}
+                >
+                    <Close />
+                </IconButton>
+            </Box>
 
-            <DialogContent>
-                <Grid container spacing={3}>
-                    {/* Resumen del Ticket */}
-                    <Grid item xs={12}>
-                        <Card>
-                            <CardContent>
-                                <Typography variant="h6" gutterBottom>
-                                    📊 Resumen del Ticket
+            <Typography variant="body2" color="text.secondary" sx={{ px: 3, mb: 2 }}>
+                Ticket #{ticket.number}
+            </Typography>
+
+            {/* Tabs */}
+            <Box sx={{ px: 3 }}>
+                <Tabs
+                    value={currentTab}
+                    onChange={handleTabChange}
+                    sx={{
+                        '& .MuiTab-root': {
+                            borderRadius: 2,
+                            mx: 0.5,
+                            fontWeight: 600,
+                            minHeight: 44
+                        }
+                    }}
+                >
+                    <Tab
+                        label={
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <AttachMoney />
+                                Pago
+                            </Box>
+                        }
+                    />
+                    <Tab
+                        label={
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Percent />
+                                Ajustes
+                            </Box>
+                        }
+                    />
+                </Tabs>
+            </Box>
+
+            <DialogContent sx={{ p: 3, pt: 2 }}>
+                {/* Payment Tab */}
+                <TabPanel value={currentTab} index={0}>
+                    {/* Ticket Summary */}
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 3,
+                            mb: 3,
+                            borderRadius: 3,
+                            background: theme.palette.mode === 'dark'
+                                ? 'rgba(148, 163, 184, 0.1)'
+                                : 'rgba(248, 250, 252, 0.8)',
+                            border: `1px solid ${theme.palette.divider}`
+                        }}
+                    >
+                        <Typography
+                            variant="h6"
+                            fontWeight="bold"
+                            gutterBottom
+                            sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1,
+                                mb: 2,
+                                color: 'text.primary'
+                            }}
+                        >
+                            <Assessment />
+                            Resumen
+                        </Typography>
+
+                        <Stack spacing={2}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <Typography color="text.secondary">Subtotal:</Typography>
+                                <Typography fontWeight={600}>{formatMXN(baseAmount)}</Typography>
+                            </Box>
+
+                            {calculatedPropinaAmount > 0 && (
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <Typography color="text.secondary">Propina:</Typography>
+                                    <Typography fontWeight={600} color="success.main">
+                                        +{formatMXN(calculatedPropinaAmount)}
+                                    </Typography>
+                                </Box>
+                            )}
+
+                            {calculatedDescuentoAmount > 0 && (
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <Typography color="text.secondary">Descuento:</Typography>
+                                    <Typography fontWeight={600} color="error.main">
+                                        -{formatMXN(calculatedDescuentoAmount)}
+                                    </Typography>
+                                </Box>
+                            )}
+
+                            <Divider />
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <Typography variant="h6" fontWeight="bold">Total:</Typography>
+                                <Typography variant="h5" fontWeight="bold" color="primary.main">
+                                    {formatMXN(finalAmount)}
                                 </Typography>
-                                <Box display="flex" justifyContent="space-between" mb={1}>
-                                    <Typography>Total Original:</Typography>
-                                    <Typography variant="h6">
-                                        {formatCurrency(ticket?.totalAmount || 0)}
-                                    </Typography>
-                                </Box>
-                                
-                                {calculations.map((calc, index) => (
-                                    <Box key={index} display="flex" justifyContent="space-between" mb={1}>
-                                        <Typography color="text.secondary">
-                                            {calc.description}:
-                                        </Typography>
-                                        <Typography 
-                                            color={calc.amount >= 0 ? "success.main" : "error.main"}
-                                        >
-                                            {formatCurrency(calc.amount)}
-                                        </Typography>
-                                    </Box>
-                                ))}
-                                
-                                <Divider sx={{ my: 1 }} />
-                                <Box display="flex" justifyContent="space-between" mb={2}>
-                                    <Typography variant="h6">Total Actual:</Typography>
-                                    <Typography variant="h6" color="primary">
-                                        {formatCurrency(currentTotal)}
-                                    </Typography>
-                                </Box>
-                                <Box display="flex" justifyContent="space-between">
-                                    <Typography variant="h6">Pendiente de Pago:</Typography>
-                                    <Typography variant="h6" color="error">
-                                        {formatCurrency(remainingAmount)}
-                                    </Typography>
-                                </Box>
-                                
-                                <Box mt={2}>
-                                    <Button 
-                                        variant="outlined" 
-                                        onClick={handleRecalculate}
-                                        disabled={loading}
-                                        fullWidth
-                                    >
-                                        🔄 Recalcular Ticket
-                                    </Button>
-                                </Box>
-                            </CardContent>
-                        </Card>
-                    </Grid>
+                            </Box>
+                        </Stack>
+                    </Paper>
 
-                    {/* Descuentos y Propinas */}
-                    <Grid item xs={12}>
-                        <Box display="flex" gap={2} mb={2}>
-                            <Button
-                                variant={showDiscountSection ? "contained" : "outlined"}
-                                startIcon={<PercentIcon />}
-                                onClick={() => setShowDiscountSection(!showDiscountSection)}
-                            >
-                                💸 Descuento
-                            </Button>
-                            <Button
-                                variant={showTipSection ? "contained" : "outlined"}
-                                startIcon={<AddIcon />}
-                                onClick={() => setShowTipSection(!showTipSection)}
-                            >
-                                💡 Propina
-                            </Button>
+                    {/* Payment Methods - Redesigned */}
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 3,
+                            mb: 3,
+                            borderRadius: 3,
+                            background: theme.palette.mode === 'dark'
+                                ? 'linear-gradient(135deg, rgba(66, 165, 245, 0.08) 0%, rgba(144, 202, 249, 0.05) 100%)'
+                                : 'linear-gradient(135deg, rgba(25, 118, 210, 0.05) 0%, rgba(66, 165, 245, 0.03) 100%)',
+                            border: `1px solid ${theme.palette.primary.main}20`
+                        }}
+                    >
+                        <Typography
+                            variant="h6"
+                            fontWeight="bold"
+                            gutterBottom
+                            sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1,
+                                mb: 2,
+                                color: 'primary.main'
+                            }}
+                        >
+                            <Payment />
+                            Método de Pago
+                        </Typography>                        <Stack spacing={1.5}>
+                            {paymentTypes.map((type) => {
+                                const IconComponent = type.icon;
+                                const isSelected = selectedPaymentType === type.value;
+
+                                return (
+                                    <Paper
+                                        key={type.value}
+                                        elevation={isSelected ? 4 : 0}
+                                        sx={{
+                                            p: 2,
+                                            borderRadius: 2,
+                                            cursor: 'pointer',
+                                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                            border: isSelected
+                                                ? `2px solid ${theme.palette[type.color]?.main || theme.palette.primary.main}`
+                                                : `1px solid ${theme.palette.divider}`,
+                                            background: isSelected
+                                                ? theme.palette.mode === 'dark'
+                                                    ? `linear-gradient(135deg, ${theme.palette[type.color]?.dark || theme.palette.primary.dark}15 0%, ${theme.palette[type.color]?.main || theme.palette.primary.main}08 100%)`
+                                                    : `linear-gradient(135deg, ${theme.palette[type.color]?.light || theme.palette.primary.light}20 0%, ${theme.palette[type.color]?.main || theme.palette.primary.main}10 100%)`
+                                                : 'transparent',
+                                            '&:hover': {
+                                                transform: 'translateY(-1px)',
+                                                boxShadow: `0 6px 20px ${theme.palette[type.color]?.main || theme.palette.primary.main}20`,
+                                                border: `1px solid ${theme.palette[type.color]?.main || theme.palette.primary.main}40`
+                                            }
+                                        }}
+                                        onClick={() => setSelectedPaymentType(type.value)}
+                                    >
+                                        <Box sx={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between'
+                                        }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                                <Box
+                                                    sx={{
+                                                        p: 1.5,
+                                                        borderRadius: 2,
+                                                        background: isSelected
+                                                            ? `${theme.palette[type.color]?.main || theme.palette.primary.main}20`
+                                                            : `${theme.palette.text.secondary}10`,
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center'
+                                                    }}
+                                                >
+                                                    <IconComponent
+                                                        sx={{
+                                                            fontSize: 24,
+                                                            color: isSelected
+                                                                ? `${type.color}.main`
+                                                                : 'text.secondary'
+                                                        }}
+                                                    />
+                                                </Box>
+                                                <Box>
+                                                    <Typography
+                                                        variant="subtitle1"
+                                                        fontWeight={isSelected ? 600 : 500}
+                                                        sx={{
+                                                            color: isSelected ? 'text.primary' : 'text.secondary'
+                                                        }}
+                                                    >
+                                                        {type.label}
+                                                    </Typography>
+                                                    {type.description && (
+                                                        <Typography
+                                                            variant="caption"
+                                                            color="text.secondary"
+                                                            sx={{ display: 'block', fontSize: '0.75rem' }}
+                                                        >
+                                                            {type.description}
+                                                        </Typography>
+                                                    )}
+                                                </Box>
+                                            </Box>
+
+                                            {isSelected && (
+                                                <Box
+                                                    sx={{
+                                                        width: 20,
+                                                        height: 20,
+                                                        borderRadius: '50%',
+                                                        background: `linear-gradient(135deg, ${theme.palette[type.color]?.main || theme.palette.primary.main} 0%, ${theme.palette[type.color]?.dark || theme.palette.primary.dark} 100%)`,
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center'
+                                                    }}
+                                                >
+                                                    <Typography
+                                                        sx={{
+                                                            color: 'white',
+                                                            fontSize: '12px',
+                                                            fontWeight: 600
+                                                        }}
+                                                    >
+                                                        ✓
+                                                    </Typography>
+                                                </Box>
+                                            )}
+                                        </Box>
+                                    </Paper>
+                                );
+                            })}
+                        </Stack>
+                    </Paper>
+
+                    {/* Amount Input - Enhanced */}
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 3,
+                            mb: 2,
+                            borderRadius: 3,
+                            background: theme.palette.mode === 'dark'
+                                ? 'linear-gradient(135deg, rgba(76, 175, 80, 0.08) 0%, rgba(129, 199, 132, 0.05) 100%)'
+                                : 'linear-gradient(135deg, rgba(76, 175, 80, 0.05) 0%, rgba(129, 199, 132, 0.03) 100%)',
+                            border: `1px solid ${theme.palette.success.main}20`
+                        }}
+                    >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                            <MonetizationOn color="success" />
+                            <Typography variant="h6" fontWeight="bold" color="success.main">
+                                Monto a Cobrar
+                            </Typography>
                         </Box>
 
-                        {showDiscountSection && (
-                            <Card sx={{ mb: 2 }}>
-                                <CardContent>
-                                    <Typography variant="h6" gutterBottom>💸 Aplicar Descuento</Typography>
-                                    <Grid container spacing={2}>
-                                        <Grid item xs={6}>
-                                            <FormControl fullWidth>
-                                                <InputLabel>Tipo de Descuento</InputLabel>
-                                                <Select
-                                                    value={discountType}
-                                                    onChange={(e) => setDiscountType(e.target.value)}
-                                                >
-                                                    <MenuItem value="percentage">Porcentaje (%)</MenuItem>
-                                                    <MenuItem value="fixed">Monto Fijo ($)</MenuItem>
-                                                </Select>
-                                            </FormControl>
-                                        </Grid>
-                                        <Grid item xs={4}>
-                                            <TextField
-                                                label="Valor"
-                                                type="number"
-                                                value={discountValue}
-                                                onChange={(e) => setDiscountValue(e.target.value)}
-                                                fullWidth
-                                                InputProps={{
-                                                    startAdornment: (
-                                                        <InputAdornment position="start">
-                                                            {discountType === 'percentage' ? '%' : '$'}
-                                                        </InputAdornment>
-                                                    )
-                                                }}
-                                            />
-                                        </Grid>
-                                        <Grid item xs={2}>
-                                            <Button
-                                                variant="contained"
-                                                onClick={handleApplyDiscount}
-                                                disabled={!discountValue || loading}
-                                                fullWidth
-                                            >
-                                                Aplicar
-                                            </Button>
-                                        </Grid>
-                                    </Grid>
-                                </CardContent>
-                            </Card>
-                        )}
+                        <TextField
+                            fullWidth
+                            type="number"
+                            value={amount}
+                            onChange={(e) => setAmount(e.target.value)}
+                            error={!!errors.amount}
+                            helperText={errors.amount}
+                            placeholder="0.00"
+                            sx={{
+                                '& .MuiOutlinedInput-root': {
+                                    borderRadius: 3,
+                                    fontSize: { xs: '1.5rem', sm: '2rem' },
+                                    fontWeight: 700,
+                                    minHeight: { xs: '60px', sm: '80px' },
+                                    background: theme.palette.background.paper,
+                                    '&:hover': {
+                                        '& .MuiOutlinedInput-notchedOutline': {
+                                            borderColor: theme.palette.success.main
+                                        }
+                                    },
+                                    '&.Mui-focused': {
+                                        '& .MuiOutlinedInput-notchedOutline': {
+                                            borderColor: theme.palette.success.main,
+                                            borderWidth: '2px'
+                                        }
+                                    }
+                                },
+                                '& .MuiInputLabel-root': {
+                                    fontSize: '1.1rem',
+                                    '&.Mui-focused': {
+                                        color: theme.palette.success.main
+                                    }
+                                }
+                            }}
+                            InputProps={{
+                                startAdornment: (
+                                    <Typography
+                                        sx={{
+                                            mr: 1,
+                                            fontWeight: 700,
+                                            fontSize: { xs: '1.5rem', sm: '2rem' },
+                                            color: 'success.main'
+                                        }}
+                                    >
+                                        $
+                                    </Typography>
+                                )
+                            }}
+                        />
+                    </Paper>
 
-                        {showTipSection && (
-                            <Card sx={{ mb: 2 }}>
-                                <CardContent>
-                                    <Typography variant="h6" gutterBottom>💡 Agregar Propina</Typography>
-                                    <Grid container spacing={2}>
-                                        <Grid item xs={10}>
-                                            <TextField
-                                                label="Monto de Propina"
-                                                type="number"
-                                                value={tipAmount}
-                                                onChange={(e) => setTipAmount(e.target.value)}
-                                                fullWidth
-                                                InputProps={{
-                                                    startAdornment: (
-                                                        <InputAdornment position="start">$</InputAdornment>
-                                                    )
-                                                }}
-                                            />
-                                        </Grid>
-                                        <Grid item xs={2}>
-                                            <Button
-                                                variant="contained"
-                                                onClick={handleApplyTip}
-                                                disabled={!tipAmount || loading}
-                                                fullWidth
-                                            >
-                                                Agregar
-                                            </Button>
-                                        </Grid>
-                                    </Grid>
-                                </CardContent>
-                            </Card>
-                        )}
-                    </Grid>
+                    {selectedPaymentType === 'Efectivo' && parseFloat(amount) > finalAmount && (
+                        <Paper
+                            sx={{
+                                p: 2,
+                                borderRadius: 2,
+                                background: 'rgba(76, 175, 80, 0.1)',
+                                border: '1px solid rgba(76, 175, 80, 0.3)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1
+                            }}
+                        >
+                            <LocalAtm color="success" />
+                            <Typography variant="body2" color="success.main" fontWeight={600}>
+                                Cambio: {formatMXN(parseFloat(amount) - finalAmount)}
+                            </Typography>
+                        </Paper>
+                    )}
+                </TabPanel>
 
-                    {/* Información de Pago */}
-                    <Grid item xs={12}>
-                        <Card>
-                            <CardContent>
-                                <Typography variant="h6" gutterBottom>
-                                    💳 Información de Pago
+                {/* Adjustments Tab */}
+                <TabPanel value={currentTab} index={1}>
+                    {/* Propina Section */}
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 3,
+                            mb: 3,
+                            borderRadius: 3,
+                            background: 'rgba(76, 175, 80, 0.05)',
+                            border: '1px solid rgba(76, 175, 80, 0.2)'
+                        }}
+                    >
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexGrow: 1 }}>
+                                <Percent color="success" />
+                                <Typography variant="h6" fontWeight="bold">
+                                    Propina
                                 </Typography>
-                                
-                                <Grid container spacing={2}>
-                                    <Grid item xs={12} md={6}>
-                                        <FormControl fullWidth>
-                                            <InputLabel>Tipo de Pago</InputLabel>
-                                            <Select
-                                                value={selectedPaymentType}
-                                                onChange={(e) => setSelectedPaymentType(e.target.value)}
-                                            >
-                                                {paymentTypes.map((type) => (
-                                                    <MenuItem key={type.id} value={type.name}>
-                                                        <Box display="flex" alignItems="center" gap={1}>
-                                                            {getPaymentTypeIcon(type.name)}
-                                                            {type.name}
-                                                        </Box>
-                                                    </MenuItem>
-                                                ))}
-                                            </Select>
-                                        </FormControl>
-                                    </Grid>
-                                    
-                                    <Grid item xs={12} md={6}>
-                                        <TextField
-                                            label="Monto a Pagar"
-                                            type="number"
-                                            value={paymentAmount}
-                                            onChange={(e) => setPaymentAmount(e.target.value)}
-                                            fullWidth
-                                            InputProps={{
-                                                startAdornment: (
-                                                    <InputAdornment position="start">$</InputAdornment>
-                                                )
-                                            }}
+                            </Box>
+                            {propinaType !== 'none' && (
+                                <Button
+                                    size="small"
+                                    onClick={resetPropina}
+                                    color="error"
+                                    variant="outlined"
+                                    sx={{ borderRadius: 2 }}
+                                >
+                                    Quitar
+                                </Button>
+                            )}
+                        </Box>
+
+                        <Stack spacing={2}>
+                            <Box>
+                                <Typography variant="body2" color="text.secondary" gutterBottom>
+                                    Porcentajes rápidos:
+                                </Typography>
+                                <Stack direction="row" spacing={1} flexWrap="wrap">
+                                    {quickTipPercentages.map((percentage) => (
+                                        <Chip
+                                            key={percentage}
+                                            label={`${percentage}%`}
+                                            onClick={() => handleQuickTipPercentage(percentage)}
+                                            color={propinaType === 'percentage' &&
+                                                propinaPercentage === percentage &&
+                                                !customPropinaPercentage ?
+                                                'success' : 'default'}
+                                            variant={propinaType === 'percentage' &&
+                                                propinaPercentage === percentage &&
+                                                !customPropinaPercentage ? 'filled' : 'outlined'}
+                                            sx={{ borderRadius: 2 }}
                                         />
-                                    </Grid>
+                                    ))}
+                                </Stack>
+                            </Box>
+
+                            <Grid container spacing={2}>
+                                <Grid item xs={6}>
+                                    <TextField
+                                        fullWidth
+                                        size="small"
+                                        label="% Personalizado"
+                                        type="number"
+                                        value={customPropinaPercentage}
+                                        onChange={(e) => {
+                                            setCustomPropinaPercentage(e.target.value);
+                                            if (e.target.value) {
+                                                setPropinaType('percentage');
+                                            }
+                                        }}
+                                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                                        InputProps={{
+                                            endAdornment: <Percent fontSize="small" />
+                                        }}
+                                    />
                                 </Grid>
+                                <Grid item xs={6}>
+                                    <TextField
+                                        fullWidth
+                                        size="small"
+                                        label="Monto fijo"
+                                        type="number"
+                                        value={propinaAmount}
+                                        onChange={(e) => {
+                                            setPropinaAmount(e.target.value);
+                                            if (e.target.value) {
+                                                setPropinaType('amount');
+                                            }
+                                        }}
+                                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                                        InputProps={{
+                                            startAdornment: <Typography sx={{ mr: 0.5 }}>$</Typography>
+                                        }}
+                                    />
+                                </Grid>
+                            </Grid>
 
-                                {change > 0 && (
-                                    <Alert severity="info" sx={{ mt: 2 }}>
-                                        <Typography variant="h6">
-                                            💰 Cambio a devolver: {formatCurrency(change)}
-                                        </Typography>
-                                    </Alert>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </Grid>
-                </Grid>
+                            {calculatedPropinaAmount > 0 && (
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Percent color="success" fontSize="small" />
+                                    <Typography variant="body2" color="success.main" fontWeight={600}>
+                                        Propina calculada: {formatMXN(calculatedPropinaAmount)}
+                                    </Typography>
+                                </Box>
+                            )}
+                        </Stack>
+                    </Paper>
 
-                {error && (
-                    <Alert severity="error" sx={{ mt: 2 }}>
-                        {error}
-                    </Alert>
-                )}
+                    {/* Descuento Section */}
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 3,
+                            borderRadius: 3,
+                            background: 'rgba(244, 67, 54, 0.05)',
+                            border: '1px solid rgba(244, 67, 54, 0.2)'
+                        }}
+                    >
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexGrow: 1 }}>
+                                <LocalAtm color="error" />
+                                <Typography variant="h6" fontWeight="bold">
+                                    Descuento
+                                </Typography>
+                            </Box>
+                            {descuentoType !== 'none' && (
+                                <Button
+                                    size="small"
+                                    onClick={resetDescuento}
+                                    color="error"
+                                    variant="outlined"
+                                    sx={{ borderRadius: 2 }}
+                                >
+                                    Quitar
+                                </Button>
+                            )}
+                        </Box>
+
+                        <Stack spacing={2}>
+                            <Box>
+                                <Typography variant="body2" color="text.secondary" gutterBottom>
+                                    Porcentajes rápidos:
+                                </Typography>
+                                <Stack direction="row" spacing={1} flexWrap="wrap">
+                                    {quickDiscountPercentages.map((percentage) => (
+                                        <Chip
+                                            key={percentage}
+                                            label={`${percentage}%`}
+                                            onClick={() => handleQuickDiscountPercentage(percentage)}
+                                            color={descuentoType === 'percentage' &&
+                                                descuentoPercentage === percentage &&
+                                                !customDescuentoPercentage ?
+                                                'error' : 'default'}
+                                            variant={descuentoType === 'percentage' &&
+                                                descuentoPercentage === percentage &&
+                                                !customDescuentoPercentage ? 'filled' : 'outlined'}
+                                            sx={{ borderRadius: 2 }}
+                                        />
+                                    ))}
+                                </Stack>
+                            </Box>
+
+                            <Grid container spacing={2}>
+                                <Grid item xs={6}>
+                                    <TextField
+                                        fullWidth
+                                        size="small"
+                                        label="% Personalizado"
+                                        type="number"
+                                        value={customDescuentoPercentage}
+                                        onChange={(e) => {
+                                            setCustomDescuentoPercentage(e.target.value);
+                                            if (e.target.value) {
+                                                setDescuentoType('percentage');
+                                            }
+                                        }}
+                                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                                        InputProps={{
+                                            endAdornment: <Percent fontSize="small" />
+                                        }}
+                                    />
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <TextField
+                                        fullWidth
+                                        size="small"
+                                        label="Monto fijo"
+                                        type="number"
+                                        value={descuentoAmount}
+                                        onChange={(e) => {
+                                            setDescuentoAmount(e.target.value);
+                                            if (e.target.value) {
+                                                setDescuentoType('amount');
+                                            }
+                                        }}
+                                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                                        InputProps={{
+                                            startAdornment: <Typography sx={{ mr: 0.5 }}>$</Typography>
+                                        }}
+                                    />
+                                </Grid>
+                            </Grid>
+
+                            {descuentoType !== 'none' && (
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    label="Motivo del descuento"
+                                    value={descuentoReason}
+                                    onChange={(e) => setDescuentoReason(e.target.value)}
+                                    error={!!errors.descuentoReason}
+                                    helperText={errors.descuentoReason}
+                                    required
+                                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                                />
+                            )}
+
+                            {calculatedDescuentoAmount > 0 && (
+                                <Typography variant="body2" color="error.main" fontWeight={600}>
+                                    ✅ Descuento calculado: -{formatMXN(calculatedDescuentoAmount)}
+                                </Typography>
+                            )}
+                        </Stack>
+                    </Paper>
+                </TabPanel>
             </DialogContent>
 
-            <DialogActions>
-                <Button onClick={handleClose} disabled={loading}>
+            <DialogActions sx={{
+                p: 3,
+                pt: 1,
+                gap: 2,
+                borderTop: `1px solid ${theme.palette.divider}`
+            }}>
+                <Button
+                    onClick={onClose}
+                    disabled={processing}
+                    variant="outlined"
+                    sx={{
+                        borderRadius: 3,
+                        px: 3,
+                        py: 1.5,
+                        fontWeight: 600
+                    }}
+                >
                     Cancelar
                 </Button>
-                <Button 
+                <Button
                     onClick={handlePayment}
                     variant="contained"
-                    disabled={loading || !selectedPaymentType || !paymentAmount}
+                    disabled={processing || finalAmount <= 0}
                     size="large"
+                    startIcon={<LocalAtm />}
+                    sx={{
+                        borderRadius: 3,
+                        px: 4,
+                        py: 1.5,
+                        fontWeight: 700,
+                        fontSize: '1rem',
+                        background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                        '&:hover': {
+                            background: 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)',
+                            transform: 'translateY(-1px)',
+                            boxShadow: '0 8px 25px rgba(37, 99, 235, 0.4)'
+                        },
+                        '&:disabled': {
+                            background: 'rgba(148, 163, 184, 0.3)',
+                            transform: 'none',
+                            boxShadow: 'none'
+                        }
+                    }}
                 >
-                    {loading ? 'Procesando...' : '💳 Procesar Pago'}
+                    {processing ? 'Procesando...' : `Cobrar ${formatMXN(finalAmount)}`}
                 </Button>
             </DialogActions>
         </Dialog>
     );
 };
 
-export default PaymentDialog; 
+export default PaymentDialog;

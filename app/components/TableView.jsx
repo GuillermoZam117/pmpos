@@ -102,7 +102,8 @@ const TableView = () => {
             debug(`🆕 Using new SambaPOS flow for LIBRE table: ${table.name}`);
 
             // Use the new ensureTicketForTable flow which includes proper ticket creation and closing
-            const result = await ensureTicketForTable(table.name);
+            // Pass the filtered tickets from dataManager to avoid re-fetching from API
+            const result = await ensureTicketForTable(table.name, allTickets);
 
             if (result?.ticket) {
                 debug('✅ New SambaPOS flow completed successfully:', result.ticket);

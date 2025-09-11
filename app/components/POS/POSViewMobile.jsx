@@ -39,6 +39,8 @@ import {
     useTheme,
     useMediaQuery,
     Grid,
+    Stack,
+    Tooltip,
 } from '@mui/material';
 import {
     ArrowBackOutlined as BackIcon,
@@ -46,7 +48,7 @@ import {
     RestaurantMenuOutlined as MenuIcon,
     PaymentOutlined as PaymentIcon,
     SendOutlined as SendIcon,
-    KitchenOutlined as KitchenIcon,
+    RestaurantOutlined as CookIcon,
     PrintOutlined as PrintIcon,
     MoreHorizOutlined as MoreIcon,
     LabelOutlined as LabelIcon,
@@ -60,11 +62,19 @@ import {
     ExpandLessOutlined as CollapseIcon,
     ChatBubbleOutline as CommentIcon,
     LockOpenOutlined as UnlockIcon,
+    CloseOutlined as CloseIcon,
+    ComputerOutlined as TerminalIcon,
+    WifiOutlined as ConnectedIcon,
+    WifiOffOutlined as DisconnectedIcon,
+    CheckCircleOutlined as ReadyIcon,
+    PendingOutlined as PendingIcon,
 } from '@mui/icons-material';
 import { formatMXN } from '../../utils/currencyFormatter';
 import MobileMenu from '../Menu/MobileMenu';
 import ProductDetailsModal from '../ProductDetailsModal';
 import PaymentDialog from '../PaymentDialog';
+import PaymentProcessor from '../PaymentProcessor';
+import OrderTagSelector from '../OrderTagSelector';
 // Replaced PinPad page with inline numeric input for admin PIN
 import { useTheme as useCustomTheme } from '../../contexts/ThemeContext';
 import menuService from '../../services/menuService';
@@ -72,11 +82,12 @@ import dataManager from '../../services/dataManager';
 import { orderService } from '../../services/orderService';
 import { ticketService } from '../../services/ticketService';
 import { paymentService } from '../../services/paymentService';
+import { automationService } from '../../services/automationService';
 import terminalService from '../../services/terminalService';
 import { userService } from '../../services/userService';
 import orderTagService from '../../services/orderTagService';
 import adminService from '../../services/adminService';
-import { createTerminalTicketAsync, changeEntityOfTerminalTicketAsync, executeAutomationCommandForTerminalTicketAsync, getAutomationCommandButtonsForTerminalTicketAsync, closeTerminalTicket as closeTerminalTicketInline, executePrintJobAsync, loadTerminalTicketWithOrders, getTicketById, getTerminalTicket as getTerminalTicketInline, fetchAutomationReasons, fetchAutomationCommands, ensureTicketForTable } from '../../queries';
+import { closeTerminalTicket, getTicketById } from '../../queries';
 import Debug from 'debug';
 
 const debug = Debug('pmpos:pos-mobile');
@@ -89,40 +100,132 @@ const ORDER_COMMENT_COMMAND = process.env.SAMBAPOS_ORDER_COMMENT_COMMAND || 'Tag
 const GIFT_COMMAND = process.env.SAMBAPOS_AUTOCMD_GIFT || 'Regalo';
 const VOID_COMMAND = process.env.SAMBAPOS_AUTOCMD_VOID || 'Anular';
 
-// Helper function to determine order status from SambaPOS orderStates JSON
-const determineOrderStatus = (orderStatesJson = '') => {
-    // If no orderStates, assume it's new
+// Helper function to determine order status from SambaPOS orderStates JSON or states array
+const determineOrderStatus = (orderStatesJson = '', statesArray = null) => {
+    console.log('🔍 [determineOrderStatus] Input JSON:', orderStatesJson, typeof orderStatesJson);
+    console.log('🔍 [determineOrderStatus] Input Array:', statesArray);
+
+    // First try to use the states array (newer format from GraphQL)
+    if (Array.isArray(statesArray) && statesArray.length > 0) {
+        console.log('🔍 [determineOrderStatus] Using states array format');
+
+        // Look for Status state
+        const statusState = statesArray.find(state =>
+            (state.stateName || '').toLowerCase() === 'status'
+        );
+
+        if (statusState && statusState.state) {
+            const status = statusState.state;
+            console.log('🔍 [determineOrderStatus] Found status from array:', status);
+
+            switch (status?.toLowerCase()) {
+                case 'submitted':
+                case 'enviado':
+                    console.log('🔍 [determineOrderStatus] Returning ENVIADO for', status);
+                    return 'ENVIADO';
+                case 'preparing':
+                case 'preparando':
+                    return 'PREPARANDO';
+                case 'ready':
+                case 'listo':
+                    return 'LISTO';
+                case 'served':
+                case 'servido':
+                    return 'SERVIDO';
+                case 'cancelled':
+                case 'cancelado':
+                    return 'CANCELADO';
+                case 'void':
+                case 'anulado':
+                    return 'ANULADO';
+                case 'new':
+                case 'nuevo':
+                    return 'NUEVO';
+                default:
+                    console.log('🔍 [determineOrderStatus] Unknown status from array:', status);
+                    return status || 'NUEVO';
+            }
+        }
+    }
+
+    // Fallback to legacy JSON format
     if (!orderStatesJson) {
+        console.log('🔍 [determineOrderStatus] No orderStates provided, returning NUEVO');
         return 'NUEVO';
     }
 
     try {
         // Parse the JSON string to get states object
         const parsed = typeof orderStatesJson === 'string' ? JSON.parse(orderStatesJson) : orderStatesJson;
+        console.log('🔍 [determineOrderStatus] Parsed states:', parsed);
 
         // Handle the format {"S":"Submitted"} or similar
         if (parsed && typeof parsed === 'object') {
             const stateValues = Object.values(parsed);
+            console.log('🔍 [determineOrderStatus] State values:', stateValues);
             if (stateValues.length > 0) {
                 const status = stateValues[0];
+                console.log('🔍 [determineOrderStatus] Raw status:', status);
                 // Map SambaPOS states to our display states
                 switch (status?.toLowerCase()) {
-                    case 'submitted': return 'ENVIADO';
+                    case 'submitted':
+                        console.log('🔍 [determineOrderStatus] Returning ENVIADO for submitted');
+                        return 'ENVIADO';
+                    case 'enviado':
+                        console.log('🔍 [determineOrderStatus] Returning ENVIADO for enviado');
+                        return 'ENVIADO';
                     case 'preparing': return 'PREPARANDO';
                     case 'ready': return 'LISTO';
                     case 'served': return 'SERVIDO';
                     case 'cancelled': return 'CANCELADO';
                     case 'void': return 'ANULADO';
                     case 'new': return 'NUEVO';
-                    default: return status || 'NUEVO';
+                    default:
+                        console.log('🔍 [determineOrderStatus] Unknown status, returning:', status || 'NUEVO');
+                        return status || 'NUEVO';
                 }
             }
         }
     } catch (e) {
+        console.error('❌ [determineOrderStatus] Error parsing order states:', e);
         debug('❌ Error parsing order states:', e);
     }
 
+    console.log('🔍 [determineOrderStatus] Fallback to NUEVO');
     return 'NUEVO';
+};// Helper function to check if order is sent/submitted to kitchen
+const isOrderSent = (order) => {
+    if (!order) return false;
+
+    console.log('🔍 [isOrderSent] Checking order:', {
+        name: order.name,
+        status: order.status,
+        isExisting: order.isExisting,
+        states: order.states
+    });
+
+    // Check if it's an existing order (already in SambaPOS) and has sent status
+    if (order.isExisting) {
+        const status = order.status?.toLowerCase();
+        const isSent = status === 'enviado' || status === 'sent' || status === 'submitted' || status === 'preparando' || status === 'ready' || status === 'listo' || status === 'served' || status === 'servido';
+        console.log('🔍 [isOrderSent] Existing order check:', { status, isSent });
+        return isSent;
+    }
+
+    // For new orders (not yet sent), check states array
+    if (Array.isArray(order.states)) {
+        const isSent = order.states.some(state => {
+            const stateName = state.stateName?.toLowerCase();
+            const stateValue = state.state?.toLowerCase();
+            return (stateName === 'status' || stateName === 'estado') &&
+                (stateValue === 'enviado' || stateValue === 'sent' || stateValue === 'submitted' || stateValue === 'preparando' || stateValue === 'ready' || stateValue === 'listo' || stateValue === 'served' || stateValue === 'servido');
+        });
+        console.log('🔍 [isOrderSent] States array check:', { states: order.states, isSent });
+        return isSent;
+    }
+
+    console.log('🔍 [isOrderSent] No match found, returning false');
+    return false;
 };
 
 const POSViewMobile = () => {
@@ -179,6 +282,7 @@ const POSViewMobile = () => {
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [productModalOpen, setProductModalOpen] = useState(false);
     const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+    const [paymentProcessorOpen, setPaymentProcessorOpen] = useState(false);
     const [expandedOrderIndex, setExpandedOrderIndex] = useState(-1);
     const [ticketBlocked, setTicketBlocked] = useState(false);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
@@ -197,10 +301,20 @@ const POSViewMobile = () => {
     const [selectedCategory, setSelectedCategory] = useState('Todos');
     const [terminalReady, setTerminalReady] = useState(false);
     const [page, setPage] = useState(0);
+
+    // Estados para etiquetas de orden
+    const [orderTagsOpen, setOrderTagsOpen] = useState(false);
+    const [selectedOrderForTags, setSelectedOrderForTags] = useState(null);
     const [gridRows, setGridRows] = useState(4);
     const [ticketTotals, setTicketTotals] = useState({ totalAmount: 0, remainingAmount: 0 });
+
+    // Estados para indicadores de estado
+    const [terminalStatus, setTerminalStatus] = useState('disconnected'); // 'connected', 'connecting', 'disconnected'
+    const [connectionStatus, setConnectionStatus] = useState('checking'); // 'connected', 'disconnected', 'checking'
+    const [shouldRefreshOrders, setShouldRefreshOrders] = useState(0); // Counter to trigger refresh
+
     const productsBoxRef = useRef(null);
-    const [actionsAnchorEl, setActionsAnchorEl] = useState(null);
+    const [actionsModalOpen, setActionsModalOpen] = useState(false);
     const isMountedRef = useRef(true);
 
     // Prevent infinite loops
@@ -213,6 +327,37 @@ const POSViewMobile = () => {
     const appState = useSelector(state => state.app);
     const menu = appState?.get ? appState.get('menu') : appState?.menu;
     const menuJS = (menu && menu.toJS ? menu.toJS() : menu) || null;
+
+    // Helper functions for status monitoring
+    const updateTerminalStatus = useCallback(async () => {
+        try {
+            const terminalId = terminalService.getTerminalId();
+            if (terminalId) {
+                setTerminalStatus('connected');
+                // Test connection to GraphQL
+                try {
+                    await ticketService.testConnection();
+                    setConnectionStatus('connected');
+                } catch {
+                    setConnectionStatus('disconnected');
+                }
+            } else {
+                setTerminalStatus('disconnected');
+                setConnectionStatus('checking');
+            }
+        } catch (error) {
+            setTerminalStatus('disconnected');
+            setConnectionStatus('disconnected');
+        }
+    }, []);
+
+    // Monitor terminal and connection status
+    useEffect(() => {
+        updateTerminalStatus();
+        const interval = setInterval(updateTerminalStatus, 45000); // Check every 45 seconds (reduced frequency)
+        return () => clearInterval(interval);
+    }, [updateTerminalStatus]);
+
     const productNameById = React.useMemo(() => {
         const map = new Map();
         const categories = menuJS?.categories || [];
@@ -365,8 +510,9 @@ const POSViewMobile = () => {
                         tid = await terminalService.ensureTerminalRegistered(userName);
                     }
                     if (tid) {
-                        debug('🎯 Calling loadTerminalTicketWithOrders, terminalId:', tid, 'ticketId:', ticket.id);
-                        await loadTerminalTicketWithOrders(tid, String(ticket.id));
+                        debug('🎯 Loading existing ticket into terminal for automation commands, terminalId:', tid, 'ticketId:', ticket.id);
+                        // Use loadTerminalTicket (not loadTerminalTicketWithOrders) to enable automation commands
+                        await ticketService.loadTerminalTicket(tid, String(ticket.id));
                         if (!cancelled && isMountedRef.current) {
                             debug('✅ Terminal ready set to true');
                             setTerminalReady(true);
@@ -397,6 +543,25 @@ const POSViewMobile = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [terminalReady]);
 
+    // Refresh orders when shouldRefreshOrders changes (after successful add)
+    useEffect(() => {
+        if (shouldRefreshOrders > 0 && terminalReady) {
+            debug('🔄 Order added successfully, refreshing orders from server...');
+            refreshOrdersFromServer();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [shouldRefreshOrders, terminalReady]);
+
+    // Refresh orders when navigating to different table or ticket
+    useEffect(() => {
+        if (terminalReady && (ticket?.id || tableId)) {
+            debug('🏠 Table/Ticket changed - refreshing orders from server...');
+            console.log('🏠 [POSViewMobile] Navigating to table/ticket - refreshing orders');
+            refreshOrdersFromServer();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [ticket?.id, tableId, terminalReady]);
+
     // Reset pagination on category change
     useEffect(() => { setPage(0); }, [selectedCategory]);
     // Preload order tags for the selected category to maximize responsiveness
@@ -422,8 +587,8 @@ const POSViewMobile = () => {
                 const ticketData = await ticketService.getTicketByTable?.(tableId);
                 const allOrders = Array.isArray(orders) && orders.length ? orders : (ticketData?.ticket?.orders || []);
                 const orderUids = allOrders.map(o => o.uid).filter(Boolean);
-                const ticketButtons = await getAutomationCommandButtonsForTerminalTicketAsync(terminalId);
-                const orderButtons = orderUids.length ? await getAutomationCommandButtonsForTerminalTicketAsync(terminalId, [orderUids[0]]) : [];
+                const ticketButtons = await automationService.getAutomationCommandButtons(terminalId);
+                const orderButtons = orderUids.length ? await automationService.getAutomationCommandButtons(terminalId, [orderUids[0]]) : [];
                 debug('?? Ticket buttons:', ticketButtons);
                 debug('?? Order buttons (first order):', orderButtons);
                 console.table(ticketButtons);
@@ -465,14 +630,14 @@ const POSViewMobile = () => {
                             lastUpdateDate: order.lastUpdateDate || null,
                             comments: order.comments || '',
                             isExisting: true,
-                            status: determineOrderStatus(terminalTicket.orderStates)
+                            status: determineOrderStatus(terminalTicket.orderStates, order.states)
                         }));
 
                         setOrders(convertedOrders);
                         debug(`✅ Loaded ${convertedOrders.length} orders from terminal ticket`);
 
                         // Check if ticket should be blocked (based on order states)
-                        const ticketStatus = determineOrderStatus(terminalTicket.orderStates);
+                        const ticketStatus = determineOrderStatus(terminalTicket.orderStates, null);
                         const isBlocked = ['SERVIDO', 'PAGADO', 'CERRADO'].includes(ticketStatus);
                         setTicketBlocked(isBlocked);
                     } else {
@@ -505,7 +670,7 @@ const POSViewMobile = () => {
                                 lastUpdateDate: order.lastUpdateDate || null,
                                 comments: order.comments || '',
                                 isExisting: true,
-                                status: determineOrderStatus(order.OrderStates || order.orderStates)
+                                status: determineOrderStatus(order.OrderStates || order.orderStates, order.states)
                             }));
 
                             if (alive) setOrders(convertedOrders);
@@ -529,8 +694,7 @@ const POSViewMobile = () => {
                             debug('?? Fetching detailed ticket by id (SQL preferred):', ticket.id);
                             const useSql = process.env.REACT_APP_USE_SQL_READS === 'true';
                             if (useSql && ticket?.id) {
-                                const { fetchTicketDetails } = await import('../../queries');
-                                const details = await fetchTicketDetails(String(ticket.id));
+                                const details = await ticketService.fetchTicketDetails(String(ticket.id));
                                 const header = details?.header || {};
                                 const ordersList = Array.isArray(details?.orders) ? details.orders : [];
                                 // Derive blocked
@@ -560,7 +724,15 @@ const POSViewMobile = () => {
                                     lastUpdateDate: o.LastUpdateDateTime || o.lastUpdateDate || null,
                                     comments: o.comments || '',
                                     isExisting: true,
-                                    status: determineOrderStatus(o.OrderStates || o.orderStates)
+                                    status: (() => {
+                                        console.log('🔍 [POSViewMobile] Order from SQL:', {
+                                            name: o.MenuItemName || o.name,
+                                            OrderStates: o.OrderStates,
+                                            orderStates: o.orderStates,
+                                            states: o.states
+                                        });
+                                        return determineOrderStatus(o.OrderStates || o.orderStates, o.states);
+                                    })()
                                 }));
                             } else {
                                 debug('?? Fetching detailed ticket by id (GraphQL fallback):', ticket.id);
@@ -586,7 +758,15 @@ const POSViewMobile = () => {
                         lastUpdateDate: order.lastUpdateDate || null,
                         comments: order.comments || '',
                         isExisting: true,
-                        status: determineOrderStatus(order.OrderStates || order.orderStates)
+                        status: (() => {
+                            console.log('🔍 [POSViewMobile] Order from ticket prop:', {
+                                name: order.name,
+                                OrderStates: order.OrderStates,
+                                orderStates: order.orderStates,
+                                states: order.states
+                            });
+                            return determineOrderStatus(order.OrderStates || order.orderStates, order.states);
+                        })()
                     }));
                     if (alive) setOrders(convertedOrders);
                 } catch (e) {
@@ -638,137 +818,15 @@ const POSViewMobile = () => {
             status: 'pending'
         };
         setOrders(prev => [...prev, newOrder]);
-        if (isMobile) setActiveTab(1);
+        // Mantener el usuario en el menú para continuar agregando productos
+        // if (isMobile) setActiveTab(1); // Comentado: permite al usuario permanecer en el menú
 
-        try {
-            // If blocked and admin, unlock ticket via automation before adding
-            if (ticketBlocked && isAdmin) {
-                try {
-                    let terminalId = terminalService.getTerminalId();
-                    if (!terminalId) {
-                        const userName = authUser?.name || null;
-                        terminalId = await terminalService.ensureTerminalRegistered(userName);
-                    }
-                    // Ensure ticket context on terminal
-                    try {
-                        if (terminalId && ticket?.id) {
-                            await loadTerminalTicketWithOrders(terminalId, String(ticket.id));
-                        } else if (terminalId && tableId) {
-                            await changeEntityOfTerminalTicketAsync(terminalId, tableId);
-                        }
-                    } catch { }
-                    // Execute unlock automation command (exact name from SambaPOS)
-                    await executeAutomationCommandForTerminalTicketAsync(terminalId, (process.env.SAMBAPOS_UNLOCK_COMMAND || 'Desbloquear cuenta'), '');
-                    setTicketBlocked(false);
-                    try {
-                        window.dispatchEvent(new CustomEvent('ticketUpdated', { detail: { source: 'unlock' } }));
-                    } catch { }
-                } catch (unlockErr) {
-                    debug('?? Failed to unlock ticket before add (admin path):', unlockErr);
-                }
-            }
-            // Ensure terminal + ticket (Discovery): create ticket only; bind mesa AFTER adding orders
-            let terminalId = terminalService.getTerminalId();
-            if (!terminalId) {
-                const userName = authUser?.name || null;
-                terminalId = await terminalService.ensureTerminalRegistered(userName);
-            }
-            try {
-                if (terminalId && ticket?.id) {
-                    await loadTerminalTicketWithOrders(terminalId, String(ticket.id));
-                    terminalTicketOpenRef.current = true;
-                } else if (terminalId) {
-                    // Reuse terminal ticket if already open; otherwise create one
-                    try {
-                        const tt = await getTerminalTicketInline();
-                        if (!tt) {
-                            console.warn('⚠️ No terminal ticket available for order calculation');
-                            return; // Skip calculation if no terminal ticket
-                        }
-                        if (tt) terminalTicketOpenRef.current = true;
-                    } catch { }
-                    if (!terminalTicketOpenRef.current) {
-                        await createTerminalTicketAsync(terminalId);
-                        terminalTicketOpenRef.current = true;
-                    }
-                }
-            } catch (ctxErr) {
-                debug('?? Could not prepare terminal ticket before add:', ctxErr);
-            }
+        console.log('🛒 [POSViewMobile] Product added to cart (will be sent on "Comandar"):', newOrder.name);
+        debug('🛒 Product added to local cart:', newOrder);
 
-            // Add order now
-            debug('🛒 Adding order to terminal:', { terminalId, name: newOrder.name, quantity: newOrder.quantity, portion: newOrder.portion });
-            await orderService.addOrder(
-                terminalId,
-                newOrder.name,
-                newOrder.quantity,
-                newOrder.portion
-            );
-            debug('✅ Order added to terminal successfully');
+        // Note: Order will be sent to SambaPOS when user clicks "Comandar" button
+        // No longer sending immediately to allow multiple items in cart
 
-            // Resolve uid (up to 5 retries × 200ms)
-            const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-            let newUid = null;
-            for (let attempt = 0; attempt < 5 && !newUid; attempt++) {
-                let tt = null;
-                try {
-                    tt = await getTerminalTicketInline();
-                    if (!tt) {
-                        console.warn('⚠️ No terminal ticket available');
-                    }
-                } catch (e) {
-                    console.warn('⚠️ Error getting terminal ticket:', e?.message);
-                }
-                const list = Array.isArray(tt?.orders) ? tt.orders : [];
-                for (const o of list) {
-                    if ((o?.name || '').toLowerCase() === (newOrder.name || '').toLowerCase()
-                        && (o?.portion || 'Normal') === (newOrder.portion || 'Normal')
-                        && o?.uid) {
-                        newUid = o.uid;
-                        break;
-                    }
-                }
-                if (!newUid) await sleep(200);
-            }
-
-            // Bind mesa AFTER adding orders (Discovery step 4)
-            try {
-                if (!ticket?.id && tableId && boundTableRef.current !== tableId) {
-                    await changeEntityOfTerminalTicketAsync(terminalId, (typeof tableName !== 'undefined' && tableName) ? tableName : String(tableId));
-                    boundTableRef.current = tableId;
-                }
-            } catch (bindErr) {
-                debug('?? Failed to bind mesa after add', bindErr);
-            }
-
-            // Apply free-text comment optionally (Discovery step 7)
-            if (newUid && newOrder.comments && newOrder.comments.trim()) {
-                try {
-                    await executeAutomationCommandForTerminalTicketAsync(terminalId, ORDER_COMMENT_COMMAND, newOrder.comments.trim(), newUid);
-                    debug('?? Comment applied on add for order', newUid);
-                } catch (tagErr) {
-                    debug('?? Failed to apply comment on add', tagErr);
-                }
-            }
-
-            // Attach uid locally
-            if (newUid) {
-                setOrders(prev => prev.map(o => o.id === localId ? { ...o, uid: newUid } : o));
-                debug('🔗 Order UID attached locally:', newUid);
-            } else {
-                debug('⚠️ No UID found for order after 5 retries');
-            }
-
-            debug('✅ handleAddToOrder completed successfully');
-
-        } catch (error) {
-            debug('? Error adding order (server):', error);
-            console.error('Failed to add order:', error);
-
-            // Remove optimistic order if server add failed
-            setOrders(prev => prev.filter(o => o.id !== localId));
-            debug('🗑️ Removed optimistic order due to server error');
-        }
     }, [isMobile, authUser, ticket?.id, tableId]);
 
     const handleCloseModal = useCallback(() => {
@@ -793,6 +851,7 @@ const POSViewMobile = () => {
     // Helpers to reload orders from server after an action (gift/void)
     const refreshOrdersFromServer = useCallback(async () => {
         try {
+            console.log('🔍 [refreshOrdersFromServer] Called - ticket?.id:', ticket?.id, 'tableId:', tableId);
             debug('🔍 refreshOrdersFromServer called - ticket?.id:', ticket?.id, 'tableId:', tableId);
 
             // Prefer detailed ticket by id when available
@@ -826,7 +885,15 @@ const POSViewMobile = () => {
                     lastUpdateDate: order.lastUpdateDate || null,
                     comments: order.comments || '',
                     isExisting: true,
-                    status: determineOrderStatus(order.OrderStates || order.orderStates)
+                    status: (() => {
+                        console.log('🔍 [refreshOrdersFromServer] Order from getTicketById:', {
+                            name: order.name,
+                            OrderStates: order.OrderStates,
+                            orderStates: order.orderStates,
+                            states: order.states
+                        });
+                        return determineOrderStatus(order.OrderStates || order.orderStates, order.states);
+                    })()
                 }));
                 debug('✅ Converted orders from getTicketById:', converted.length, 'orders');
                 // Merge: keep any pending locals without uid
@@ -864,7 +931,15 @@ const POSViewMobile = () => {
                         lastUpdateDate: order.lastUpdateDate || null,
                         comments: order.comments || '',
                         isExisting: true,
-                        status: determineOrderStatus(order.OrderStates || order.orderStates)
+                        status: (() => {
+                            console.log('🔍 [refreshOrdersFromServer] Order from ticketService.getTicketByTable:', {
+                                name: order.name,
+                                OrderStates: order.OrderStates,
+                                orderStates: order.orderStates,
+                                states: order.states
+                            });
+                            return determineOrderStatus(order.OrderStates || order.orderStates, order.states);
+                        })()
                     }));
                     debug('✅ Converted orders from ticketService:', converted.length, 'orders');
                     setOrders(prev => {
@@ -876,9 +951,9 @@ const POSViewMobile = () => {
                 }
             }
             // Fallback: read from terminal
-            debug('🖥️ Fallback: trying getTerminalTicketInline');
-            const tt = await getTerminalTicketInline();
-            debug('🖥️ getTerminalTicketInline result:', tt);
+            debug('🖥️ Fallback: trying ticketService.getTerminalTicket');
+            const tt = await ticketService.getTerminalTicket(terminalService.getTerminalId());
+            debug('🖥️ ticketService.getTerminalTicket result:', tt);
             if (!tt) {
                 console.warn('⚠️ No terminal ticket available, keeping current state');
                 return; // keep current state if no terminal ticket
@@ -904,7 +979,15 @@ const POSViewMobile = () => {
                 lastUpdateDate: order.lastUpdateDate || null,
                 comments: order.comments || '',
                 isExisting: true,
-                status: determineOrderStatus(order.OrderStates || order.orderStates)
+                status: (() => {
+                    console.log('🔍 [refreshOrdersFromServer] Order from terminal ticket:', {
+                        name: order.name,
+                        OrderStates: order.OrderStates,
+                        orderStates: order.orderStates,
+                        states: order.states
+                    });
+                    return determineOrderStatus(order.OrderStates || order.orderStates, order.states);
+                })()
             }));
             debug('✅ Converted orders from terminal ticket:', converted.length, 'orders');
             setOrders(prev => {
@@ -937,11 +1020,27 @@ const POSViewMobile = () => {
         }
         try {
             if (terminalId && ticket?.id) {
-                await loadTerminalTicketWithOrders(terminalId, String(ticket.id));
+                // Validate that the ticket still exists and is active before loading
+                console.log('🔍 [ensureTerminalContext] Validating ticket:', ticket.id);
+                try {
+                    const ticketValidation = await getTicketById(ticket.id);
+                    if (ticketValidation && (!ticketValidation.isClosed)) {
+                        console.log('✅ [ensureTerminalContext] Ticket is valid, loading into terminal');
+                        await ticketService.loadTerminalTicketWithOrders(terminalId, String(ticket.id));
+                    } else {
+                        console.log('⚠️ [ensureTerminalContext] Ticket is closed/invalid, skipping load:', {
+                            exists: !!ticketValidation,
+                            isClosed: ticketValidation?.isClosed
+                        });
+                    }
+                } catch (ticketError) {
+                    console.log('⚠️ [ensureTerminalContext] Ticket validation failed, treating as invalid:', ticketError.message);
+                    // Continue with table-only binding below
+                }
             } else if (terminalId && tableId) {
                 // Do not create ticket here to avoid duplicates; binding happens during add
                 // If there's already a terminal ticket bound, changeEntity will succeed; otherwise submit will create
-                try { await changeEntityOfTerminalTicketAsync(terminalId, tableId); } catch (e) { /* ignore */ }
+                try { await ticketService.changeEntityOfTerminalTicket(terminalId, tableId); } catch (e) { /* ignore */ }
             }
         } catch (e) {
             debug('?? ensureTerminalContext failed (non-critical):', e);
@@ -960,7 +1059,7 @@ const POSViewMobile = () => {
                 for (const o of orders) {
                     if (!o?.uid || !o.isExisting) continue;
                     try {
-                        const btns = await getAutomationCommandButtonsForTerminalTicketAsync(terminalId, [o.uid]);
+                        const btns = await automationService.getAutomationCommandButtons(terminalId, [o.uid]);
                         const names = new Set((btns || []).map(b => b.name));
                         map[o.uid] = names;
                     } catch { }
@@ -976,95 +1075,82 @@ const POSViewMobile = () => {
 
     const handleGiftOrderCore = useCallback(async (order, reason = '') => {
         try {
-            debug(`?? Starting gift action for order: ${order?.uid}`);
+            debug(`🎁 Starting gift action for order: ${order?.uid}`);
 
             const terminalId = await ensureTerminalContext();
-            debug(`?? Terminal context: ${terminalId}`);
-
             if (!terminalId) {
-                debug('? No terminal ID available for gift command');
                 throw new Error('No se pudo obtener terminal ID');
             }
             if (!order?.uid) {
-                debug('? No order UID available for gift command');
                 throw new Error('No se pudo identificar la orden');
             }
 
-            debug(`?? Executing gift automation command for terminal ${terminalId}, order ${order.uid}`);
-            try {
-                await executeAutomationCommandForTerminalTicketAsync(terminalId, GIFT_COMMAND, reason || '', order.uid);
-            } catch (e1) {
-                // Fallback to common English name if localized name fails
-                try { await executeAutomationCommandForTerminalTicketAsync(terminalId, 'Gift', reason || '', order.uid); }
-                catch (e2) { throw e1; }
-            }
-            debug(`? Gift command executed successfully`);
+            // Usar el nuevo servicio GraphQL para gift
+            await automationService.executeAutomationCommand(terminalId, GIFT_COMMAND, reason || 'GraphQL gift', order.uid);
+            debug(`✅ Gift order completed successfully`);
 
-            // Notify and refresh
-            try {
-                debug(`?? Dispatching ticketUpdated event`);
-                window.dispatchEvent(new CustomEvent('ticketUpdated', { detail: { source: 'gift' } }));
-            } catch { }
-
-            debug(`🔄 Refreshing orders from server`);
+            // Refrescar datos
             await paymentService.recalculateTicket(terminalId, true);
             await refreshOrdersFromServer();
             await refreshTicketTotals();
-            debug(`✅ Orders refreshed successfully`);
 
             setSnackbar({ open: true, severity: 'success', message: 'Orden marcada como Regalo' });
         } catch (e) {
-            debug('? Gift command failed:', e);
-            console.error('Gift command error details:', e);
+            debug('❌ Gift command failed:', e);
             setSnackbar({ open: true, severity: 'error', message: `No se pudo aplicar Regalo: ${e.message || e}` });
-            throw e; // Re-throw to be caught by handleAdminPinConfirm
+            throw e;
         }
     }, [ensureTerminalContext, refreshOrdersFromServer]);
 
     const handleVoidOrderCore = useCallback(async (order, reason = '') => {
         try {
-            debug(`? Starting void action for order: ${order?.uid}`);
+            debug(`❌ Starting void action for order: ${order?.uid}`);
 
             const terminalId = await ensureTerminalContext();
-            debug(`?? Terminal context: ${terminalId}`);
-
             if (!terminalId) {
-                debug('? No terminal ID available for void command');
                 throw new Error('No se pudo obtener terminal ID');
             }
             if (!order?.uid) {
-                debug('? No order UID available for void command');
                 throw new Error('No se pudo identificar la orden');
             }
 
-            debug(`?? Executing void automation command for terminal ${terminalId}, order ${order.uid}`);
-            try {
-                await executeAutomationCommandForTerminalTicketAsync(terminalId, VOID_COMMAND, reason || '', order.uid);
-            } catch (e1) {
-                // Fallback to common English name if localized name fails
-                try { await executeAutomationCommandForTerminalTicketAsync(terminalId, 'Void', reason || '', order.uid); }
-                catch (e2) { throw e1; }
-            }
-            debug(`✅ Void command executed successfully`);
+            // Usar el servicio unificado para void order
+            await automationService.executeAutomationCommand(
+                `VoidOrderViaAutomation:TerminalId=${terminalId},OrderUid=${order.uid}`,
+                terminalId
+            );
+            debug(`✅ Void order completed successfully`);
 
             // Dispatch ticket updated event
             debug(`📡 Dispatching ticketUpdated event`);
-            window.dispatchEvent(new CustomEvent('ticketUpdated', { detail: { source: 'void' } }));
-
-            debug(`🔄 Refreshing orders from server`);
+            // Refrescar datos
             await paymentService.recalculateTicket(terminalId, true);
             await refreshOrdersFromServer();
             await refreshTicketTotals();
-            debug(`✅ Orders refreshed successfully`);
 
             setSnackbar({ open: true, severity: 'success', message: 'Orden anulada' });
         } catch (e) {
-            debug('? Void command failed:', e);
-            console.error('Void command error details:', e);
-            setSnackbar({ open: true, severity: 'error', message: `No se pudo Paso 1: confirma PIN para anular: ${e.message || e}` });
-            throw e; // Re-throw to be caught by handleAdminPinConfirm
+            debug('❌ Void command failed:', e);
+            setSnackbar({ open: true, severity: 'error', message: `No se pudo anular: ${e.message || e}` });
+            throw e;
         }
     }, [ensureTerminalContext, refreshOrdersFromServer]);
+
+    const handleOrderTags = useCallback((order) => {
+        debug(`🏷️ Opening order tags for order: ${order?.uid}`);
+        setSelectedOrderForTags(order);
+        setOrderTagsOpen(true);
+    }, []);
+
+    const handleOrderTagsApplied = useCallback(async (orderUid, appliedTags) => {
+        debug(`✅ Order tags applied: ${orderUid}`, appliedTags);
+        setOrderTagsOpen(false);
+        setSelectedOrderForTags(null);
+
+        // Refrescar órdenes para mostrar las nuevas etiquetas
+        await refreshOrdersFromServer();
+        setSnackbar({ open: true, severity: 'success', message: 'Etiquetas aplicadas correctamente' });
+    }, [refreshOrdersFromServer]);
 
     // Prompt for admin PIN before executing gift/void
     const requestAdminPin = useCallback(async (action, order) => {
@@ -1229,89 +1315,233 @@ const POSViewMobile = () => {
     }, [adminAction, adminTargetOrder, adminPin, adminReason, handleGiftOrderCore, handleVoidOrderCore]);
 
     const handleSendToKitchen = useCallback(async () => {
-        debug('?? Submitting to kitchen (automation command if available, fallback to close)');
+        console.log('🍳 [POSViewMobile] Starting kitchen submission...');
+        debug('🍳 Submitting to kitchen - will send all pending orders first');
+
         try {
+            console.log('🔍 [POSViewMobile] Getting terminal ID...');
             let terminalId = terminalService.getTerminalId();
             if (!terminalId) {
+                console.log('⚠️ [POSViewMobile] No terminal ID, registering...');
                 const userName = authUser?.name || null;
                 terminalId = await terminalService.ensureTerminalRegistered(userName);
             }
-            // For new tickets (no ticket.id): do NOT re-create if already in session; create only if needed
-            if (terminalId && !ticket?.id) {
-                // Check if terminal ticket exists
-                const tt = await getTerminalTicketInline();
-                terminalTicketOpenRef.current = !!tt;
-                if (!tt) {
-                    console.warn('⚠️ No terminal ticket available for kitchen submission');
-                }
+            console.log('✅ [POSViewMobile] Terminal ID obtained:', terminalId);
 
-                if (!terminalTicketOpenRef.current) {
-                    await createTerminalTicketAsync(terminalId);
-                    terminalTicketOpenRef.current = true;
-                }
-
-                // Ensure mesa is bound before closing (only once)
-                if (tableId && boundTableRef.current !== tableId) {
-                    await changeEntityOfTerminalTicketAsync(terminalId, tableId);
-                    boundTableRef.current = tableId;
-                }
-            } else if (terminalId && ticket?.id) {
-                await loadTerminalTicketWithOrders(terminalId, String(ticket.id));
-            }
             if (!terminalId) {
+                console.error('❌ [POSViewMobile] Still no terminal ID after registration');
                 setSnackbar({ open: true, severity: 'error', message: 'No hay terminal registrada' });
                 return;
             }
-            // Try automation command first
-            const submitCmdName = SUBMIT_CMD || 'Imprimir pedido';
 
-            // Always use closeTerminalTicket - no fallbacks, no automation commands
-            debug('🍳 Closing terminal ticket to submit orders');
-            await closeTerminalTicketInline();
-            debug('✅ Terminal ticket closed successfully');
+            // STEP 1: Send all pending orders from cart to SambaPOS
+            const pendingOrders = orders.filter(order => !order.isExisting && !order.uid);
+            console.log('🛒 [POSViewMobile] DEBUGGING ORDER FILTER:');
+            console.log('🛒 [POSViewMobile] Total orders in cart:', orders.length);
+            orders.forEach((order, index) => {
+                console.log(`🛒 [POSViewMobile] Order ${index + 1}:`, {
+                    name: order.name,
+                    isExisting: order.isExisting,
+                    hasUid: !!order.uid,
+                    uid: order.uid,
+                    status: order.status,
+                    willBeSent: !order.isExisting && !order.uid
+                });
+            });
+            console.log('🛒 [POSViewMobile] Found pending orders to send:', pendingOrders.length);
+            console.log('🛒 [POSViewMobile] Pending orders details:', pendingOrders.map(o => ({
+                name: o.name,
+                quantity: o.quantity,
+                portion: o.portion
+            })));
 
-            // Success - dispatch events and navigate with proper timing
-            if (typeof window !== 'undefined') {
-                window.dispatchEvent(new CustomEvent('ticketUpdated', { detail: { source: 'submit' } }));
-
-                // Robust verification using direct SambaPOS GraphQL API with retries
-                if (tableId) {
-                    debug('� Verifying order persistence with SambaPOS API...');
-                    const verifySuccess = await verifyOrderPersistence(tableId, ticket?.id);
-
-                    if (verifySuccess) {
-                        debug('✅ Order persistence verified successfully');
-                    } else {
-                        debug('⚠️ Order persistence verification failed - may need manual check');
-                        setSnackbar({
-                            open: true,
-                            severity: 'warning',
-                            message: 'Orden enviada pero verificación pendiente. Revise la mesa manualmente.'
-                        });
+            if (pendingOrders.length > 0) {
+                console.log('🍽️ [POSViewMobile] Pending orders to send:', pendingOrders.map(o => o.name));
+                console.log('🍽️ [POSViewMobile] Sending pending orders to SambaPOS...');                // Handle ticket setup before sending orders
+                if (ticketBlocked && isAdmin) {
+                    try {
+                        console.log('🔓 [POSViewMobile] Unlocking blocked ticket before sending orders...');
+                        await automationService.executeAutomationCommand(
+                            terminalId,
+                            process.env.SAMBAPOS_UNLOCK_COMMAND || 'Desbloquear cuenta',
+                            'Auto-unlock for admin before sending orders'
+                        );
+                        setTicketBlocked(false);
+                    } catch (unlockErr) {
+                        console.warn('⚠️ [POSViewMobile] Failed to unlock ticket before sending:', unlockErr);
                     }
                 }
 
-                // Refresh table data after verification
+                // Ensure terminal context
+                try {
+                    if (terminalId && ticket?.id) {
+                        await ticketService.loadTerminalTicketWithOrders(terminalId, String(ticket.id));
+                        terminalTicketOpenRef.current = true;
+                    } else if (terminalId) {
+                        try {
+                            const tt = await ticketService.getTerminalTicket(terminalId);
+                            if (tt) {
+                                terminalTicketOpenRef.current = true;
+                                debug('✅ Existing terminal ticket found for orders');
+                            }
+                        } catch { }
+                    }
+                } catch (ctxErr) {
+                    debug('⚠️ Could not prepare terminal ticket context before sending orders:', ctxErr);
+                }
+
+                // Send each pending order to SambaPOS
+                console.log('🔄 [POSViewMobile] Starting to send orders one by one...');
+                for (let i = 0; i < pendingOrders.length; i++) {
+                    const order = pendingOrders[i];
+                    try {
+                        console.log(`➕ [POSViewMobile] Sending order ${i + 1}/${pendingOrders.length} to SambaPOS:`, {
+                            name: order.name,
+                            quantity: order.quantity,
+                            portion: order.portion,
+                            tableId: tableId
+                        });
+
+                        const orderResult = await orderService.addOrder(
+                            terminalId,
+                            order.name,
+                            order.quantity,
+                            order.portion,
+                            tableId
+                        );
+
+                        console.log(`✅ [POSViewMobile] Order ${i + 1} sent successfully:`, orderResult);
+
+                        // Try to resolve UID for the sent order
+                        const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+                        let newUid = null;
+                        for (let attempt = 0; attempt < 3 && !newUid; attempt++) {
+                            try {
+                                const tt = await ticketService.getTerminalTicket(terminalId);
+                                const list = Array.isArray(tt?.orders) ? tt.orders : [];
+                                for (const o of list) {
+                                    if ((o?.name || '').toLowerCase() === (order.name || '').toLowerCase()
+                                        && (o?.portion || 'Normal') === (order.portion || 'Normal')
+                                        && o?.uid) {
+                                        newUid = o.uid;
+                                        break;
+                                    }
+                                }
+                                if (!newUid && attempt < 2) await sleep(200);
+                            } catch { }
+                        }
+
+                        // Update local order with UID and mark as existing
+                        if (newUid) {
+                            setOrders(prev => prev.map(o =>
+                                o.id === order.id
+                                    ? { ...o, uid: newUid, isExisting: true, status: 'ENVIADO' }
+                                    : o
+                            ));
+
+                            // Apply comments if any
+                            if (order.comments && order.comments.trim()) {
+                                try {
+                                    await automationService.executeAutomationCommand(
+                                        terminalId,
+                                        ORDER_COMMENT_COMMAND,
+                                        order.comments.trim(),
+                                        newUid
+                                    );
+                                } catch (commentErr) {
+                                    console.warn('⚠️ Failed to apply comment:', commentErr);
+                                }
+                            }
+                        }
+
+                        console.log('✅ [POSViewMobile] Order sent successfully:', order.name);
+                    } catch (orderErr) {
+                        console.error('❌ [POSViewMobile] Failed to send order:', order.name, orderErr);
+                        setSnackbar({ open: true, severity: 'error', message: `Error enviando ${order.name}` });
+                        throw orderErr; // Stop process if any order fails
+                    }
+                }
+
+                console.log('🏁 [POSViewMobile] ORDER SENDING LOOP COMPLETED!');
+                console.log('🏁 [POSViewMobile] Successfully sent all orders:', pendingOrders.map(o => o.name));
+
+                // Bind mesa AFTER adding all orders (if needed)
+                try {
+                    if (!ticket?.id && tableId && boundTableRef.current !== tableId) {
+                        console.log('🏠 [POSViewMobile] Binding table to ticket after orders...');
+                        await ticketService.changeEntityOfTerminalTicket(terminalId, String(tableId));
+                        boundTableRef.current = tableId;
+                    }
+                } catch (bindErr) {
+                    console.warn('⚠️ Failed to bind mesa after sending orders:', bindErr);
+                }
+
+                console.log('✅ [POSViewMobile] All pending orders sent to SambaPOS successfully');
+            } else {
+                console.log('ℹ️ [POSViewMobile] No pending orders to send - all orders already in SambaPOS');
+            }
+
+            // STEP 2: Now close the terminal ticket to finalize submission
+            console.log('🍳 [POSViewMobile] Closing terminal ticket to finalize submission...');
+            debug('🍳 Closing terminal ticket to submit orders');
+
+            const closeResult = await closeTerminalTicket();
+            console.log('✅ [POSViewMobile] Terminal ticket closed successfully:', closeResult);
+            debug('✅ Terminal ticket closed successfully');
+
+            // CRITICAL: Refresh orders from server to get updated states BEFORE navigating
+            console.log('🔄 [POSViewMobile] Refreshing orders from server to get updated states...');
+            try {
+                await refreshOrdersFromServer();
+                console.log('✅ [POSViewMobile] Orders refreshed with updated states from server');
+
+                // Small delay to ensure UI updates
+                await new Promise(resolve => setTimeout(resolve, 500));
+            } catch (refreshErr) {
+                console.warn('⚠️ [POSViewMobile] Failed to refresh orders after submit:', refreshErr);
+            }
+
+            // Success - dispatch events and navigate
+            if (typeof window !== 'undefined') {
+                console.log('📡 [POSViewMobile] Dispatching ticketUpdated event...');
+                window.dispatchEvent(new CustomEvent('ticketUpdated', { detail: { source: 'submit' } }));
+
+                // Quick verification
+                if (tableId) {
+                    console.log('🔍 [POSViewMobile] Quick order verification...');
+                    const verifySuccess = await verifyOrderPersistence(tableId, ticket?.id);
+                    if (verifySuccess) {
+                        console.log('✅ [POSViewMobile] Order persistence confirmed');
+                    } else {
+                        console.warn('⚠️ [POSViewMobile] Verification incomplete - but orders were sent');
+                    }
+                }
+
+                // Start refresh in background
                 if (typeof window.refreshData === 'function') {
-                    debug('🔄 Refreshing tables data...');
-                    await window.refreshData('tables');
-                    debug('✅ Tables data refreshed');
+                    console.log('🔄 [POSViewMobile] Starting background refresh...');
+                    window.refreshData('tables').catch(err => {
+                        debug('⚠️ Background refresh failed:', err);
+                    });
                 }
             }
+
+            console.log('🏠 [POSViewMobile] Navigating back to tables...');
             navigate('/tables', { replace: true });
+
         } catch (error) {
+            console.error('❌ [POSViewMobile] Error submitting to kitchen:', error);
             debug('🚨 Error submitting to kitchen:', error);
-            console.error('Kitchen submission failed:', error);
             setSnackbar({ open: true, severity: 'error', message: 'Error al enviar a cocina' });
         }
-    }, [ensureTerminalContext]);
+    }, [orders, authUser, tableId, ticket, boundTableRef, terminalTicketOpenRef, navigate, setSnackbar, isAdmin, ticketBlocked, refreshOrdersFromServer]);
 
     // Robust order persistence verification using direct SambaPOS API
     const verifyOrderPersistence = useCallback(async (tableId, originalTicketId) => {
         debug('🔍 Starting order persistence verification for table:', tableId);
 
-        const maxRetries = 6; // Up to 12 seconds of retries
-        const retryDelays = [1000, 1500, 2000, 2500, 3000, 3500]; // Progressive delays
+        const maxRetries = 3; // Reduced to 3 attempts (max 3 seconds total)
+        const retryDelays = [500, 1000, 1500]; // Much shorter delays
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
@@ -1323,8 +1553,7 @@ const POSViewMobile = () => {
                 }
 
                 // Get fresh table tickets directly from SambaPOS GraphQL API
-                const { getTableTickets } = await import('../../queries');
-                const tableTickets = await getTableTickets(tableId);
+                const tableTickets = await ticketService.getTableTickets(tableId);
                 debug(`📋 Retrieved ${tableTickets.length} tickets for table ${tableId}`);
 
                 // Check for meaningful ticket data indicating order persistence
@@ -1404,113 +1633,93 @@ const POSViewMobile = () => {
                 terminalId = await terminalService.ensureTerminalRegistered(userName);
             }
 
-            // Ensure ticket context is open on this terminal before executing the command
+            // Ensure ticket context is loaded on this terminal before executing automation commands
             try {
                 if (terminalId && ticket?.id) {
-                    await loadTerminalTicketWithOrders(terminalId, String(ticket.id));
-                    debug('?? Loaded ticket into terminal for print:', ticket.id);
+                    // For mesa ocupada: ALWAYS load the existing ticket into terminal first
+                    console.log('📋 [POSViewMobile] Loading existing ticket into terminal for automation command:', ticket.id);
+                    await ticketService.loadTerminalTicket(terminalId, String(ticket.id));
+                    debug('✅ Loaded existing ticket into terminal for automation commands:', ticket.id);
                 } else if (terminalId && tableId) {
-                    await changeEntityOfTerminalTicketAsync(terminalId, (typeof tableName !== 'undefined' && tableName) ? tableName : String(tableId));
-                    debug('?? Bound terminal to mesa for print:', tableId);
+                    await ticketService.changeEntityOfTerminalTicket(terminalId, String(tableId));
+                    debug('✅ Bound terminal to mesa for print:', tableId);
                 }
             } catch (ctxErr) {
-                debug('?? Could not prepare terminal ticket context before print:', ctxErr);
+                console.warn('⚠️ [POSViewMobile] Could not prepare terminal ticket context before automation command:', ctxErr);
+                debug('⚠️ Could not prepare terminal ticket context before print:', ctxErr);
             }
 
-            // Prefer Automation Command on the active terminal ticket if available
+            // Use automation command per DISCOVERY GRAPHQL documentation
             if (terminalId) {
-                try {
-                    const printCmd = process.env.SAMBAPOS_PRINT_ACCOUNT_COMMAND || 'Imprimir factura';
-                    await executeAutomationCommandForTerminalTicketAsync(terminalId, printCmd, '');
-                    debug('?? Print bill via automation command');
-                    // Notify tables to refresh immediately (should flip to Cuenta solicitada)
-                    try {
-                        if (typeof window !== 'undefined') {
-                            window.dispatchEvent(new CustomEvent('ticketUpdated', { detail: { source: 'print-bill' } }));
-                            if (typeof window.refreshData === 'function') {
-                                window.refreshData('tables').catch(() => { });
-                            }
-                        }
-                    } catch { }
-                    // After printing, return to table map
-                    // Mark as blocked in UI immediately
-                    setTicketBlocked(true);
-                    navigate('/tables', { replace: true });
-                    return;
-                } catch (cmdErr) {
-                    debug('?? Print command failed, will try print job if ticketId present:', cmdErr);
-                }
-            }
+                console.log('🖨️ [POSViewMobile] Executing print bill automation command...');
+                const printCmd = process.env.SAMBAPOS_PRINT_ACCOUNT_COMMAND || 'Imprimir factura';
 
-            // Fallback: print job on last known ticket id (if provided in navigation state)
-            if (ticket?.id) {
-                await executePrintJobAsync({ name: PRINT_JOB, ticketId: ticket.id });
-                debug('?? Print bill via print job for ticket', ticket.id);
-                // Notify tables to refresh immediately
+                // Call automation command with correct parameters: (terminalId, commandName, orderUid, value)
+                await automationService.executeAutomationCommand(terminalId, printCmd, null, "");
+
+                console.log('✅ [POSViewMobile] Print bill command executed successfully');
+                debug('✅ Print bill via automation command executeAutomationCommandForTerminalTicket');
+
+                // Notify tables to refresh immediately (should flip to Cuenta solicitada)
                 if (typeof window !== 'undefined') {
-                    window.dispatchEvent(new CustomEvent('ticketUpdated', { detail: { source: 'print-job' } }));
+                    window.dispatchEvent(new CustomEvent('ticketUpdated', { detail: { source: 'print-bill' } }));
                     if (typeof window.refreshData === 'function') {
-                        await window.refreshData('tables');
+                        window.refreshData('tables').catch(() => { });
                     }
                 }
 
-                // After printing, return to table map
-                setTicketBlocked(true);
+                // Mark as blocked in UI immediately (only if component is still mounted)
+                if (isMountedRef.current) {
+                    setTicketBlocked(true);
+                }
                 navigate('/tables', { replace: true });
             } else {
-                alert('No hay ticket para imprimir.');
+                throw new Error('No hay terminal registrada para imprimir');
             }
         } catch (e) {
-            debug('? Print bill failed:', e);
+            console.error('❌ [POSViewMobile] Print bill failed:', e);
+            debug('❌ Print bill failed:', e);
             alert('Error al imprimir cuenta: ' + (e?.message || e));
         }
-    }, [authUser, ticket]);
+    }, [authUser, ticket, tableId]);
 
     const handlePayment = useCallback(async (paymentInfo) => {
-        debug('💳 Processing payment using real GraphQL:', paymentInfo);
+        debug('💳 Processing payment using GraphQL Flow Service:', paymentInfo);
 
         try {
-            // TODO: Implement payment using paymentService
-            // Resolve terminal id (register if needed)
+            // Usar el nuevo servicio GraphQL
             let terminalId = terminalService.getTerminalId();
             if (!terminalId) {
-                const userName = authUser?.name || null;
-                terminalId = await terminalService.ensureTerminalRegistered(userName);
-            }
-            if (!terminalId) {
-                setSnackbar({ open: true, severity: 'error', message: 'No hay terminal registrada' });
-                return;
-            }
-            // Ensure ticket context is loaded on this terminal
-            try {
-                if (terminalId && ticket?.id) {
-                    await loadTerminalTicketWithOrders(terminalId, String(ticket.id));
-                } else if (terminalId && tableId) {
-                    await changeEntityOfTerminalTicketAsync(terminalId, tableId);
-                }
-            } catch (ctxErr) {
-                debug('?? Could not ensure ticket context before payment:', ctxErr);
+                // Registrar terminal usando terminalService unificado (GraphQL Simple)
+                terminalId = await terminalService.registerTerminal('COMEDOR', 'SERVIDOR', 'MESAS', authUser?.name || 'graphiql');
+                terminalService.setTerminalId(terminalId);
             }
 
-            const result = await paymentService.processPayment(
+            // Cargar ticket si existe usando ticketService unificado
+            if (ticket?.id) {
+                await ticketService.loadTerminalTicket(terminalId, String(ticket.id));
+            }
+
+            // Procesar pago usando el servicio unificado
+            const result = await paymentService.payTerminalTicket(
                 terminalId,
                 paymentInfo.paymentType,
                 paymentInfo.amount
             );
 
-            debug('? Payment processed:', result);
+            debug('✅ Payment processed successfully:', result);
 
-            // Clear orders after successful payment
+            // Limpiar órdenes tras pago exitoso
             if (isMountedRef.current) setOrders([]);
 
-            // Navigate back to tables
+            // Navegar de vuelta a mesas
             navigate('/tables');
 
         } catch (error) {
-            debug('? Payment failed:', error);
-            console.error('Payment processing failed:', error);
+            debug('❌ Payment failed:', error);
+            setSnackbar({ open: true, severity: 'error', message: `Error en pago: ${error.message}` });
         }
-    }, [navigate]);
+    }, [navigate, authUser, ticket]);
 
     const calculateTotal = useCallback(() => {
         return orders.reduce((total, order) => total + (order.price * order.quantity), 0);
@@ -1536,15 +1745,18 @@ const POSViewMobile = () => {
                 const userName = authUser?.name || null;
                 terminalId = await terminalService.ensureTerminalRegistered(userName);
             }
-            if (terminalId && ticket?.id) {
-                await loadTerminalTicketWithOrders(terminalId, String(ticket.id));
-            } else if (terminalId && tableId) {
-                await changeEntityOfTerminalTicketAsync(terminalId, (typeof tableName !== 'undefined' && tableName) ? tableName : String(tableId));
-            }
-            const unlockCmd = process.env.SAMBAPOS_UNLOCK_COMMAND || 'Desbloquear cuenta';
-            await executeAutomationCommandForTerminalTicketAsync(terminalId, unlockCmd, reason || '');
+
+            // Use GraphQL service to unlock ticket
+            await automationService.executeAutomationCommand(
+                process.env.SAMBAPOS_UNLOCK_COMMAND || 'Desbloquear cuenta',
+                terminalId,
+                {
+                    ticketId: ticket?.id || null,
+                    reason: reason || 'Manual unlock'
+                }
+            );
+
             setTicketBlocked(false);
-            await paymentService.recalculateTicket(terminalId, true);
             await refreshOrdersFromServer();
             await refreshTicketTotals();
             setSnackbar({ open: true, severity: 'success', message: 'Cuenta desbloqueada' });
@@ -1572,9 +1784,9 @@ const POSViewMobile = () => {
 
             try {
                 if (terminalId && ticket?.id) {
-                    await loadTerminalTicketWithOrders(terminalId, String(ticket.id));
+                    await ticketService.loadTerminalTicketWithOrders(terminalId, String(ticket.id));
                 } else if (terminalId && tableId) {
-                    await changeEntityOfTerminalTicketAsync(terminalId, (typeof tableName !== 'undefined' && tableName) ? tableName : String(tableId));
+                    await ticketService.changeEntityOfTerminalTicket(terminalId, (typeof tableName !== 'undefined' && tableName) ? tableName : String(tableId));
                 }
             } catch (ctxErr) {
                 debug('?? Could not ensure ticket context before opening payment dialog:', ctxErr);
@@ -1583,16 +1795,64 @@ const POSViewMobile = () => {
             debug('? Error preparing payment dialog:', e);
         }
 
-        setPaymentDialogOpen(true);
+        if (isMountedRef.current) {
+            setPaymentDialogOpen(true);
+        }
     }, [authUser, ticket, tableId]);
 
-    // Bottom actions menu handlers
-    const openActionsMenu = useCallback((e) => setActionsAnchorEl(e.currentTarget), []);
-    const closeActionsMenu = useCallback(() => setActionsAnchorEl(null), []);
-    const handleViewOrders = useCallback(() => { setActiveTab(1); closeActionsMenu(); }, [closeActionsMenu]);
-    const handlePrintFromMenu = useCallback(async () => { try { await handlePrintBill(); } finally { closeActionsMenu(); } }, [handlePrintBill, closeActionsMenu]);
-    const handlePayFromMenu = useCallback(async () => { try { await handleOpenPaymentDialog(); } finally { closeActionsMenu(); } }, [handleOpenPaymentDialog, closeActionsMenu]);
-    const handleTicketTags = useCallback(() => { closeActionsMenu(); setSnackbar({ open: true, severity: 'info', message: 'Etiquetas del ticket: próximamente' }); }, [closeActionsMenu]);
+    // Bottom actions modal handlers
+    const openActionsModal = useCallback(() => setActionsModalOpen(true), []);
+    const closeActionsModal = useCallback(() => setActionsModalOpen(false), []);
+    const handleViewOrders = useCallback(() => { setActiveTab(1); closeActionsModal(); }, [closeActionsModal]);
+    const handlePrintFromModal = useCallback(async () => { try { await handlePrintBill(); } finally { closeActionsModal(); } }, [handlePrintBill, closeActionsModal]);
+
+    // Handler para abrir el nuevo PaymentProcessor unificado
+    const handleOpenPaymentProcessor = useCallback(async () => {
+        debug('💳 Abriendo PaymentProcessor unificado');
+
+        if (!ticket?.id) {
+            debug('⚠️ No hay ticket activo para procesar pago');
+            setSnackbar({ open: true, severity: 'warning', message: 'No hay pedidos para procesar' });
+            return;
+        }
+
+        // Validar que hay órdenes
+        if (orders.length === 0) {
+            debug('⚠️ No hay órdenes en el ticket para procesar pago');
+            setSnackbar({ open: true, severity: 'warning', message: 'Agregue productos antes de procesar el pago' });
+            return;
+        }
+
+        try {
+            // Abrir el nuevo PaymentProcessor
+            setPaymentProcessorOpen(true);
+        } catch (error) {
+            debug('❌ Error abriendo PaymentProcessor:', error);
+            setSnackbar({ open: true, severity: 'error', message: 'Error al abrir procesador de pagos' });
+        }
+    }, [ticket, orders.length]);
+
+    const handlePaymentProcessorCompleted = useCallback(async (paymentInfo) => {
+        debug('✅ Pago procesado exitosamente:', paymentInfo);
+
+        try {
+            // Refrescar datos después del pago
+            await refreshOrdersFromServer();
+
+            // Mostrar confirmación
+            setSnackbar({
+                open: true,
+                severity: 'success',
+                message: `Pago de ${paymentInfo.amount} procesado con ${paymentInfo.paymentMethod}`
+            });
+        } catch (error) {
+            debug('❌ Error refrescando después del pago:', error);
+        }
+    }, [refreshOrdersFromServer]);
+
+    const handlePayFromModalNew = useCallback(async () => { try { await handleOpenPaymentProcessor(); } finally { closeActionsModal(); } }, [handleOpenPaymentProcessor, closeActionsModal]);
+
+    const handleTicketTags = useCallback(() => { closeActionsModal(); setSnackbar({ open: true, severity: 'info', message: 'Etiquetas del ticket: próximamente' }); }, [closeActionsModal]);
 
 
 
@@ -1768,38 +2028,83 @@ const POSViewMobile = () => {
         );
     };
 
-    // Mobile cart component
+    // Mobile cart component - Fixed to use full available space
     const MobileCart = () => (
-        <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', p: 1 }}>
+        <Paper sx={{
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            width: '100%',
+            borderRadius: { xs: 0, sm: 1 }
+        }}>
             {orders.length === 0 ? (
                 <Box sx={{
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    height: 200,
-                    textAlign: 'center'
+                    flex: 1,
+                    textAlign: 'center',
+                    p: 3
                 }}>
-                    <ReceiptIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
-                    <Typography variant="h6" color="text.secondary" gutterBottom>
+                    <ReceiptIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+                    <Typography variant="h5" color="text.secondary" gutterBottom>
                         Carrito vacío
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
                         Selecciona productos del menú para empezar
                     </Typography>
                     <Button
-                        variant="outlined"
+                        variant="contained"
                         onClick={() => setActiveTab(0)}
-                        sx={{ mt: 2 }}
+                        size="large"
+                        startIcon={<MenuIcon />}
                     >
                         Ver Menú
                     </Button>
                 </Box>
             ) : (
                 <>
-                    {/* Scrollable orders list */}
-                    <Box sx={{ flex: 1, overflowY: 'auto', pr: 0.5 }}>
-                        <List sx={{ pb: 0 }}>
+                    {/* Enhanced Cart Header with all ticket info */}
+                    <Box sx={{
+                        p: { xs: 1.5, sm: 2 },
+                        borderBottom: 2,
+                        borderColor: 'primary.main',
+                        bgcolor: 'primary.main',
+                        color: 'primary.contrastText'
+                    }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                            {/* First row: Mesa and Ticket */}
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Typography variant="h6" fontWeight="bold" sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
+                                    Mesa {tableId}
+                                </Typography>
+                                <Typography variant="body1" fontWeight="600" sx={{ fontSize: { xs: '0.9rem', sm: '1rem' } }}>
+                                    {isNew ? 'Nuevo Ticket' : (ticket?.number ? `Ticket #${ticket.number}` : (ticket?.id ? `Ticket #${ticket.id}` : 'Ticket Pendiente'))}
+                                </Typography>
+                            </Box>
+
+                            {/* Second row: Order count and Total */}
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Typography variant="body2" sx={{ opacity: 0.9, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
+                                    Pedido ({orderCount} {orderCount === 1 ? 'producto' : 'productos'})
+                                </Typography>
+                                <Typography variant="h6" fontWeight="bold" sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
+                                    Total: {formatMXN(displayTotal)}
+                                </Typography>
+                            </Box>
+                        </Box>
+                    </Box>
+
+                    {/* Scrollable orders list - takes full available space, with bottom padding for sticky buttons */}
+                    <Box sx={{
+                        flex: 1,
+                        overflowY: 'auto',
+                        p: 1,
+                        pb: isMobile ? 'calc(80px + env(safe-area-inset-bottom, 0px))' : 1 // Extra padding for mobile buttons
+                    }}>
+                        <List sx={{ py: 0 }}>
                             {orders.map((order, index) => (
                                 <Card key={order.id} sx={{ mb: 1, overflow: 'visible' }}>
                                     <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
@@ -1873,88 +2178,118 @@ const POSViewMobile = () => {
                                                 </Typography>
 
                                                 <Box display="flex" alignItems="center" gap={0.5}>
-                                                    <IconButton
-                                                        size="small"
-                                                        onClick={() => handleQuantityChange(order.id, -1)}
-                                                        disabled={order.isExisting || order.quantity <= 1}
-                                                        color="primary"
-                                                    >
-                                                        <RemoveIcon fontSize="small" />
-                                                    </IconButton>
-                                                    <Typography variant="body1" sx={{ minWidth: 24, textAlign: 'center' }}>
-                                                        {order.quantity}
-                                                    </Typography>
-                                                    <IconButton
-                                                        size="small"
-                                                        onClick={() => handleQuantityChange(order.id, 1)}
-                                                        disabled={order.isExisting}
-                                                        color="primary"
-                                                    >
-                                                        <AddIcon fontSize="small" />
-                                                    </IconButton>
-                                                    <IconButton
-                                                        size="small"
-                                                        onClick={() => handleRemoveOrder(order.id)}
-                                                        color="error"
-                                                        disabled={order.isExisting}
-                                                    >
-                                                        <DeleteIcon fontSize="small" />
-                                                    </IconButton>
+                                                    {/* Normal quantity and delete buttons - only for NOT sent orders */}
+                                                    {!isOrderSent(order) && (
+                                                        <>
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={() => handleQuantityChange(order.id, -1)}
+                                                                disabled={order.quantity <= 1}
+                                                                color="primary"
+                                                                title="Reducir cantidad"
+                                                            >
+                                                                <RemoveIcon fontSize="small" />
+                                                            </IconButton>
+                                                            <Typography variant="body1" sx={{ minWidth: 24, textAlign: 'center' }}>
+                                                                {order.quantity}
+                                                            </Typography>
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={() => handleQuantityChange(order.id, 1)}
+                                                                color="primary"
+                                                                title="Aumentar cantidad"
+                                                            >
+                                                                <AddIcon fontSize="small" />
+                                                            </IconButton>
+                                                            <IconButton
+                                                                size="small"
+                                                                color="primary"
+                                                                title="Etiquetas"
+                                                                onClick={(e) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    handleOrderTags(order);
+                                                                }}
+                                                            >
+                                                                <LabelIcon fontSize="small" />
+                                                            </IconButton>
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={() => handleRemoveOrder(order.id)}
+                                                                color="error"
+                                                                title="Eliminar orden"
+                                                            >
+                                                                <DeleteIcon fontSize="small" />
+                                                            </IconButton>
+                                                        </>
+                                                    )}
+
+                                                    {/* Special buttons for SENT orders - Cortesía and Cancelar Producto */}
+                                                    {isOrderSent(order) && (
+                                                        <>
+                                                            <Typography variant="body1" sx={{ minWidth: 24, textAlign: 'center', mr: 1 }}>
+                                                                {order.quantity}
+                                                            </Typography>
+                                                            <IconButton
+                                                                size="small"
+                                                                color="primary"
+                                                                title="Etiquetas"
+                                                                onClick={(e) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    handleOrderTags(order);
+                                                                }}
+                                                            >
+                                                                <LabelIcon fontSize="small" />
+                                                            </IconButton>
+                                                            <IconButton
+                                                                size="small"
+                                                                color="success"
+                                                                title="Cortesía"
+                                                                onClick={(e) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    try {
+                                                                        debug(`🎁 Gift button clicked for order: ${order?.uid}`);
+                                                                        requestAdminPin('gift', order);
+                                                                    } catch (error) {
+                                                                        debug('❌ Error in gift button click:', error);
+                                                                        setSnackbar({
+                                                                            open: true,
+                                                                            severity: 'error',
+                                                                            message: 'Error al procesar solicitud de regalo'
+                                                                        });
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <GiftIcon fontSize="small" />
+                                                            </IconButton>
+                                                            <IconButton
+                                                                size="small"
+                                                                color="warning"
+                                                                title="Cancelar Producto"
+                                                                onClick={(e) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    try {
+                                                                        debug(`❌ Void button clicked for order: ${order?.uid}`);
+                                                                        requestAdminPin('void', order);
+                                                                    } catch (error) {
+                                                                        debug('❌ Error in void button click:', error);
+                                                                        console.error('Void button click error:', error);
+                                                                        setSnackbar({
+                                                                            open: true,
+                                                                            severity: 'error',
+                                                                            message: 'Error al procesar solicitud de anulación'
+                                                                        });
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <CancelIcon fontSize="small" />
+                                                            </IconButton>
+                                                        </>
+                                                    )}
                                                 </Box>
-
-                                                {order.isExisting && order.status === 'sent' && (
-                                                    <Box display="flex" alignItems="center" gap={0.5} mt={0.5}>
-                                                        <IconButton
-                                                            size="small"
-                                                            color="success"
-                                                            title="Regalo"
-                                                            onClick={(e) => {
-                                                                e.preventDefault();
-                                                                e.stopPropagation();
-                                                                try {
-                                                                    debug(`?? Gift button clicked for order: ${order?.uid}`);
-                                                                    requestAdminPin('gift', order);
-                                                                } catch (error) {
-                                                                    debug('? Error in gift button click:', error);
-                                                                    console.error('Gift button click error:', error);
-                                                                    setSnackbar({
-                                                                        open: true,
-                                                                        severity: 'error',
-                                                                        message: 'Error al procesar solicitud de regalo'
-                                                                    });
-                                                                }
-                                                            }}
-                                                            disabled={false} // Allow Gift/Void buttons in sent orders (admin PIN protects)
-                                                        >
-                                                            <GiftIcon fontSize="small" />
-                                                        </IconButton>
-                                                        <IconButton
-                                                            size="small"
-                                                            color="warning"
-                                                            title="Anular"
-                                                            onClick={(e) => {
-                                                                e.preventDefault();
-                                                                e.stopPropagation();
-                                                                try {
-                                                                    debug(`? Void button clicked for order: ${order?.uid}`);
-                                                                    requestAdminPin('void', order);
-                                                                } catch (error) {
-                                                                    debug('? Error in void button click:', error);
-                                                                    console.error('Void button click error:', error);
-                                                                    setSnackbar({
-                                                                        open: true,
-
-                                                                        severity: 'error',
-                                                                        message: 'Error al procesar solicitud de anulación'
-                                                                    });
-                                                                }
-                                                            }}
-                                                            disabled={false} // Allow Gift/Void buttons in sent orders (admin PIN protects)
-                                                        >
-                                                            <CancelIcon fontSize="small" />
-                                                        </IconButton>
-                                                    </Box>
-                                                )}
                                             </Box>
                                         </Box>
                                     </CardContent>
@@ -1977,14 +2312,14 @@ const POSViewMobile = () => {
                             <Box display="flex" gap={1}>
                                 <Button
                                     variant="contained"
-                                    startIcon={<KitchenIcon />}
+                                    startIcon={<CookIcon />}
                                     onClick={handleSendToKitchen}
                                     fullWidth
                                     disabled={orders.length === 0}
                                     size="large"
                                     sx={{
                                         minHeight: '48px',
-                                        fontSize: '1.1rem',
+                                        fontSize: { xs: '0.9rem', sm: '1.1rem' },
                                         fontWeight: 600,
                                         bgcolor: 'success.main',
                                         '&:hover': { bgcolor: 'success.dark' }
@@ -1995,12 +2330,12 @@ const POSViewMobile = () => {
                                 <Button
                                     variant="outlined"
                                     startIcon={<MoreIcon />}
-                                    onClick={openActionsMenu}
+                                    onClick={openActionsModal}
                                     fullWidth
                                     size="large"
                                     sx={{
                                         minHeight: '48px',
-                                        fontSize: '1.1rem',
+                                        fontSize: { xs: '0.9rem', sm: '1.1rem' },
                                         fontWeight: 600
                                     }}
                                 >
@@ -2011,7 +2346,7 @@ const POSViewMobile = () => {
                     )}
                 </>
             )}
-        </Box>
+        </Paper>
     );
 
     // If neither ticket nor tableId is provided, nothing to render
@@ -2028,43 +2363,189 @@ const POSViewMobile = () => {
             height: '100vh',
             bgcolor: 'background.default'
         }}>
-            {/* Mobile Header */}
-            <AppBar position="sticky" elevation={1}>
-                <Toolbar sx={{ minHeight: { xs: 56, sm: 64 }, pt: 'env(safe-area-inset-top, 0px)', px: { xs: 1, sm: 2 }, display: 'flex', flexWrap: { xs: 'wrap', sm: 'nowrap' }, gap: 1 }}>
-                    <IconButton
-                        edge="start"
-                        color="inherit"
-                        onClick={handleBack}
-                        sx={{ mr: 2 }}
-                    >
-                        <BackIcon />
-                    </IconButton>
+            {/* Enhanced Mobile Header with Status Indicators */}
+            <AppBar position="sticky" elevation={4} sx={{
+                background: theme => `linear-gradient(45deg, ${theme.palette.primary.main} 30%, ${theme.palette.primary.dark} 90%)`,
+                borderBottom: theme => `2px solid ${theme.palette.primary.light}`,
+            }}>
+                <Toolbar sx={{
+                    minHeight: { xs: 80, sm: 88 }, // Increased height for better layout
+                    pt: 'env(safe-area-inset-top, 0px)',
+                    px: { xs: 1.5, sm: 2.5 },
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'stretch',
+                    gap: 1
+                }}>
+                    {/* Top row: Back button, Mesa info, Status indicators, Actions */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <IconButton
+                                edge="start"
+                                color="inherit"
+                                onClick={handleBack}
+                                sx={{
+                                    mr: 2,
+                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                    '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.2)' }
+                                }}
+                            >
+                                <BackIcon />
+                            </IconButton>
 
-                    <Box flex={1}>
-                        <Typography variant="h6" noWrap sx={{ color: 'common.white' }}>
-                            Mesa {tableId}
-                        </Typography>
-                        <Typography variant="caption" sx={{ opacity: 0.9, color: 'common.white' }}>
-                            {isNew ? 'Nuevo Ticket' : (ticket?.number ? `Ticket #${ticket.number}` : (ticket?.id ? `Ticket #${ticket.id}` : ''))}
-                        </Typography>
+                            <Box>
+                                <Typography variant="h5" noWrap sx={{
+                                    color: 'common.white',
+                                    fontWeight: 'bold',
+                                    fontSize: { xs: '1.3rem', sm: '1.5rem' }
+                                }}>
+                                    Mesa {tableId}
+                                </Typography>
+                                {/* Enhanced Status indicators with better contrast */}
+                                <Stack direction="row" spacing={0.5} sx={{ mt: 0.5 }}>
+                                    <Tooltip title={`Terminal ${terminalStatus === 'connected' ? 'Conectado' : 'Desconectado'}: ${terminalService.getTerminalId() || 'Sin ID'}`}>
+                                        <Chip
+                                            icon={terminalStatus === 'connected' ? <TerminalIcon /> : <PendingIcon />}
+                                            label={`Terminal: ${terminalService.getTerminalId()?.slice(-6) || 'N/A'}`}
+                                            size="small"
+                                            sx={{
+                                                backgroundColor: (theme) => terminalStatus === 'connected'
+                                                    ? theme.palette.mode === 'dark'
+                                                        ? 'rgba(76, 175, 80, 0.3)'  // Green in dark theme
+                                                        : 'rgba(27, 94, 32, 0.8)'   // Darker green in light theme
+                                                    : theme.palette.mode === 'dark'
+                                                        ? 'rgba(255, 152, 0, 0.3)'  // Orange in dark theme
+                                                        : 'rgba(230, 81, 0, 0.8)',  // Darker orange in light theme
+                                                color: (theme) => theme.palette.mode === 'dark'
+                                                    ? 'rgba(255, 255, 255, 0.95)'
+                                                    : 'rgba(255, 255, 255, 1)',
+                                                border: (theme) => `1px solid ${terminalStatus === 'connected'
+                                                    ? theme.palette.success.main
+                                                    : theme.palette.warning.main}`,
+                                                fontSize: { xs: '0.65rem', sm: '0.7rem' },
+                                                height: { xs: '22px', sm: '24px' },
+                                                fontWeight: 700,
+                                                '& .MuiChip-icon': {
+                                                    fontSize: { xs: '0.8rem', sm: '0.9rem' },
+                                                    color: (theme) => terminalStatus === 'connected'
+                                                        ? theme.palette.success.main
+                                                        : theme.palette.warning.main
+                                                }
+                                            }}
+                                        />
+                                    </Tooltip>
+
+                                    <Tooltip title={`Conexión ${connectionStatus === 'connected' ? 'Activa' : connectionStatus === 'checking' ? 'Verificando' : 'Sin Conexión'}`}>
+                                        <Chip
+                                            icon={connectionStatus === 'connected' ? <ConnectedIcon /> :
+                                                connectionStatus === 'checking' ? <PendingIcon /> : <DisconnectedIcon />}
+                                            label={connectionStatus === 'connected' ? 'Conectado' :
+                                                connectionStatus === 'checking' ? 'Verificando' : 'Sin Conexión'}
+                                            size="small"
+                                            sx={{
+                                                backgroundColor: (theme) => connectionStatus === 'connected'
+                                                    ? theme.palette.mode === 'dark'
+                                                        ? 'rgba(33, 150, 243, 0.3)'  // Blue in dark theme
+                                                        : 'rgba(13, 71, 161, 0.8)'   // Darker blue in light theme
+                                                    : connectionStatus === 'checking'
+                                                        ? theme.palette.mode === 'dark'
+                                                            ? 'rgba(255, 193, 7, 0.3)'  // Yellow in dark theme
+                                                            : 'rgba(245, 127, 23, 0.8)' // Darker yellow in light theme
+                                                        : theme.palette.mode === 'dark'
+                                                            ? 'rgba(244, 67, 54, 0.3)'  // Red in dark theme
+                                                            : 'rgba(183, 28, 28, 0.8)', // Darker red in light theme
+                                                color: (theme) => theme.palette.mode === 'dark'
+                                                    ? 'rgba(255, 255, 255, 0.95)'
+                                                    : 'rgba(255, 255, 255, 1)',
+                                                border: (theme) => `1px solid ${connectionStatus === 'connected'
+                                                    ? theme.palette.info.main
+                                                    : connectionStatus === 'checking'
+                                                        ? theme.palette.warning.main
+                                                        : theme.palette.error.main
+                                                    }`,
+                                                fontSize: { xs: '0.65rem', sm: '0.7rem' },
+                                                height: { xs: '22px', sm: '24px' },
+                                                fontWeight: 700,
+                                                '& .MuiChip-icon': {
+                                                    fontSize: { xs: '0.8rem', sm: '0.9rem' },
+                                                    color: (theme) => connectionStatus === 'connected'
+                                                        ? theme.palette.info.main
+                                                        : connectionStatus === 'checking'
+                                                            ? theme.palette.warning.main
+                                                            : theme.palette.error.main
+                                                }
+                                            }}
+                                        />
+                                    </Tooltip>
+                                </Stack>
+                            </Box>
+                        </Box>
+
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Tooltip title="Cambiar tema">
+                                <IconButton
+                                    color="inherit"
+                                    onClick={toggleTheme}
+                                    sx={{
+                                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                        '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.2)' }
+                                    }}
+                                >
+                                    <ThemeIcon />
+                                </IconButton>
+                            </Tooltip>
+
+                            <Tooltip title={`Ver carrito (${orderCount} productos)`}>
+                                <IconButton
+                                    color="inherit"
+                                    onClick={() => setActiveTab(1)}
+                                    sx={{
+                                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                        '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.2)' }
+                                    }}
+                                >
+                                    <Badge badgeContent={orderCount} color="error">
+                                        <ReceiptIcon />
+                                    </Badge>
+                                </IconButton>
+                            </Tooltip>
+                        </Box>
                     </Box>
 
-                    <IconButton
-                        color="inherit"
-                        onClick={toggleTheme}
-                        sx={{ mr: 1 }}
-                    >
-                        <ThemeIcon />
-                    </IconButton>
+                    {/* Bottom row: Ticket info and date/time */}
+                    <Box sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        width: '100%',
+                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                        borderRadius: 1,
+                        px: 1.5,
+                        py: 0.5
+                    }}>
+                        <Typography variant="body2" sx={{
+                            color: 'common.white',
+                            fontWeight: 600,
+                            fontSize: { xs: '0.8rem', sm: '0.875rem' }
+                        }}>
+                            {isNew ? 'Nuevo Ticket' : (ticket?.number ? `Ticket #${ticket.number}` : (ticket?.id ? `Ticket #${ticket.id}` : 'Ticket Pendiente'))}
+                        </Typography>
 
-                    <IconButton
-                        color="inherit"
-                        onClick={() => setActiveTab(1)}
-                    >
-                        <Badge badgeContent={orderCount} color="error">
-                            <ReceiptIcon />
-                        </Badge>
-                    </IconButton>
+                        <Typography variant="body2" sx={{
+                            color: 'rgba(255, 255, 255, 0.9)',
+                            fontWeight: 500,
+                            fontSize: { xs: '0.75rem', sm: '0.8rem' }
+                        }}>
+                            {new Date().toLocaleDateString('es-MX', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric'
+                            })} • {new Date().toLocaleTimeString('es-MX', {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            })}
+                        </Typography>
+                    </Box>
                 </Toolbar>
             </AppBar>
 
@@ -2074,15 +2555,13 @@ const POSViewMobile = () => {
                     <CircularProgress />
                 </Box>
             ) : (
-                <Box sx={{ flex: 1, overflow: 'hidden', p: 1 }}>
+                <Box sx={{ flex: 1, overflow: 'hidden', p: { xs: 0, sm: 1 } }}>
                     {isMobile ? (
                         // Mobile: two separate screens (Menu or Carrito), selected via state or Acciones menu
                         activeTab === 1 ? (
-                            <Box sx={{ height: '100%', display: 'flex' }}>
-                                <MobileCart />
-                            </Box>
+                            <MobileCart />
                         ) : (
-                            <Box sx={{ height: '100%', display: 'flex' }}>
+                            <Box sx={{ height: '100%', display: 'flex', p: 1 }}>
                                 <Paper sx={{ p: 1, display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
                                     <CategoryBar />
                                     <Box sx={{ mt: 1, flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }} ref={productsBoxRef}>
@@ -2131,12 +2610,17 @@ const POSViewMobile = () => {
                             <Grid item xs={6}>
                                 <Button
                                     variant="contained"
-                                    startIcon={<KitchenIcon />}
+                                    startIcon={<CookIcon />}
                                     onClick={handleSendToKitchen}
                                     fullWidth
                                     disabled={orders.length === 0}
                                     color="success"
                                     size="large"
+                                    sx={{
+                                        fontSize: { xs: '0.8rem', sm: '1rem' },
+                                        fontWeight: 600,
+                                        minHeight: { xs: '44px', sm: '48px' }
+                                    }}
                                 >
                                     {LABEL_SUBMIT}
                                 </Button>
@@ -2145,11 +2629,16 @@ const POSViewMobile = () => {
                                 <Button
                                     variant="outlined"
                                     startIcon={<MoreIcon />}
-                                    onClick={openActionsMenu}
+                                    onClick={openActionsModal}
                                     fullWidth
                                     size="large"
+                                    sx={{
+                                        fontSize: { xs: '0.8rem', sm: '1rem' },
+                                        fontWeight: 600,
+                                        minHeight: { xs: '44px', sm: '48px' }
+                                    }}
                                 >
-                                    Acciones
+                                    + Acciones
                                 </Button>
                             </Grid>
                         </Grid>
@@ -2157,35 +2646,183 @@ const POSViewMobile = () => {
 
                 </>
             )}
-            {/* Actions Menu (shared for mobile/desktop) */}
-            {/** Ensure anchor element is still in the DOM to avoid MUI warning */}
-            <Menu
-                anchorEl={(actionsAnchorEl && document.body && document.body.contains(actionsAnchorEl)) ? actionsAnchorEl : null}
-                open={Boolean(actionsAnchorEl && document.body && document.body.contains(actionsAnchorEl))}
-                onClose={closeActionsMenu}
-                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-                transformOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            {/* Actions Modal (modern centered design) */}
+            <Dialog
+                open={actionsModalOpen}
+                onClose={closeActionsModal}
+                maxWidth="sm"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        borderRadius: 2,
+                        bgcolor: theme.palette.mode === 'dark' ? 'grey.900' : 'background.paper',
+                        boxShadow: theme.shadows[10],
+                        m: 2
+                    }
+                }}
             >
-                {isAdmin && ticketBlocked && (
-                    <MenuItem onClick={() => { requestAdminPin('unlock', null); }}>
-                        <UnlockIcon fontSize="small" style={{ marginRight: 8 }} /> Desbloquear cuenta
-                    </MenuItem>
-                )}
-                <MenuItem onClick={handleViewOrders}>
-                    <ReceiptIcon fontSize="small" style={{ marginRight: 8 }} /> Carrito ({orderCount}) • {formatMXN(displayTotal)}
-                </MenuItem>
-                <MenuItem onClick={handlePrintFromMenu} disabled={orders.length === 0}>
-                    <PrintIcon fontSize="small" style={{ marginRight: 8 }} /> {LABEL_PRINT_BILL}
-                </MenuItem>
-                {canPay && (
-                    <MenuItem onClick={handlePayFromMenu} disabled={orders.length === 0}>
-                        <PaymentIcon fontSize="small" style={{ marginRight: 8 }} /> Cobrar ticket
-                    </MenuItem>
-                )}
-                <MenuItem onClick={handleTicketTags}>
-                    <LabelIcon fontSize="small" style={{ marginRight: 8 }} /> Etiquetas del ticket
-                </MenuItem>
-            </Menu>
+                <Box sx={{
+                    p: 3,
+                    background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+                    color: 'white'
+                }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Box>
+                            <Typography variant="h6" fontWeight="bold">
+                                Acciones del Ticket
+                            </Typography>
+                            <Typography variant="body2" sx={{ opacity: 0.9, mt: 0.5 }}>
+                                Mesa {tableId} • {orderCount} {orderCount === 1 ? 'producto' : 'productos'} • {formatMXN(displayTotal)}
+                            </Typography>
+                        </Box>
+                        <IconButton
+                            onClick={closeActionsModal}
+                            sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.1)' }}
+                        >
+                            <CloseIcon />
+                        </IconButton>
+                    </Box>
+                </Box>
+
+                <Box sx={{ p: 3 }}>
+                    <Grid container spacing={2}>
+                        {/* View Cart */}
+                        <Grid item xs={12} sm={6}>
+                            <Card
+                                sx={{
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                    '&:hover': {
+                                        transform: 'translateY(-2px)',
+                                        boxShadow: theme.shadows[6]
+                                    }
+                                }}
+                                onClick={handleViewOrders}
+                            >
+                                <CardContent sx={{ textAlign: 'center', p: 2 }}>
+                                    <ReceiptIcon sx={{ fontSize: 32, color: 'primary.main', mb: 1 }} />
+                                    <Typography variant="h6" fontWeight="bold" gutterBottom>
+                                        Ver Carrito
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                        {orderCount} productos en el carrito
+                                    </Typography>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+
+                        {/* Print Bill */}
+                        <Grid item xs={12} sm={6}>
+                            <Card
+                                sx={{
+                                    cursor: orders.length === 0 ? 'not-allowed' : 'pointer',
+                                    opacity: orders.length === 0 ? 0.5 : 1,
+                                    transition: 'all 0.2s',
+                                    '&:hover': orders.length > 0 ? {
+                                        transform: 'translateY(-2px)',
+                                        boxShadow: theme.shadows[6]
+                                    } : {}
+                                }}
+                                onClick={orders.length > 0 ? handlePrintFromModal : undefined}
+                            >
+                                <CardContent sx={{ textAlign: 'center', p: 2 }}>
+                                    <PrintIcon sx={{ fontSize: 32, color: 'info.main', mb: 1 }} />
+                                    <Typography variant="h6" fontWeight="bold" gutterBottom>
+                                        {LABEL_PRINT_BILL}
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                        Imprimir cuenta previa
+                                    </Typography>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+
+                        {/* Process Payment */}
+                        {canPay && (
+                            <Grid item xs={12} sm={6}>
+                                <Card
+                                    sx={{
+                                        cursor: orders.length === 0 ? 'not-allowed' : 'pointer',
+                                        opacity: orders.length === 0 ? 0.5 : 1,
+                                        transition: 'all 0.2s',
+                                        background: orders.length > 0 ? `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.success.dark} 100%)` : 'inherit',
+                                        color: orders.length > 0 ? 'white' : 'inherit',
+                                        '&:hover': orders.length > 0 ? {
+                                            transform: 'translateY(-2px)',
+                                            boxShadow: theme.shadows[8]
+                                        } : {}
+                                    }}
+                                    onClick={orders.length > 0 ? handlePayFromModalNew : undefined}
+                                >
+                                    <CardContent sx={{ textAlign: 'center', p: 2 }}>
+                                        <PaymentIcon sx={{ fontSize: 32, mb: 1 }} />
+                                        <Typography variant="h6" fontWeight="bold" gutterBottom>
+                                            Cobrar Ticket
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                                            Procesar pago completo
+                                        </Typography>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+                        )}
+
+                        {/* Ticket Tags */}
+                        <Grid item xs={12} sm={6}>
+                            <Card
+                                sx={{
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                    '&:hover': {
+                                        transform: 'translateY(-2px)',
+                                        boxShadow: theme.shadows[6]
+                                    }
+                                }}
+                                onClick={handleTicketTags}
+                            >
+                                <CardContent sx={{ textAlign: 'center', p: 2 }}>
+                                    <LabelIcon sx={{ fontSize: 32, color: 'warning.main', mb: 1 }} />
+                                    <Typography variant="h6" fontWeight="bold" gutterBottom>
+                                        Etiquetas
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                        Configurar etiquetas
+                                    </Typography>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+
+                        {/* Unlock Ticket (Admin only) */}
+                        {isAdmin && ticketBlocked && (
+                            <Grid item xs={12}>
+                                <Card
+                                    sx={{
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                        background: `linear-gradient(135deg, ${theme.palette.error.main} 0%, ${theme.palette.error.dark} 100%)`,
+                                        color: 'white',
+                                        '&:hover': {
+                                            transform: 'translateY(-2px)',
+                                            boxShadow: theme.shadows[8]
+                                        }
+                                    }}
+                                    onClick={() => { requestAdminPin('unlock', null); closeActionsModal(); }}
+                                >
+                                    <CardContent sx={{ textAlign: 'center', p: 2 }}>
+                                        <UnlockIcon sx={{ fontSize: 32, mb: 1 }} />
+                                        <Typography variant="h6" fontWeight="bold" gutterBottom>
+                                            Desbloquear Cuenta
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                                            Reabrir ticket para modificaciones
+                                        </Typography>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+                        )}
+                    </Grid>
+                </Box>
+            </Dialog>
             {/* Product Details Modal */}
             <ProductDetailsModal
                 open={productModalOpen}
@@ -2208,12 +2845,41 @@ const POSViewMobile = () => {
                     remainingAmount: totalAmount
                 }}
                 terminalId={terminalService.getTerminalId?.() || ''}
-                onPaymentSuccess={(ticketAfterPay, paymentPayload) => {
+                onPaymentSuccess={(paymentResult) => {
                     // Close dialog before any navigation to avoid setState on unmounted
-                    setPaymentDialogOpen(false);
-                    handlePayment(paymentPayload);
+                    if (isMountedRef.current) {
+                        setPaymentDialogOpen(false);
+
+                        // PaymentDialog has already processed the payment and closed the ticket if needed
+                        // Just handle UI cleanup and navigation
+                        debug('✅ Payment completed successfully:', paymentResult);
+
+                        // Clear orders after successful payment
+                        setOrders([]);
+
+                        // Show success message
+                        setSnackbar({
+                            open: true,
+                            severity: 'success',
+                            message: paymentResult.ticketClosed
+                                ? `Pago completado. Ticket cerrado.`
+                                : `Pago de ${formatMXN(paymentResult.amount)} procesado correctamente.`
+                        });
+
+                        // Navigate back to tables
+                        navigate('/tables');
+                    }
                 }}
                 onError={(error) => alert('Error: ' + error.message)}
+            />
+
+            {/* NEW: Payment Processor Unificado */}
+            <PaymentProcessor
+                open={paymentProcessorOpen}
+                onClose={() => setPaymentProcessorOpen(false)}
+                ticketTotal={displayTotal}
+                terminalId={terminalService.getTerminalId?.() || ''}
+                onPaymentCompleted={handlePaymentProcessorCompleted}
             />
 
             {/* Snackbar feedback */}
@@ -2370,6 +3036,24 @@ const POSViewMobile = () => {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            {/* Order Tags Selector */}
+            {orderTagsOpen && selectedOrderForTags && (
+                <OrderTagSelector
+                    terminalId={terminalService.getTerminalId()}
+                    product={{
+                        Id: selectedOrderForTags.productId || selectedOrderForTags.MenuItemId,
+                        Name: selectedOrderForTags.name || selectedOrderForTags.MenuItemName || selectedOrderForTags.caption
+                    }}
+                    orderUid={selectedOrderForTags.uid}
+                    open={orderTagsOpen}
+                    onClose={() => {
+                        setOrderTagsOpen(false);
+                        setSelectedOrderForTags(null);
+                    }}
+                    onTagsSelected={handleOrderTagsApplied}
+                />
+            )}
         </Box>
     );
 };

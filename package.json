@@ -16,7 +16,19 @@
     "debug": "cross-env NODE_ENV=development webpack serve --mode development --env debug=true",
     "debug:api": "node --experimental-json-modules --no-warnings scripts/debug-sambapos.mjs",
     "clean": "rimraf dist",
-    "analyze": "cross-env NODE_ENV=production webpack --mode production --analyze"
+    "analyze": "cross-env NODE_ENV=production webpack --mode production --analyze",
+    "smoke:mesa1:new": "node scripts/smoke-mesa1-new-flow.js --base http://localhost:9000 --user graphiql --pass graphiql --client graphiql --terminal SERVIDOR --department MESAS --ticketType COMEDOR --table 1 --entityType Mesas --qty 1 --close true",
+    "smoke:mesa1:add": "node scripts/smoke-mesa1-add-order.js --base http://localhost:9000 --user graphiql --pass graphiql --client graphiql --terminal SERVIDOR --department MESAS --ticketType COMEDOR --table 1 --entityType Mesas --qty 1",
+    "smoke:mesa1:add:close": "node scripts/smoke-mesa1-add-order.js --base http://localhost:9000 --user graphiql --pass graphiql --client graphiql --terminal SERVIDOR --department MESAS --ticketType COMEDOR --table 1 --entityType Mesas --qty 1 --close true",
+    "smoke:mesa1:close": "node scripts/smoke-mesa1-close.js --base http://localhost:9000 --user graphiql --pass graphiql --client graphiql --terminal SERVIDOR --department MESAS --ticketType COMEDOR --table 1 --entityType Mesas",
+    "smoke:mesa1:void": "node scripts/smoke-mesa1-void-order.js --base http://localhost:9000 --user graphiql --pass graphiql --client graphiql --terminal SERVIDOR --department MESAS --ticketType COMEDOR --table 1 --entityType Mesas --close true",
+    "smoke:mesa1:void:noclose": "node scripts/smoke-mesa1-void-order.js --base http://localhost:9000 --user graphiql --pass graphiql --client graphiql --terminal SERVIDOR --department MESAS --ticketType COMEDOR --table 1 --entityType Mesas",
+    "smoke:mesa1:gift": "node scripts/smoke-mesa1-gift-order.js --base http://localhost:9000 --user graphiql --pass graphiql --client graphiql --terminal SERVIDOR --department MESAS --ticketType COMEDOR --table 1 --entityType Mesas --close true",
+    "smoke:mesa1:gift:noclose": "node scripts/smoke-mesa1-gift-order.js --base http://localhost:9000 --user graphiql --pass graphiql --client graphiql --terminal SERVIDOR --department MESAS --ticketType COMEDOR --table 1 --entityType Mesas",
+    "smoke:mesa1:pay": "node scripts/smoke-mesa1-pay-ticket.js --base http://localhost:9000 --user graphiql --pass graphiql --client graphiql --terminal SERVIDOR --department MESAS --ticketType COMEDOR --table 1 --entityType Mesas --payment Efectivo --close true",
+    "smoke:mesa1:pay:noclose": "node scripts/smoke-mesa1-pay-ticket.js --base http://localhost:9000 --user graphiql --pass graphiql --client graphiql --terminal SERVIDOR --department MESAS --ticketType COMEDOR --table 1 --entityType Mesas --payment Efectivo",
+    "smoke:mesa1:new:tags": "node scripts/smoke-mesa1-new-with-tags.js --base http://localhost:9000 --user graphiql --pass graphiql --client graphiql --terminal SERVIDOR --department MESAS --ticketType COMEDOR --table 1 --entityType Mesas --qty 1 --close true",
+    "smoke:mesa1:new:tags:noclose": "node scripts/smoke-mesa1-new-with-tags.js --base http://localhost:9000 --user graphiql --pass graphiql --client graphiql --terminal SERVIDOR --department MESAS --ticketType COMEDOR --table 1 --entityType Mesas --qty 1"
   },
   "devDependencies": {
     "@babel/core": "^7.24.5",
@@ -52,7 +64,6 @@
   },
   "dependencies": {
     "18": "0.0.0",
-    "@apollo/client": "^3.13.1",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@microsoft/signalr": "^9.0.6",
@@ -65,7 +76,6 @@
     "core-js": "^3.37.1",
     "debug": "^4.4.0",
     "graphql": "^16.10.0",
-    "graphql-request": "^7.1.2",
     "history": "^5.x",
     "immutability-helper": "^3.1.1",
     "immutable": "^5.0.3",

@@ -1,0 +1,706 @@
+PS C:\PMPOS\pmpos> npm run smoke:mesa1:new
+
+> react-boilerplate@2.5.6 smoke:mesa1:new
+> node scripts/smoke-mesa1-new-flow.js --base http://localhost:9000 --user graphiql --pass graphiql --client graphiql --terminal SERVIDOR --department MESAS --ticketType COMEDOR --table 1 --entityType Mesas --qty 1
+
+
+== Config ==
+ {
+  BASE: 'http://localhost:9000',
+  GQL: 'http://localhost:9000/api/graphql',
+  AUTH: 'http://localhost:9000/Token',
+  USER: 'graphiql',
+  TERMINAL: 'SERVIDOR',
+  DEPARTMENT: 'MESAS',
+  TICKET_TYPE: 'COMEDOR',
+  TABLE: '1',
+  ENTITY_TYPE: 'Mesas',
+  PRODUCT: '',
+  PORTION: 'Normal',
+  QTY: 1
+}
+
+== Token OK ==
+ AQAAANCMnd8B...
+
+== registerTerminal -> terminalId ==
+ 5WOEffzxyE6GYWK3UnXG7Q
+
+== createTerminalTicket ==
+ {
+  id: 0,
+  uid: '0trsiOuYVUu3BkTSO62D0A',
+  number: '',
+  totalAmount: 0,
+  remainingAmount: 0
+}
+
+== changeEntityOfTerminalTicket ==
+ { changeEntityOfTerminalTicket: { id: 0, entities: [ [Object] ] } }
+
+== Picked product from menu ==
+ { prodName: 'CAFE AMERICANO', portion: 'Normal' }
+
+== addOrderToTerminalTicket ==
+ { totalAmount: 45, remainingAmount: 45 }
+
+== getTerminalTicket (after add) ==
+ {
+  id: 0,
+  uid: '0trsiOuYVUu3BkTSO62D0A',
+  number: '',
+  totalAmount: 45,
+  remainingAmount: 45,
+  orders: [
+    {
+      uid: 'Kf3TzPn2r0yWsb7BZSkVgg',
+      name: 'CAFE AMERICANO',
+      quantity: 1,
+      price: 45,
+      portion: 'Normal'
+    }
+  ],
+  entities: [ { name: '1', type: 'Mesas' } ]
+}
+
+✅ Smoke OK
+PS C:\PMPOS\pmpos> npm run smoke:mesa1:close
+
+> react-boilerplate@2.5.6 smoke:mesa1:close
+> node scripts/smoke-mesa1-close.js --base http://localhost:9000 --user graphiql --pass graphiql --client graphiql --terminal SERVIDOR --department MESAS --ticketType COMEDOR --table 1 --entityType Mesas
+
+
+== Config ==
+ {
+  BASE: 'http://localhost:9000',
+  GQL: 'http://localhost:9000/api/graphql',
+  USER: 'graphiql',
+  TERMINAL: 'SERVIDOR',
+  TABLE: '1',
+  ENTITY_TYPE: 'Mesas'
+}
+
+== Token OK ==
+ AQAAANCMnd8B...
+
+== registerTerminal -> terminalId ==
+ yTWLKjUbUU6f-t2R6Ql8IA
+
+❌ Smoke FAILED: No open ticket for table
+PS C:\PMPOS\pmpos> npm run smoke:mesa1:new
+
+> react-boilerplate@2.5.6 smoke:mesa1:new
+> node scripts/smoke-mesa1-new-flow.js --base http://localhost:9000 --user graphiql --pass graphiql --client graphiql --terminal SERVIDOR --department MESAS --ticketType COMEDOR --table 1 --entityType Mesas --qty 1 --close true
+
+
+== Config ==
+ {
+  BASE: 'http://localhost:9000',
+  GQL: 'http://localhost:9000/api/graphql',
+  AUTH: 'http://localhost:9000/Token',
+  USER: 'graphiql',
+  TERMINAL: 'SERVIDOR',
+  DEPARTMENT: 'MESAS',
+  TICKET_TYPE: 'COMEDOR',
+  TABLE: '1',
+  ENTITY_TYPE: 'Mesas',
+  PRODUCT: '',
+  PORTION: 'Normal',
+  QTY: 1
+}
+
+== Token OK ==
+ AQAAANCMnd8B...
+
+== registerTerminal -> terminalId ==
+ nOjIyg-NbE6-9FBmty4W9A
+
+== createTerminalTicket ==
+ {
+  id: 0,
+  uid: 'CMnZneh7Xke1ZcxQZM_vkg',
+  number: '',
+  totalAmount: 0,
+  remainingAmount: 0
+}
+
+== changeEntityOfTerminalTicket ==
+ { changeEntityOfTerminalTicket: { id: 0, entities: [ [Object] ] } }
+
+== Picked product from menu ==
+ { prodName: 'CAFE AMERICANO', portion: 'Normal' }
+
+== addOrderToTerminalTicket ==
+ { totalAmount: 45, remainingAmount: 45 }
+
+== getTerminalTicket (after add) ==
+ {
+  id: 0,
+  uid: 'CMnZneh7Xke1ZcxQZM_vkg',
+  number: '',
+  totalAmount: 45,
+  remainingAmount: 45,
+  orders: [
+    {
+      uid: 'CmuyOUYR_U-hv-IRs-eF3g',
+      name: 'CAFE AMERICANO',
+      quantity: 1,
+      price: 45,
+      portion: 'Normal'
+    }
+  ],
+  entities: [ { name: '1', type: 'Mesas' } ]
+}
+
+== closeTerminalTicket ==
+ null
+
+✅ Smoke OK
+PS C:\PMPOS\pmpos> npm run smoke:mesa1:add:close
+
+> react-boilerplate@2.5.6 smoke:mesa1:add:close
+> node scripts/smoke-mesa1-add-order.js --base http://localhost:9000 --user graphiql --pass graphiql --client graphiql --terminal SERVIDOR --department MESAS --ticketType COMEDOR --table 1 --entityType Mesas --qty 1 --close true
+
+
+== Config ==
+ {
+  BASE: 'http://localhost:9000',
+  GQL: 'http://localhost:9000/api/graphql',
+  USER: 'graphiql',
+  TERMINAL: 'SERVIDOR',
+  TABLE: '1',
+  PRODUCT: '',
+  PORTION: 'Normal',
+  QTY: 1
+}
+
+== Token OK ==
+ AQAAANCMnd8B...
+
+== registerTerminal -> terminalId ==
+ FHLNrX73tUGxpYLaIl1_4A
+
+== loadTerminalTicket ==
+ {
+  id: 27418,
+  number: '27440',
+  totalAmount: 45,
+  remainingAmount: 45,
+  orders: [
+    {
+      uid: 'CmuyOUYR_U-hv-IRs-eF3g',
+      name: 'CAFE AMERICANO',
+      quantity: 1,
+      price: 45,
+      portion: 'Normal'
+    }
+  ]
+}
+
+== Picked product from menu ==
+ { prodName: 'CAFE AMERICANO', portion: 'Normal' }
+
+== addOrderToTerminalTicket ==
+ { totalAmount: 90, remainingAmount: 90 }
+
+== getTerminalTicket (after add) ==
+ {
+  id: 27418,
+  number: '27440',
+  totalAmount: 90,
+  remainingAmount: 90,
+  orders: [
+    {
+      uid: 'CmuyOUYR_U-hv-IRs-eF3g',
+      name: 'CAFE AMERICANO',
+      quantity: 1,
+      price: 45,
+      portion: 'Normal'
+    },
+    {
+      uid: 'JTQMQWwDf06Dg622iH_rFw',
+      name: 'CAFE AMERICANO',
+      quantity: 1,
+      price: 45,
+      portion: 'Normal'
+    }
+  ]
+}
+
+== closeTerminalTicket ==
+
+
+✅ Smoke OK
+PS C:\PMPOS\pmpos> npm run smoke:mesa1:add:close
+
+> react-boilerplate@2.5.6 smoke:mesa1:add:close
+> node scripts/smoke-mesa1-add-order.js --base http://localhost:9000 --user graphiql --pass graphiql --client graphiql --terminal SERVIDOR --department MESAS --ticketType COMEDOR --table 1 --entityType Mesas --qty 1 --close true
+
+
+== Config ==
+ {
+  BASE: 'http://localhost:9000',
+  GQL: 'http://localhost:9000/api/graphql',
+  USER: 'graphiql',
+  TERMINAL: 'SERVIDOR',
+  TABLE: '1',
+  PRODUCT: '',
+  PORTION: 'Normal',
+  QTY: 1
+}
+
+== Token OK ==
+ AQAAANCMnd8B...
+
+== registerTerminal -> terminalId ==
+ 5ninwPcYskubRp9GwZEIKg
+
+== loadTerminalTicket ==
+ {
+  id: 27418,
+  number: '27440',
+  totalAmount: 90,
+  remainingAmount: 90,
+  orders: [
+    {
+      uid: 'CmuyOUYR_U-hv-IRs-eF3g',
+      name: 'CAFE AMERICANO',
+      quantity: 1,
+      price: 45,
+      portion: 'Normal'
+    },
+    {
+      uid: 'JTQMQWwDf06Dg622iH_rFw',
+      name: 'CAFE AMERICANO',
+      quantity: 1,
+      price: 45,
+      portion: 'Normal'
+    }
+  ]
+}
+
+== Picked product from menu ==
+ { prodName: 'CAFE AMERICANO', portion: 'Normal' }
+
+== addOrderToTerminalTicket ==
+ { totalAmount: 135, remainingAmount: 135 }
+
+== getTerminalTicket (after add) ==
+ {
+  id: 27418,
+  number: '27440',
+  totalAmount: 135,
+  remainingAmount: 135,
+  orders: [
+    {
+      uid: 'CmuyOUYR_U-hv-IRs-eF3g',
+      name: 'CAFE AMERICANO',
+      quantity: 1,
+      price: 45,
+      portion: 'Normal'
+    },
+    {
+      uid: 'JTQMQWwDf06Dg622iH_rFw',
+      name: 'CAFE AMERICANO',
+      quantity: 1,
+      price: 45,
+      portion: 'Normal'
+    },
+    {
+      uid: 'DzP5Jjh7tEy2gnhW2Qs6iQ',
+      name: 'CAFE AMERICANO',
+      quantity: 1,
+      price: 45,
+      portion: 'Normal'
+    }
+  ]
+}
+
+== closeTerminalTicket ==
+
+
+✅ Smoke OK
+PS C:\PMPOS\pmpos> npm run smoke:mesa1:void
+
+> react-boilerplate@2.5.6 smoke:mesa1:void
+> node scripts/smoke-mesa1-void-order.js --base http://localhost:9000 --user graphiql --pass graphiql --client graphiql --terminal SERVIDOR --department MESAS --ticketType COMEDOR --table 1 --entityType Mesas --close true
+
+
+== Config ==
+ {
+  BASE: 'http://localhost:9000',
+  GQL: 'http://localhost:9000/api/graphql',
+  USER: 'graphiql',
+  TERMINAL: 'SERVIDOR',
+  TABLE: '1',
+  TARGET_NAME: '',
+  DO_CLOSE: true
+}
+
+== Token OK ==
+ AQAAANCMnd8B...
+
+== registerTerminal -> terminalId ==
+ w22j_eb_-USWWNPlgQLnNg
+
+== loadTerminalTicket ==
+ {
+  id: 27418,
+  number: '27440',
+  totalAmount: 135,
+  remainingAmount: 135,
+  orders: [
+    {
+      uid: 'CmuyOUYR_U-hv-IRs-eF3g',
+      name: 'CAFE AMERICANO',
+      quantity: 1,
+      price: 45,
+      portion: 'Normal'
+    },
+    {
+      uid: 'JTQMQWwDf06Dg622iH_rFw',
+      name: 'CAFE AMERICANO',
+      quantity: 1,
+      price: 45,
+      portion: 'Normal'
+    },
+    {
+      uid: 'DzP5Jjh7tEy2gnhW2Qs6iQ',
+      name: 'CAFE AMERICANO',
+      quantity: 1,
+      price: 45,
+      portion: 'Normal'
+    }
+  ]
+}
+
+== Order to void ==
+ {
+  uid: 'DzP5Jjh7tEy2gnhW2Qs6iQ',
+  name: 'CAFE AMERICANO',
+  quantity: 1,
+  price: 45,
+  portion: 'Normal'
+}
+
+== cancelOrderOnTerminalTicket error ==
+ Error trying to resolve cancelOrderOnTerminalTicket.
+
+== executeAutomationCommand(Anular) ==
+ { id: 27418 }
+
+== getTerminalTicket (after void) ==
+ {
+  id: 27418,
+  number: '27440',
+  totalAmount: 90,
+  remainingAmount: 90,
+  orders: [
+    {
+      uid: 'CmuyOUYR_U-hv-IRs-eF3g',
+      name: 'CAFE AMERICANO',
+      quantity: 1,
+      price: 45,
+      portion: 'Normal'
+    },
+    {
+      uid: 'JTQMQWwDf06Dg622iH_rFw',
+      name: 'CAFE AMERICANO',
+      quantity: 1,
+      price: 45,
+      portion: 'Normal'
+    },
+    {
+      uid: 'DzP5Jjh7tEy2gnhW2Qs6iQ',
+      name: 'CAFE AMERICANO',
+      quantity: 1,
+      price: 45,
+      portion: 'Normal'
+    }
+  ]
+}
+
+== closeTerminalTicket ==
+
+
+✅ Smoke OK
+PS C:\PMPOS\pmpos> npm run smoke:mesa1:gift
+
+> react-boilerplate@2.5.6 smoke:mesa1:gift
+> node scripts/smoke-mesa1-gift-order.js --base http://localhost:9000 --user graphiql --pass graphiql --client graphiql --terminal SERVIDOR --department MESAS --ticketType COMEDOR --table 1 --entityType Mesas --close true
+
+
+== Config ==
+ {
+  BASE: 'http://localhost:9000',
+  GQL: 'http://localhost:9000/api/graphql',
+  USER: 'graphiql',
+  TERMINAL: 'SERVIDOR',
+  TABLE: '1',
+  TARGET_NAME: '',
+  DO_CLOSE: true
+}
+
+== Token OK ==
+ AQAAANCMnd8B...
+
+== registerTerminal -> terminalId ==
+ BP7Dg_2Kv0yEJF6NtsM0pg
+
+== loadTerminalTicket ==
+ {
+  id: 27418,
+  number: '27440',
+  totalAmount: 90,
+  remainingAmount: 90,
+  orders: [
+    {
+      uid: 'CmuyOUYR_U-hv-IRs-eF3g',
+      name: 'CAFE AMERICANO',
+      quantity: 1,
+      price: 45,
+      portion: 'Normal'
+    },
+    {
+      uid: 'JTQMQWwDf06Dg622iH_rFw',
+      name: 'CAFE AMERICANO',
+      quantity: 1,
+      price: 45,
+      portion: 'Normal'
+    },
+    {
+      uid: 'DzP5Jjh7tEy2gnhW2Qs6iQ',
+      name: 'CAFE AMERICANO',
+      quantity: 1,
+      price: 45,
+      portion: 'Normal'
+    }
+  ]
+}
+
+== Order to gift ==
+ {
+  uid: 'DzP5Jjh7tEy2gnhW2Qs6iQ',
+  name: 'CAFE AMERICANO',
+  quantity: 1,
+  price: 45,
+  portion: 'Normal'
+}
+
+== executeAutomationCommand(Regalo) ==
+ { id: 27418 }
+
+== getTerminalTicket (after gift) ==
+ {
+  id: 27418,
+  number: '27440',
+  totalAmount: 90,
+  remainingAmount: 90,
+  orders: [
+    {
+      uid: 'CmuyOUYR_U-hv-IRs-eF3g',
+      name: 'CAFE AMERICANO',
+      quantity: 1,
+      price: 45,
+      portion: 'Normal'
+    },
+    {
+      uid: 'JTQMQWwDf06Dg622iH_rFw',
+      name: 'CAFE AMERICANO',
+      quantity: 1,
+      price: 45,
+      portion: 'Normal'
+    },
+    {
+      uid: 'DzP5Jjh7tEy2gnhW2Qs6iQ',
+      name: 'CAFE AMERICANO',
+      quantity: 1,
+      price: 45,
+      portion: 'Normal'
+    }
+  ]
+}
+
+== closeTerminalTicket ==
+
+
+✅ Smoke OK
+PS C:\PMPOS\pmpos> npm run smoke:mesa1:pay
+
+> react-boilerplate@2.5.6 smoke:mesa1:pay
+> node scripts/smoke-mesa1-pay-ticket.js --base http://localhost:9000 --user graphiql --pass graphiql --client graphiql --terminal SERVIDOR --department MESAS --ticketType COMEDOR --table 1 --entityType Mesas --payment Efectivo --close true
+
+
+== Config ==
+ {
+  BASE: 'http://localhost:9000',
+  GQL: 'http://localhost:9000/api/graphql',
+  USER: 'graphiql',
+  TERMINAL: 'SERVIDOR',
+  TABLE: '1',
+  PAYMENT_TYPE_INPUT: 'Efectivo',
+  DO_CLOSE: true
+}
+
+== Token OK ==
+ AQAAANCMnd8B...
+
+== registerTerminal -> terminalId ==
+ auPjqrVjzkimYQMVqrxbig
+
+== loadTerminalTicket ==
+ {
+  id: 27418,
+  number: '27440',
+  totalAmount: 135,
+  remainingAmount: 135,
+  orders: [
+    {
+      uid: 'CmuyOUYR_U-hv-IRs-eF3g',
+      name: 'CAFE AMERICANO',
+      quantity: 1,
+      price: 45,
+      portion: 'Normal'
+    },
+    {
+      uid: 'JTQMQWwDf06Dg622iH_rFw',
+      name: 'CAFE AMERICANO',
+      quantity: 1,
+      price: 45,
+      portion: 'Normal'
+    },
+    {
+      uid: 'DzP5Jjh7tEy2gnhW2Qs6iQ',
+      name: 'CAFE AMERICANO',
+      quantity: 1,
+      price: 45,
+      portion: 'Normal'
+    }
+  ]
+}
+
+== Payment type selected ==
+ Efectivo
+
+== payTerminalTicket ==
+ { remainingAmount: 0 }
+
+== getTerminalTicket (after pay) ==
+ { id: 27418, number: '27440', totalAmount: 135, remainingAmount: 0 }
+
+== closeTerminalTicket ==
+
+PS C:\PMPOS\pmpos> npm run smoke:mesa1:new:tags -- --product "POLLO" --portion "Normal" --tagGroup "SABORES SALSAS POLLO" --tagValue "ADOBADO" --close true
+npm warn Expanding --product to --production. This will stop working in the next major version of npm.
+npm warn "Normal" is being parsed as a normal command line argument.
+npm warn "SABORES SALSAS POLLO" is being parsed as a normal command line argument.
+npm warn "ADOBADO" is being parsed as a normal command line argument.
+npm warn config production Use `--omit=dev` instead.
+npm warn Unknown cli config "--portion". This will stop working in the next major version of npm.
+npm warn Unknown cli config "--tagGroup". This will stop working in the next major version of npm.
+npm warn Unknown cli config "--tagValue". This will stop working in the next major version of npm.
+npm warn Unknown cli config "--close". This will stop working in the next major version of npm.
+
+> react-boilerplate@2.5.6 smoke:mesa1:new:tags
+> node scripts/smoke-mesa1-new-with-tags.js --base http://localhost:9000 --user graphiql --pass graphiql --client graphiql --terminal SERVIDOR --department MESAS --ticketType COMEDOR --table 1 --entityType Mesas --qty 1 --close true POLLO Normal SABORES SALSAS POLLO ADOBADO
+
+
+== Config ==
+ {
+  BASE: 'http://localhost:9000',
+  GQL: 'http://localhost:9000/api/graphql',
+  USER: 'graphiql',
+  TERMINAL: 'SERVIDOR',
+  MENU: 'MENU',
+  TABLE: '1',
+  PRODUCT: '',
+  PORTION: 'Normal',
+  TAG_GROUP: '',
+  TAG_VALUE: '',
+  QTY: 1,
+  DO_CLOSE: true,
+  DISCOVER: false
+}
+
+== Token OK ==
+ AQAAANCMnd8B...
+
+== registerTerminal -> terminalId ==
+ 70e20tzJOUeM6DbRdXAjng
+
+== createTerminalTicket ==
+ {
+  id: 0,
+  uid: 'gEzlrNQ8l0amCQA2s-L28Q',
+  number: '',
+  totalAmount: 0,
+  remainingAmount: 0
+}
+
+== changeEntityOfTerminalTicket ==
+ { changeEntityOfTerminalTicket: { id: 0, entities: [ [Object] ] } }
+
+== Aviso ==
+ No se encontró producto con etiquetas disponibles, se intentará con el primero del menú para validar flujo base
+
+== Chosen product & tag (pre) ==
+ {
+  prodName: 'CAFE AMERICANO',
+  portion: 'Normal',
+  chosenGroup: undefined,
+  chosenTag: undefined,
+  menu: 'fallback'
+}
+
+== Ticket after add ==
+ {
+  id: 0,
+  number: '',
+  totalAmount: 45,
+  remainingAmount: 45,
+  orders: [
+    {
+      uid: '6oQBoIB7jEK9AtcpARmKmg',
+      name: 'CAFE AMERICANO',
+      portion: 'Normal',
+      tags: []
+    }
+  ]
+}
+
+== Discovered tags for order ==
+ [
+  {
+    name: 'BEBIDAS',
+    tags: [
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object]
+    ]
+  },
+  { name: 'PARA LLEVAR', tags: [ [Object], [Object] ] }
+]
+
+== Chosen product & tag (post-discovery) ==
+ {
+  prodName: 'CAFE AMERICANO',
+  portion: 'Normal',
+  chosenGroup: 'BEBIDAS',
+  chosenTag: 'CON HIELO'
+}
+
+== Ticket after tagging ==
+ {
+  id: 0,
+  totalAmount: 45,
+  remainingAmount: 45,
+  orders: [ { uid: '6oQBoIB7jEK9AtcpARmKmg', tags: [Array] } ]
+}
+
+== closeTerminalTicket ==
+ null
+
+✅ Smoke OK
+PS C:\PMPOS\pmpos> 

@@ -102,13 +102,76 @@ class DebugCommands {
             console.log('✅ Debug data cleared');
         };
 
-        console.log('🔧 Debug commands available:');
+        // Order debugging commands
+        window.debugOrder = async (productName = 'CAFE AMERICANO') => {
+            console.group('🛒 Order Debug Info');
+            try {
+                const { terminalService } = await import('../services/terminalService');
+                const { orderService } = await import('../services/orderService');
+
+                const terminalId = terminalService.getTerminalId();
+                console.log('Current terminal ID:', terminalId);
+
+                if (terminalId) {
+                    console.log('Testing addOrderToTerminalTicket...');
+                    await orderService.debugAddOrder(terminalId, productName);
+                } else {
+                    console.error('❌ No terminal ID available');
+                }
+            } catch (error) {
+                console.error('❌ Order debug failed:', error);
+            }
+            console.groupEnd();
+        };
+
+        window.testAddOrder = async (terminalId, productName = 'CAFE AMERICANO', quantity = 1, portion = 'Normal') => {
+            console.group('🧪 Test Add Order');
+            try {
+                const { orderService } = await import('../services/orderService');
+                console.log('Testing with:', { terminalId, productName, quantity, portion });
+
+                const result = await orderService.debugAddOrder(terminalId, productName, quantity, portion);
+                console.log('✅ Test result:', result);
+                return result;
+            } catch (error) {
+                console.error('❌ Test failed:', error);
+                throw error;
+            }
+            console.groupEnd();
+        };
+
+        window.diagnoseOrder = async (productName = 'CAFE AMERICANO', productId = 910) => {
+            console.group('🔬 Diagnose Order Problem');
+            try {
+                const { terminalService } = await import('../services/terminalService');
+                const { orderService } = await import('../services/orderService');
+
+                const terminalId = terminalService.getTerminalId();
+                console.log('Using terminal ID:', terminalId);
+
+                if (terminalId) {
+                    const result = await orderService.diagnoseAddOrderProblem(terminalId, productName, productId);
+                    console.log('✅ Diagnosis completed:', result);
+                    return result;
+                } else {
+                    console.error('❌ No terminal ID available');
+                    throw new Error('No terminal ID available');
+                }
+            } catch (error) {
+                console.error('❌ Diagnosis failed:', error);
+                throw error;
+            }
+            console.groupEnd();
+        }; console.log('🔧 Debug commands available:');
         console.log('  - window.debugTerminal() - Show terminal and token status');
         console.log('  - window.fixTerminal() - Clear tokens to force refresh');
         console.log('  - window.testTerminal() - Show basic terminal info');
         console.log('  - window.checkConnection() - Test SambaPOS connectivity');
         console.log('  - window.debugTokens() - Show token details');
         console.log('  - window.clearDebugData() - Clear all tokens and cache');
+        console.log('  - window.debugOrder(productName) - Debug order addition');
+        console.log('  - window.testAddOrder(terminalId, productName, quantity, portion) - Test add order');
+        console.log('  - window.diagnoseOrder(productName, productId) - Complete order diagnosis');
     }
 }
 

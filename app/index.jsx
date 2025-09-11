@@ -19,6 +19,7 @@ import './utils/logExporter';
 // Initialize debug commands in development
 if (process.env.NODE_ENV !== 'production') {
     import('./utils/debugCommands');
+    import('./utils/requestMonitoring');
 }
 
 // Lazy load components

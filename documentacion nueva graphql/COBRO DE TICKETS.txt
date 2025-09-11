@@ -1,0 +1,331 @@
+# Flujo Completo: **Cobro de Tickets** (SambaPOS GraphQL)
+
+> Objetivo: cobrar tickets abiertos (con saldo) usando la Terminal API, soportando pagos completos, parciales, mixtos y verificación antes del cierre.
+>
+> Convenciones:
+>
+> * Usa `terminalId` (hash de `registerTerminal`) para todas las mutaciones **Terminal...**.
+> * Si vas a consultar **grupos de tags** por producto usa **nombre** del terminal, pero para cobrar **no es necesario**.
+> * `ticketId` (cuando se use) va como **String**.
+
+---
+
+## 0) Autenticación
+
+Agrega el header en tu cliente GraphQL:
+
+```json
+{ "Authorization": "Bearer <ACCESS_TOKEN>" }
+```
+
+---
+
+## 1) Identificar el ticket a cobrar
+
+### 1.1 Global (todos los usuarios)
+
+```graphql
+query {
+  getTickets(isClosed: false, orderBy: date) {
+    id
+    number
+    totalAmount
+    remainingAmount
+    entities { type name }
+    states { stateName state }
+  }
+}
+```
+
+### 1.2 En tu sesión de terminal
+
+```graphql
+query {
+  getTerminalTicket(terminalId: "<TERMINAL_ID>") {
+    id number totalAmount remainingAmount
+    payments { name amount }
+  }
+}
+```
+
+---
+
+## 2) Registrar terminal (si no tienes una activa)
+
+```graphql
+mutation {
+  registerTerminal(
+    ticketType: "COMEDOR"
+    terminal: "SERVIDOR"
+    department: "MESAS"
+    user: "CAJERO"
+  )
+}
+```
+
+> Guarda el `terminalId` devuelto.
+
+---
+
+## 3) Crear o **cargar** el ticket a cobrar
+
+### 3.1 Crear (si no existe)
+
+```graphql
+mutation {
+  createTerminalTicket(terminalId: "<TERMINAL_ID>") { uid totalAmount }
+}
+```
+
+### 3.2 Cargar por `ticketId` (si ya existe)
+
+> `ticketId` como **String**
+
+```graphql
+mutation {
+  loadTerminalTicket(terminalId: "<TERMINAL_ID>", ticketId: "<TICKET_ID>") {
+    id number totalAmount
+  }
+}
+```
+
+---
+
+## 4) (Opcional) Ver tipos de pago disponibles
+
+> Según tu configuración: nombres como **Efectivo**, **Tarjeta**, **Transferencia**, **Vales**, **Cuenta Cliente**, etc.
+
+```graphql
+query {
+  getPaymentTypes { name }
+}
+```
+Este no sirve se debe implementar en helper api 
+Cómo confirmar y arreglar
+1) Identifica los IDs reales de tu contexto
+-- ¿Cuál es el DepartmentId de "MESAS"?
+SELECT Id, Name FROM Departments;        -- busca "MESAS"
+
+-- ¿Cuál es el TicketTypeId de "COMEDOR"?
+SELECT Id, Name FROM TicketTypes;        -- busca "COMEDOR"
+
+-- ¿Cuál es el TerminalId de "SERVIDOR"?
+SELECT Id, Name FROM Terminals;          -- busca "SERVIDOR"
+
+-- ¿Cuál es el UserRoleId del rol operativo?
+SELECT Id, Name FROM UserRoles;          -- ya viste: ADMIN=1, MESERO=2, CAJERO=3
+
+(ajusta nombres si difieren en tu setup)
+DECLARE @UserRoleId     INT = 3;  -- CAJERO (o 1 si estás probando ADMIN)
+DECLARE @DepartmentId   INT =  ?; -- Id de "MESAS"
+DECLARE @TerminalId     INT =  ?; -- Id de "SERVIDOR"
+DECLARE @TicketTypeId   INT =  ?; -- Id de "COMEDOR"
+
+SELECT DISTINCT pt.Id, pt.Name
+FROM PaymentTypes pt
+JOIN PaymentTypeMaps m ON m.PaymentTypeId = pt.Id
+WHERE (m.UserRoleId   IN (@UserRoleId, 0))
+  AND (m.DepartmentId IN (@DepartmentId, 0))
+  AND (m.TerminalId   IN (@TerminalId, 0))
+  AND (m.TicketTypeId IN (@TicketTypeId, 0))
+ORDER BY pt.Name;
+
+---
+
+## 5) Cobro **simple** (pago total en una sola forma)
+
+> Usa el **remainingAmount** actual o el monto deseado.
+
+```graphql
+mutation {
+  executePayment(
+    terminalId: "<TERMINAL_ID>"
+    paymentTypeName: "Efectivo"
+    amount: 123.45
+    # exchangeRate: 1            # (opcional si manejas monedas)
+  )
+}
+```
+
+Verifica:
+
+```graphql
+query {
+  getTerminalTicket(terminalId: "<TERMINAL_ID>") {
+    totalAmount remainingAmount
+    payments { name amount }
+  }
+}
+```
+
+---
+
+## 6) Cobro **parcial** / **mixto** (varias formas de pago)
+
+> Divide el saldo en 2 o más `executePayment`.
+
+```graphql
+mutation { executePayment(terminalId: "<TERMINAL_ID>", paymentTypeName: "Efectivo", amount: 100) }
+mutation { executePayment(terminalId: "<TERMINAL_ID>", paymentTypeName: "Tarjeta",  amount: 55.50) }
+```
+
+Verifica `remainingAmount` hasta que sea 0.
+
+---
+
+## 7) Cobro **por cuenta** (cargo a crédito / cuenta nombrada)
+
+> Cuando el método de pago exige una **cuenta asociada**.
+
+```graphql
+mutation {
+  executePaymentWithAccountName(
+    terminalId: "<TERMINAL_ID>"
+    paymentTypeName: "Cuenta Cliente"
+    accountName: "Juan Perez"
+    amount: 200
+  )
+}
+```
+
+---
+
+## 8) (Opcional) Cobro exacto por monto calculado por el POS
+
+> Útil si delegas el cálculo (redondeos, reglas de servicio, etc.).
+
+```graphql
+mutation {
+  executePaymentByAmount(
+    terminalId: "<TERMINAL_ID>"
+    paymentTypeName: "Efectivo"
+    amount:  "REMAINING"   # reemplaza por el remainingAmount que leíste
+  )
+}
+```
+
+---
+
+## 9) (Opcional) Propina / cargos (si tu setup lo maneja por cálculos)
+
+> Si tienes configuradas **Calculations** (p. ej., Propina), aplícalas antes de pagar. (Los nombres varían por sistema.)
+
+```graphql
+mutation {
+  executeAutomationCommandForTerminalTicket(
+    terminalId: "<TERMINAL_ID>"
+    name: "Agregar Propina"
+    value: "10"   # por ejemplo, 10 = $10 o 10%
+  ) { id }
+}
+```
+
+Verifica el cambio en `calculations` y en `remainingAmount`.
+
+---
+
+## 10) Cerrar el ticket
+
+> Debe estar **en 0** el `remainingAmount` (a menos que tu flujo permita cerrar con saldo).
+
+```graphql
+mutation { closeTerminalTicket(terminalId: "<TERMINAL_ID>") }
+```
+
+---
+
+## 11) (Opcional) Cancelar pagos
+
+> Si necesitas revertir el cobro antes del cierre o para reabrir un ticket.
+
+```graphql
+mutation {
+  executeAutomationCommandForTerminalTicket(
+    terminalId: "<TERMINAL_ID>"
+    name: "Cancel Payments"   # o "Cancelar Pagos" / "Remove Payments"
+    value: ""
+  ) { id }
+}
+```
+
+---
+
+## 12) Verificación final (resumen de cobro)
+
+```graphql
+query {
+  getTerminalTicket(terminalId: "<TERMINAL_ID>") {
+    id number
+    totalAmount remainingAmount
+    payments { name amount }
+    calculations { name calculationAmount }
+    states { stateName state }
+  }
+}
+```
+
+---
+
+## 13) (Opcional) Desregistrar terminal
+
+```graphql
+mutation { unregisterTerminal(terminalId: "<TERMINAL_ID>") }
+```
+
+---
+
+## Troubleshooting
+
+* **No baja el `remainingAmount`**: confirma `paymentTypeName` válido y que la cuenta/terminal coinciden con el departamento/ticket.
+* **Error al pagar**: revisa límites del tipo de pago (redondeos, moneda, permisos) o usa `executePaymentWithAccountName` si requiere cuenta.
+* **No cierra**: valida que `remainingAmount == 0` y que no existan reglas que bloqueen el cierre (por estados/impresiones pendientes).
+* **Reaplicar pagos**: usa *Cancelar Pagos* (Automation Command) y vuelve a ejecutar los pagos correctos.
+
+---
+
+## (Corrección) Paso 4: Obtener **tipos de pago** según *userRoleId*
+
+> En tu esquema `getPaymentTypes(userRoleId: Int): [PaymentTypes]` **requiere** el `userRoleId`. Si consultas con un rol que no tiene mapeados ciertos métodos, solo verás los permitidos para ese rol.
+
+### 4.1 Detectar roles
+
+```graphql
+query { getUserRoles { id name } }
+```
+
+### 4.2 Consultar métodos con el **rol operativo** (recomendado: CAJERO)
+
+```graphql
+query {
+  getPaymentTypes(userRoleId: 3) {   # 3 = CAJERO en tu sistema
+    id
+    name
+    buttonHeader
+    buttonColor
+  }
+}
+```
+
+> Si usas `userRoleId: 1 (ADMIN)` y en los *Mappings* ese rol solo tiene "TRANSFER", verás únicamente ese método.
+
+### 4.3 Diagnóstico rápido
+
+* Si la lista sigue incompleta, revisa los **Mappings** de cada Payment Type en SambaPOS:
+
+  * **User Role**: incluye el rol que usas (p. ej., *CAJERO*) o `*`.
+  * **Department** / **Ticket Type** / **Terminal**: que apliquen a tu contexto (MESAS / COMEDOR / SERVIDOR o `*`).
+* Asegúrate de tener un **ticket activo** cargado en el `terminalId` antes de pagar.
+
+### 4.4 Alternativa (si ya conoces los nombres)
+
+Puedes omitir la consulta y pagar directo con `payTerminalTicket`:
+
+```graphql
+mutation {
+  payTerminalTicket(
+    terminalId: "<TERMINAL_ID>"
+    paymentTypeName: "Efectivo"
+    amount: 123.45
+  ) { ticketId amount remainingAmount errorMessage }
+}
+```

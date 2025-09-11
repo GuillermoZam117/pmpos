@@ -29,6 +29,16 @@
             "date": 1757355450378,
             "name": "C:\\PMPOS\\pmpos\\server\\logs\\error-2025-09-08.log",
             "hash": "22aeedf587d57955e84f7f84ecab12d19b1698714e39de776939788c1060aa01"
+        },
+        {
+            "date": 1757461680951,
+            "name": "C:\\PMPOS\\pmpos\\server\\logs\\error-2025-09-09.log",
+            "hash": "299a7b78e5b10eaec2ca733b153bccc279d7fe5376bbd4ab52ef16e391dfba63"
+        },
+        {
+            "date": 1757522142275,
+            "name": "C:\\PMPOS\\pmpos\\server\\logs\\error-2025-09-10.log",
+            "hash": "c7cf85de2bbbdf0e9c53e476618b7a2b4dc346f463d5800e533378620a9afe13"
         }
     ],
     "hashType": "sha256"

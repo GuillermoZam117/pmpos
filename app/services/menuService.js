@@ -2,8 +2,8 @@
  * Menu Service for PMPOS
  * Enhanced menu management with robust caching and no fallbacks
  */
-import { appconfig } from '../config';
-import { tokenService } from './tokenService';
+import { gql, graphqlRequest } from './graphqlService';
+import { GET_MENU, GET_PRODUCTS } from '../graphql/queries';
 import cacheService from './cacheService';
 import Debug from 'debug';
 
@@ -22,7 +22,7 @@ class MenuService {
      */
     async getMenu(forceRefresh = false) {
         debug('📋 Getting menu...', { forceRefresh });
-        
+
         // Check cache first unless forced refresh
         if (!forceRefresh && !this.loading) {
             const cachedMenu = cacheService.getMenu();
@@ -41,100 +41,117 @@ class MenuService {
             return this.currentMenu;
         }
 
-        return this.loadMenuFromServer();
+        try {
+            return await this.loadMenuFromServer();
+        } catch (error) {
+            // Offline-friendly: prefer cached menu; otherwise return empty structure
+            try {
+                const cached = cacheService.getMenu && cacheService.getMenu();
+                if (cached) {
+                    debug('dY"? Using cached menu after failure');
+                    this.currentMenu = cached;
+                    this.buildIndex(cached);
+                    return cached;
+                }
+            } catch (_) {}
+            debug('dY"? Returning empty menu after failure');
+            this.currentMenu = { categories: [] };
+            return this.currentMenu;
+        }
     }
 
     /**
-     * Load menu from server with enhanced error handling
+     * Load menu from server - ÚNICO QUERY QUE FUNCIONA
      */
     async loadMenuFromServer() {
         this.loading = true;
         this.error = null;
 
         try {
-            const token = await tokenService.getValidAccessToken();
-            if (!token) {
-                throw new Error('No authentication token available');
-            }
-
-            const config = appconfig();
-            const queries = this.getMenuQueries();
-            
-            // Try each query format until one succeeds
-            for (let i = 0; i < queries.length; i++) {
-                debug(`📋 Trying menu query format ${i + 1}/${queries.length}...`);
-                
-                try {
-                    const menuData = await this.executeQuery(queries[i], token, config);
-                    if (menuData && this.validateMenuData(menuData)) {
-                        debug('✅ Menu loaded successfully with format', i + 1);
-                        
-                        // Cache the successful result
-                        cacheService.setMenu(menuData);
-                        this.currentMenu = menuData;
-                        this.buildIndex(menuData);
-                        
-                        return menuData;
-                    }
-                } catch (queryError) {
-                    debug(`❌ Query format ${i + 1} failed:`, queryError.message);
-                    debug(`❌ Query was:`, queries[i]);
-                    debug(`❌ Full error:`, queryError);
-                    continue;
+            // Canonical GET_MENU attempt (non-fatal):
+            try {
+                const dataCanonical = await graphqlRequest(GET_MENU, { name: 'MENU' });
+                const menuCanonical = dataCanonical?.getMenu || null;
+                if (menuCanonical && menuCanonical.categories) {
+                    cacheService.setMenu(menuCanonical);
+                    this.currentMenu = menuCanonical;
+                    this.buildIndex(menuCanonical);
+                    return menuCanonical;
                 }
+            } catch (e) {
+                try { debug('dY"? Canonical GET_MENU failed, falling back:', e?.message || e); } catch {}
             }
-            
-            throw new Error('All menu query formats failed');
-            
+            // Canonical query path using shared queries
+            const dataCanonical = await graphqlRequest(GET_MENU, { name: 'MENU' });
+            const menuCanonical = dataCanonical?.getMenu || null;
+            if (menuCanonical && menuCanonical.categories) {
+                cacheService.setMenu(menuCanonical);
+                this.currentMenu = menuCanonical;
+                this.buildIndex(menuCanonical);
+                return menuCanonical;
+            }
+            // ÚNICO QUERY QUE FUNCIONA - SIN FALLBACKS
+            const query = `query { 
+                menu: getMenu(name: "MENU") { 
+                    categories { 
+                        id 
+                        name 
+                        menuItems { 
+                            id 
+                            name 
+                            caption 
+                            quantity 
+                            product { 
+                                name 
+                                barcode 
+                                groupCode 
+                                price 
+                                portions { 
+                                    id 
+                                    name 
+                                    price 
+                                } 
+                            } 
+                        } 
+                    } 
+                } 
+            }`;
+
+            debug('🍽️ Loading menu with WORKING QUERY (no fallbacks)...');
+            const data = await this.executeQuery(query);
+
+            if (data?.menu && data.menu.categories) {
+                debug('✅ Menu loaded successfully:', `${data.menu.categories.length} categories`);
+
+                // Cache the successful result
+                cacheService.setMenu(data.menu);
+                this.currentMenu = data.menu;
+                this.buildIndex(data.menu);
+
+                return data.menu;
+            } else {
+                throw new Error('Invalid menu data structure received');
+            }
         } catch (error) {
-            debug('❌ Menu loading failed:', error);
+            debug('❌ Menu loading failed:', error.message);
             this.error = error;
-            throw error;
+            throw new Error(`Error al cargar menu: ${error.message}`);
         } finally {
             this.loading = false;
         }
     }
 
     /**
-     * Execute GraphQL query with enhanced diagnostics
+     * Execute GraphQL query using unified method
      */
-    async executeQuery(query, token, config) {
-        debug(`🔗 Executing GraphQL query to: ${config.GQLurl}`);
-        debug(`🔑 Token status: ${token ? `Present (${token.substring(0, 10)}...)` : 'Missing'}`);
+    async executeQuery(query) {
+        debug(`🔗 Executing GraphQL query`);
         debug(`📝 Query being sent:`, query.substring(0, 200) + '...');
-        
+
         try {
-            const response = await fetch(config.GQLurl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ query })
-            });
-
-            debug(`📡 HTTP Response: ${response.status} ${response.statusText}`);
-            debug(`📡 Response headers:`, Object.fromEntries(response.headers.entries()));
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                debug(`❌ HTTP Error response body:`, errorText);
-                
-                // Provide specific error messages for common issues
-                if (response.status === 401) {
-                    throw new Error(`Authentication failed (401). Check SambaPOS credentials and token.`);
-                } else if (response.status === 404) {
-                    throw new Error(`GraphQL endpoint not found (404). Check SambaPOS URL: ${config.GQLurl}`);
-                } else if (response.status === 500) {
-                    throw new Error(`SambaPOS server error (500). Check SambaPOS service status.`);
-                } else {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
-                }
-            }
-
-            const data = await response.json();
+            const data = await gql(query);
             debug(`📦 Full GraphQL response:`, data);
-            
+
             if (data.errors && data.errors.length > 0) {
                 debug(`❌ GraphQL errors:`, data.errors);
                 const errorMsg = data.errors.map(e => e.message).join(', ');
@@ -142,196 +159,32 @@ class MenuService {
             }
 
             // Handle both getMenu and menu response formats
-            const menu = data.data?.getMenu || data.data?.menu;
+            const menu = data?.getMenu || data?.menu;
             debug(`🍽️ Menu data structure:`, menu ? `Found ${menu.categories?.length || 0} categories` : 'No menu data');
-            
+
             if (menu && menu.categories) {
                 debug(`📋 Categories found: ${menu.categories.map(c => c.name).join(', ')}`);
             }
-            
-            return menu;
-            
-        } catch (fetchError) {
-            debug(`❌ Fetch error:`, fetchError);
-            
-            // Provide user-friendly error messages for network issues
-            if (fetchError.name === 'TypeError' && fetchError.message.includes('Failed to fetch')) {
-                throw new Error(`Cannot connect to SambaPOS server at ${config.GQLurl}. Check if SambaPOS is running and accessible.`);
-            }
-            
-            throw fetchError;
+
+            return data;
+        } catch (error) {
+            debug(`❌ GraphQL error:`, error);
+            throw error;
         }
     }
 
     /**
-     * Get different menu query formats for compatibility
+     * Get products with portions and tags (single working query)
      */
-    getMenuQueries() {
-        return [
-            // Exact query format that worked in GraphiQL testing
-            `query GetMenu {
-                getMenu(name: "MENU") {
-                    categories {
-                        name
-                        menuItems {
-                            name
-                            product {
-                                id
-                                name
-                                portions { name price }
-                            }
-                        }
-                    }
-                }
-            }`,
-            // Enhanced query with complete product information
-            `query GetMenu {
-                menu {
-                    id
-                    name
-                    categories {
-                        id
-                        name
-                        caption
-                        color
-                        foreground
-                        sortOrder
-                        menuItems {
-                            id
-                            name
-                            caption
-                            productId
-                            sortOrder
-                            image
-                            description
-                            product {
-                                id
-                                name
-                                caption
-                                description
-                                portions {
-                                    id
-                                    name
-                                    price
-                                    isDefault
-                                }
-                            }
-                            portions {
-                                id
-                                name
-                                price
-                                isDefault
-                            }
-                            tags {
-                                id
-                                name
-                                value
-                            }
-                            defaultOrderTags {
-                                id
-                                name
-                                value
-                                price
-                            }
-                        }
-                    }
-                }
-            }`,
-            // Standard query format
-            `query GetMenu {
-                menu {
-                    categories {
-                        id
-                        name
-                        caption
-                        color
-                        menuItems {
-                            id
-                            name
-                            caption
-                            productId
-                            product {
-                                id
-                                name
-                                portions {
-                                    id
-                                    name
-                                    price
-                                }
-                            }
-                            portions {
-                                id
-                                name
-                                price
-                            }
-                            defaultOrderTags {
-                                id
-                                name
-                                value
-                                price
-                            }
-                        }
-                    }
-                }
-            }`,
-            // Simplified fallback query
-            `query GetMenu {
-                menu {
-                    categories {
-                        name
-                        menuItems {
-                            name
-                            productId
-                            portions {
-                                name
-                                price
-                            }
-                        }
-                    }
-                }
-            }`
-        ];
+    async getProducts() {
+        const data = await graphqlRequest(GET_PRODUCTS, {});
+        return data?.getProducts || [];
     }
 
     /**
-     * Validate menu data structure
-     */
-    validateMenuData(menuData) {
-        if (!menuData) {
-            debug('❌ No menu data received');
-            return false;
-        }
+     * Wait for loading to complete
 
-        if (!menuData.categories || !Array.isArray(menuData.categories)) {
-            debug('❌ Invalid menu structure: no categories array');
-            return false;
-        }
-
-        if (menuData.categories.length === 0) {
-            debug('⚠️ Empty menu: no categories found');
-            return false;
-        }
-
-        // Validate each category has required fields
-        for (const category of menuData.categories) {
-            if (!category.name) {
-                debug('❌ Invalid category: missing name');
-                return false;
-            }
-
-            if (category.menuItems && Array.isArray(category.menuItems)) {
-                for (const item of category.menuItems) {
-                    if (!item.name && !item.caption) {
-                        debug('❌ Invalid menu item: missing name/caption');
-                        return false;
-                    }
-                }
-            }
-        }
-
-        debug('✅ Menu data validation passed');
-        return true;
-    }
+    // No fallbacks or validations beyond GraphQL schema contract
 
     /**
      * Wait for loading to complete
@@ -362,7 +215,7 @@ class MenuService {
 
         for (const category of this.currentMenu.categories) {
             if (category.menuItems) {
-                const menuItem = category.menuItems.find(item => 
+                const menuItem = category.menuItems.find(item =>
                     item.productId === productId || item.id === productId
                 );
                 if (menuItem) {

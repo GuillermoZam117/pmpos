@@ -16,15 +16,15 @@
 - `npm run clean`, `npm run analyze`, `npm run stats`: Clean and bundle analysis.
 
 ## Coding Style & Naming Conventions
-- Indentation: 2 spaces; aim ~100 chars/line; single quotes (ESLint enforced). `console.*` allowed for diagnostics.
+- Indentation: 2 spaces; ~100 chars/line; single quotes (ESLint enforced). `console.*` allowed for diagnostics.
 - Components: PascalCase files under `app/components/`.
-- Modules/functions: camelCase; constants: UPPER_SNAKE_CASE (`ActionTypes.js`).
+- Modules/functions: camelCase; constants: UPPER_SNAKE_CASE (e.g., `ActionTypes.js`).
 - Keep side effects in `services/`; reducers/actions manage state.
 
 ## Testing Guidelines
 - Frameworks: Karma + Mocha (webpack preprocessor; PhantomJS headless).
 - Location: `tests/`; naming: `*_test.js`.
-- Coverage: HTML in `coverage/`. Prefer tests for reducers, services, and critical UI flows.
+- Coverage: HTML in `coverage/`. Prioritize reducers, services, and critical UI flows.
 - Commands: `npm test` (CI) and `npm run test:tdd` (dev).
 
 ## Commit & Pull Request Guidelines
@@ -37,9 +37,10 @@
 - State: Redux store (`app/store.js`), reducers in `app/reducers/`, actions in `app/actions/`.
 - Data: GraphQL via `@apollo/client` and `graphql-request` (`app/apollo.js`, `app/utils/graphqlClient.js`, `app/queries.js`).
 - Realtime: SignalR (`app/signalr.js`); domain calls in `app/services/*`.
-- Auth & errors: JWT in `app/services/tokenService.js`; guards in `app/components/PrivateRoute.jsx`; error boundary/utilities provided.
+- Auth & errors: JWT in `app/services/tokenService.js`; guards in `app/components/PrivateRoute.jsx`.
 
 ## Security & Configuration Tips
 - Do not commit secrets. Use `.env.*` with webpack/dotenv injection.
 - Endpoints: `app/config.js`, `app/utils/sambapos-config.js`. Dynamic host via `?api=...` or `?port=...` (stored in `localStorage`). Fixed envs via `SAMBAPOS_API_URL` or `SAMBAPOS_API_PORT`.
 - Credentials: set `SAMBAPOS_USERNAME`, `SAMBAPOS_PASSWORD`, `SAMBAPOS_CLIENT_ID`. SambaPOS API requires Message Server port with `+` and token at `/Token`.
+
