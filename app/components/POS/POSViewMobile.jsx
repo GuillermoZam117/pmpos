@@ -789,7 +789,15 @@ const POSViewMobile = () => {
         console.log('🖱️ [PRODUCTO CLICKEADO] Usuario hizo click en producto:', {
             name: product.name,
             caption: product.caption,
-            id: product.id
+            id: product.id,
+            productId: product.productId,
+            portions: product.portions,
+            // CRÍTICO: Debug de etiquetas disponibles
+            orderTags: product.orderTags,
+            defaultOrderTags: product.defaultOrderTags,
+            hasOrderTags: !!(product.orderTags && product.orderTags.length > 0),
+            hasDefaultOrderTags: !!(product.defaultOrderTags && product.defaultOrderTags.length > 0),
+            fullProduct: product
         });
 
         if (ticketBlocked && !isAdmin) {
@@ -2081,6 +2089,22 @@ const POSViewMobile = () => {
         const productsAll = selectedCategory === 'Todos'
             ? categories.flatMap(c => c.menuItems || [])
             : (categories.find(c => c.name === selectedCategory)?.menuItems || []);
+
+        // DEBUGGING: Log products and their structure
+        console.log('🔍 [PRODUCT GRID] Products loaded for category:', {
+            selectedCategory: selectedCategory,
+            totalProducts: productsAll.length,
+            sampleProducts: productsAll.slice(0, 3).map(p => ({
+                name: p.name,
+                id: p.id,
+                productId: p.productId,
+                hasOrderTags: !!(p.orderTags && p.orderTags.length > 0),
+                hasDefaultOrderTags: !!(p.defaultOrderTags && p.defaultOrderTags.length > 0),
+                orderTags: p.orderTags,
+                defaultOrderTags: p.defaultOrderTags,
+                fullStructure: p
+            }))
+        });
         // Category color mapping: prefer color coming from SambaPOS category fields
         const paletteColors = ['primary', 'secondary', 'success', 'warning', 'info', 'error'];
         const catColorByName = new Map();
@@ -2152,10 +2176,12 @@ const POSViewMobile = () => {
         );
     };
 
-    // Mobile cart component - Fixed to use full available space
+    // Mobile cart component - CORREGIDO: Altura limitada para zona segura de botones
     const MobileCart = () => (
         <Paper sx={{
+            // CRÍTICO: Altura calculada para dejar espacio garantizado a botones fijos
             height: '100%',
+            maxHeight: 'calc(100vh - 160px)', // LÍMITE SÚPER AGRESIVO: Garantizar botones visibles
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
@@ -2221,13 +2247,14 @@ const POSViewMobile = () => {
                         </Box>
                     </Box>
 
-                    {/* Scrollable orders list - takes full available space, with bottom padding for sticky buttons */}
+                    {/* Scrollable orders list - ALTURA LIMITADA para zona segura de botones */}
                     <Box sx={{
                         flex: 1,
                         overflowY: 'auto',
                         p: 1,
-                        // ZONA SEGURA CRÍTICA: Espacio generoso para que los botones NUNCA tapen contenido
-                        pb: isMobile ? 'calc(160px + env(safe-area-inset-bottom, 0px))' : 'calc(180px + 16px)' // Zona segura amplia
+                        // ZONA SEGURA CRÍTICA: Altura máxima agresiva para garantizar espacio de botones fijos
+                        maxHeight: isMobile ? 'calc(100vh - 180px)' : 'none', // Límite MUCHO más agresivo en mobile
+                        pb: isMobile ? 'calc(10px + env(safe-area-inset-bottom, 0px))' : 'calc(40px + 16px)' // Padding mínimo ya que el contenedor está muy limitado
                     }}>
                         <List sx={{ py: 0 }}>
                             {orders.map((order, index) => (
@@ -2700,7 +2727,16 @@ const POSViewMobile = () => {
                     {isMobile ? (
                         // Mobile: two separate screens (Menu or Carrito), selected via state or Acciones menu
                         activeTab === 1 ? (
-                            <MobileCart />
+                            <Box sx={{
+                                height: '100%',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                // ZONA SEGURA CRÍTICA: Altura máxima súper agresiva para evitar desbordamiento de botones
+                                maxHeight: 'calc(100vh - 140px)', // Header ~60px + Botones ~80px = 140px mínimo
+                                overflow: 'hidden'
+                            }}>
+                                <MobileCart />
+                            </Box>
                         ) : (
                             <Box sx={{ height: '100%', display: 'flex', p: 1 }}>
                                 <Paper sx={{ p: 1, display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>

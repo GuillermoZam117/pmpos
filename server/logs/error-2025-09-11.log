@@ -1,0 +1,2 @@
+2025-09-11 15:09:05.858 [ERROR] 🔴 [dr29t0zu] 500 GET /internal-api/order-tags/907/Normal - 47ms {"requestId":"dr29t0zu","method":"GET","url":"/internal-api/order-tags/907/Normal","status":500,"duration":47,"slow":false}
+2025-09-11 15:12:40.553 [ERROR] 🔴 [c04zueto] 500 GET /internal-api/order-tags/1796/Normal - 28ms {"requestId":"c04zueto","method":"GET","url":"/internal-api/order-tags/1796/Normal","status":500,"duration":28,"slow":false}

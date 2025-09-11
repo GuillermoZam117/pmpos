@@ -176,7 +176,7 @@ app.get('/internal-api/health', async (req, res) => {
  *         description: Server error
  */
 app.post('/internal-api/validate-admin', async (req, res) => {
-    const requestId = req.requestId || Math.random().toString(36).slice(2,10);
+    const requestId = req.requestId || Math.random().toString(36).slice(2, 10);
     try {
         const { pin, name } = req.body || {};
         if (!pin && !name) return res.status(400).json({ ok: false, error: 'pin or name required' });
@@ -252,7 +252,7 @@ app.post('/internal-api/validate-admin', async (req, res) => {
  *         description: Server error
  */
 app.get('/internal-api/users/admins', async (req, res) => {
-    const requestId = req.requestId || Math.random().toString(36).slice(2,10);
+    const requestId = req.requestId || Math.random().toString(36).slice(2, 10);
     try {
         const db = require('./lib/db');
         const sql = `
@@ -317,7 +317,7 @@ app.get('/internal-api/users/admins', async (req, res) => {
  *         description: Server error
  */
 app.get('/internal-api/users', async (req, res) => {
-    const requestId = req.requestId || Math.random().toString(36).slice(2,10);
+    const requestId = req.requestId || Math.random().toString(36).slice(2, 10);
     try {
         const db = require('./lib/db');
         const sql = `
@@ -424,13 +424,13 @@ app.get('/internal-api/active-tickets', async (req, res) => {
         }
 
         debug(`🔍 [${requestId}] Cache miss: querying database for active tickets`);
-        
+
         // Create the promise and store it to deduplicate concurrent requests
         activeTicketsPromise = (async () => {
             try {
                 const db = require('./lib/db');
-        // Include UID and status fields (TicketUid, TicketStates) and mesa id for client mapping
-        const rows = await db.query(`
+                // Include UID and status fields (TicketUid, TicketStates) and mesa id for client mapping
+                const rows = await db.query(`
             SELECT 
                 TicketId, TicketUid, TicketNumber, 
                 OpenedAt, ClosedAt, IsClosed, LastUpdateTime,
@@ -480,7 +480,7 @@ app.get('/internal-api/active-tickets', async (req, res) => {
         // Wait for the result and return it
         const result = await activeTicketsPromise;
         res.json(result);
-        
+
     } catch (err) {
         debug(`❌ [${requestId}] Error active-tickets: ${err.message}`);
         // Clear the promise on error
@@ -783,7 +783,7 @@ app.get('/internal-api/tickets/:id/details', async (req, res) => {
             FROM dbo.VistaTicketsEnriquecida 
             WHERE TicketId = @id
         `, { id: ticketId });
-        
+
         // Orders from VistaDetalleOrdenes (safe column selection)
         const orders = await db.query(`
             SELECT
@@ -807,7 +807,7 @@ app.get('/internal-api/tickets/:id/details', async (req, res) => {
             WHERE o.TicketId = @id
             ORDER BY o.CreatedDateTime ASC
         `, { id: ticketId });
-        
+
         // Get payments for this ticket (for detailed payment info)
         const payments = await db.query(`
             SELECT 
@@ -832,9 +832,9 @@ app.get('/internal-api/tickets/:id/details', async (req, res) => {
         };
 
         debug(`✅ [${requestId}] Ticket ${ticketId} details: ${summary.totalOrders} orders, ${payments.length} payments`);
-        
-        res.json({ 
-            header: header[0] || null, 
+
+        res.json({
+            header: header[0] || null,
             orders,
             payments,
             summary
@@ -914,7 +914,7 @@ app.get('/internal-api/tables', async (req, res) => {
     try {
         const screen = req.query.screen ? String(req.query.screen) : null;
         const cacheKey = `tables:${screen || 'all'}`;
-        
+
         // Check cache first
         const cached = cache.get(cacheKey);
         if (cached) {
@@ -930,7 +930,7 @@ app.get('/internal-api/tables', async (req, res) => {
         }
 
         debug(`🔍 [${requestId}] Tables cache miss: querying for ${cacheKey}`);
-        
+
         // Create the promise and store it to deduplicate concurrent requests
         const tablesPromise = (async () => {
             try {
@@ -1031,7 +1031,7 @@ app.get('/internal-api/tables', async (req, res) => {
                             e.Name
                     `);
                 }
-        
+
                 debug(`✅ [${requestId}] Tables query complete: found ${rows?.length || 0} tables for ${cacheKey}`);
                 cache.set(cacheKey, rows, parseInt(process.env.CACHE_TTL_MS || '5000', 10));
                 return rows;
@@ -1050,7 +1050,7 @@ app.get('/internal-api/tables', async (req, res) => {
         // Wait for the result and return it
         const result = await tablesPromise;
         res.json(result);
-        
+
     } catch (err) {
         debug(`❌ [${requestId}] Error tables: ${err.message}`);
         // Clear the promise on error
@@ -1198,7 +1198,7 @@ app.get('/internal-api/automation-commands', async (req, res) => {
 
         let whereClause = '1=1';
         const params = {};
-        
+
         if (nameFilter) {
             whereClause += ' AND ac.Name = @name';
             params.name = nameFilter;
@@ -1296,8 +1296,8 @@ app.get('/internal-api/automation-reasons', async (req, res) => {
                         buttonHeader: cmd.ButtonHeader,
                         color: cmd.Color,
                         reason: reason.trim(),
-                        actionType: cmd.Name.toLowerCase().includes('anular') || cmd.Name.toLowerCase().includes('void') ? 'void' : 
-                                   cmd.Name.toLowerCase().includes('regalo') || cmd.Name.toLowerCase().includes('gift') ? 'gift' : 'other'
+                        actionType: cmd.Name.toLowerCase().includes('anular') || cmd.Name.toLowerCase().includes('void') ? 'void' :
+                            cmd.Name.toLowerCase().includes('regalo') || cmd.Name.toLowerCase().includes('gift') ? 'gift' : 'other'
                     });
                 });
             }
@@ -1415,7 +1415,7 @@ app.post('/internal-api/frontend-logs', async (req, res) => {
     const requestId = req.requestId || 'unknown';
     try {
         const { logs, uploadTimestamp, browserInfo } = req.body;
-        
+
         if (!logs || !Array.isArray(logs)) {
             debug(`⚠️ [${requestId}] Invalid logs format`);
             return res.status(400).json({ error: 'Invalid logs format' });
@@ -1430,7 +1430,7 @@ app.post('/internal-api/frontend-logs', async (req, res) => {
         // Import file logger (Winston) for backend storage
         const fs = require('fs');
         const path = require('path');
-        
+
         // Ensure logs directory exists
         const logsDir = path.join(process.cwd(), 'logs');
         if (!fs.existsSync(logsDir)) {
@@ -1439,16 +1439,16 @@ app.post('/internal-api/frontend-logs', async (req, res) => {
 
         // Group logs by date and type for file writing
         const logsByDateAndType = {};
-        
+
         logs.forEach(log => {
             const logDate = log.timestamp ? log.timestamp.split('T')[0] : new Date().toISOString().split('T')[0];
             const logType = log.type?.includes('graphql') ? 'graphql' : 'api';
             const key = `${logDate}-${logType}`;
-            
+
             if (!logsByDateAndType[key]) {
                 logsByDateAndType[key] = [];
             }
-            
+
             // Format log entry for file
             const formattedLog = {
                 timestamp: log.timestamp || new Date().toISOString(),
@@ -1461,7 +1461,7 @@ app.post('/internal-api/frontend-logs', async (req, res) => {
                 uploadedAt: uploadTimestamp,
                 serverRequestId: requestId
             };
-            
+
             logsByDateAndType[key].push(formattedLog);
         });
 
@@ -1470,14 +1470,14 @@ app.post('/internal-api/frontend-logs', async (req, res) => {
             const [date, type] = key.split('-');
             const filename = `frontend-${type}-${date}.log`;
             const filepath = path.join(logsDir, filename);
-            
+
             // Format each log entry as a line
             const logLines = logEntries.map(entry => {
                 const { timestamp, level, message, ...metadata } = entry;
                 const metaStr = Object.keys(metadata).length > 0 ? ` ${JSON.stringify(metadata)}` : '';
                 return `${timestamp} [${level.toUpperCase()}] ${message}${metaStr}`;
             }).join('\n');
-            
+
             // Append to file (create if doesn't exist)
             return new Promise((resolve, reject) => {
                 fs.appendFile(filepath, logLines + '\n', 'utf8', (err) => {
@@ -1493,10 +1493,10 @@ app.post('/internal-api/frontend-logs', async (req, res) => {
         });
 
         await Promise.all(promises);
-        
+
         debug(`✅ [${requestId}] Successfully stored ${logs.length} frontend logs`);
-        res.json({ 
-            status: 'ok', 
+        res.json({
+            status: 'ok',
             logsReceived: logs.length,
             filesWritten: Object.keys(logsByDateAndType).length
         });
@@ -1504,6 +1504,585 @@ app.post('/internal-api/frontend-logs', async (req, res) => {
     } catch (err) {
         debug(`❌ [${requestId}] Error storing frontend logs: ${err.message}`);
         res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * @swagger
+ * /internal-api/order-tags/{productId}/{portion}:
+ *   get:
+ *     summary: Get order tags for a specific product and portion
+ *     description: Retrieve available order tag groups and options for product customization
+ *     parameters:
+ *       - in: path
+ *         name: productId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: The product ID
+ *       - in: path
+ *         name: portion
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The portion name (e.g., "Normal", "Grande")
+ *     responses:
+ *       200:
+ *         description: Order tags data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 productId:
+ *                   type: integer
+ *                 portion:
+ *                   type: string
+ *                 tagGroups:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       name:
+ *                         type: string
+ *                       minSelection:
+ *                         type: integer
+ *                       maxSelection:
+ *                         type: integer
+ *                       tags:
+ *                         type: array
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             id:
+ *                               type: integer
+ *                             name:
+ *                               type: string
+ *                             price:
+ *                               type: number
+ *                 summary:
+ *                   type: object
+ *                   properties:
+ *                     totalGroups:
+ *                       type: integer
+ *                     totalTags:
+ *                       type: integer
+ *       400:
+ *         description: Invalid parameters
+ *       500:
+ *         description: Database error
+ */
+app.get('/internal-api/order-tags/:productId/:portion', async (req, res) => {
+    const requestId = req.requestId || 'unknown';
+    try {
+        const productId = parseInt(req.params.productId, 10);
+        const portion = req.params.portion || 'Normal';
+
+        if (!productId) {
+            debug(`⚠️ [${requestId}] Invalid productId: ${req.params.productId}`);
+            return res.status(400).json({ error: 'Invalid product ID' });
+        }
+
+        debug(`🏷️ [${requestId}] Fetching order tags for product ${productId}, portion: ${portion}`);
+        const db = require('./lib/db');
+
+        // Query order tag groups and their tags for the specific product/portion
+        // Using real SambaPOS schema: OrderTagGroups, OrderTagMaps, OrderTags
+        const tagGroups = await db.query(`
+            SELECT DISTINCT
+                otg.Id as GroupId,
+                otg.SortOrder as GroupSortOrder,
+                otg.MinSelectedItems as MinSelection,
+                otg.MaxSelectedItems as MaxSelection,
+                otg.ColumnCount,
+                otg.ButtonHeight,
+                otg.FontSize,
+                otg.ButtonColor,
+                ot.Id as TagId,
+                ot.Name as TagName,
+                ot.Price as TagPrice,
+                ot.SortOrder as TagSortOrder,
+                ot.MaxQuantity,
+                ot.Color as TagColor,
+                ot.Description as TagDescription
+            FROM OrderTagGroups otg
+            INNER JOIN OrderTags ot ON ot.OrderTagGroupId = otg.Id
+            INNER JOIN OrderTagMaps otm ON otm.OrderTagGroupId = otg.Id
+            WHERE (otm.MenuItemId = @productId OR otm.MenuItemId = 0)
+            AND (otm.PortionName = @portion OR otm.PortionName IS NULL OR otm.PortionName = '')
+            ORDER BY otg.SortOrder, ot.SortOrder
+        `, {
+            productId,
+            portion
+        }); debug(`🔍 [${requestId}] Raw query returned ${tagGroups.length} tag records`);
+
+        // Group the results by OrderTagGroup
+        const groupedData = {};
+        tagGroups.forEach(row => {
+            const groupId = row.GroupId;
+            if (!groupedData[groupId]) {
+                groupedData[groupId] = {
+                    id: row.GroupId,
+                    name: `Group ${row.GroupId}`, // We don't have group names in the real schema
+                    sortOrder: row.GroupSortOrder || 0,
+                    minSelection: row.MinSelection || 0,
+                    maxSelection: row.MaxSelection || 1,
+                    columnCount: row.ColumnCount || 1,
+                    buttonHeight: row.ButtonHeight || 65,
+                    fontSize: row.FontSize || 14,
+                    buttonColor: row.ButtonColor,
+                    tags: []
+                };
+            }
+
+            if (row.TagId) {
+                groupedData[groupId].tags.push({
+                    id: row.TagId,
+                    name: row.TagName,
+                    price: row.TagPrice || 0,
+                    sortOrder: row.TagSortOrder || 0,
+                    maxQuantity: row.MaxQuantity || 1,
+                    color: row.TagColor,
+                    description: row.TagDescription
+                });
+            }
+        }); const finalTagGroups = Object.values(groupedData);
+        const totalTags = finalTagGroups.reduce((sum, group) => sum + group.tags.length, 0);
+
+        debug(`✅ [${requestId}] Product ${productId} (${portion}): ${finalTagGroups.length} groups, ${totalTags} total tags`);
+
+        res.json({
+            productId,
+            portion,
+            tagGroups: finalTagGroups,
+            summary: {
+                totalGroups: finalTagGroups.length,
+                totalTags
+            }
+        });
+
+    } catch (err) {
+        debug(`❌ [${requestId}] Error fetching order tags for product ${req.params.productId}: ${err.message}`);
+        res.status(500).json({ error: err.message, details: err.message });
+    }
+});
+
+/**
+ * @swagger
+ * /internal-api/automation-buttons/{terminalId}:
+ *   post:
+ *     summary: Get automation command buttons for terminal ticket
+ *     description: Retrieve available automation command buttons for a specific terminal and ticket orders
+ *     parameters:
+ *       - in: path
+ *         name: terminalId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The terminal ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               orderUids:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Array of order UIDs
+ *     responses:
+ *       200:
+ *         description: Automation buttons data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 terminalId:
+ *                   type: string
+ *                 orderUids:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                 buttons:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       name:
+ *                         type: string
+ *                       command:
+ *                         type: string
+ *                       color:
+ *                         type: string
+ *                       enabled:
+ *                         type: boolean
+ *                 summary:
+ *                   type: object
+ *                   properties:
+ *                     totalButtons:
+ *                       type: integer
+ *       400:
+ *         description: Invalid parameters
+ *       500:
+ *         description: Database error
+ */
+app.post('/internal-api/automation-buttons/:terminalId', async (req, res) => {
+    const requestId = req.requestId || 'unknown';
+    try {
+        const terminalId = req.params.terminalId;
+        const { orderUids = [] } = req.body || {};
+
+        if (!terminalId) {
+            debug(`⚠️ [${requestId}] Invalid terminalId: ${req.params.terminalId}`);
+            return res.status(400).json({ error: 'Invalid terminal ID' });
+        }
+
+        debug(`🔘 [${requestId}] Fetching automation buttons for terminal ${terminalId}, orders: ${orderUids.length}`);
+        const db = require('./lib/db');
+
+        // For now, return empty result to avoid breaking the app while we research the schema
+        // TODO: Implement proper automation commands query when schema is available
+        debug(`✅ [${requestId}] Terminal ${terminalId}: 0 automation buttons (placeholder)`);
+
+        res.json({
+            terminalId,
+            orderUids,
+            buttons: [],
+            summary: {
+                totalButtons: 0
+            }
+        });
+
+    } catch (err) {
+        debug(`❌ [${requestId}] Error fetching automation buttons for terminal ${req.params.terminalId}: ${err.message}`);
+
+        res.json({
+            terminalId: req.params.terminalId,
+            orderUids: req.body?.orderUids || [],
+            buttons: [],
+            summary: {
+                totalButtons: 0
+            }
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /internal-api/active-tickets:
+ *   get:
+ *     summary: Get all active (unpaid) tickets
+ *     description: Retrieve all tickets that are currently open and unpaid
+ *     parameters:
+ *       - in: query
+ *         name: forceRefresh
+ *         schema:
+ *           type: boolean
+ *         description: Force refresh bypassing cache
+ *     responses:
+ *       200:
+ *         description: Active tickets data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 tickets:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       ticketId:
+ *                         type: integer
+ *                       ticketNumber:
+ *                         type: string
+ *                       ticketUid:
+ *                         type: string
+ *                       totalAmount:
+ *                         type: number
+ *                       remainingAmount:
+ *                         type: number
+ *                       openedAt:
+ *                         type: string
+ *                         format: date-time
+ *                       departmentId:
+ *                         type: integer
+ *                       terminalId:
+ *                         type: string
+ *                       ticketStates:
+ *                         type: string
+ *                       tableId:
+ *                         type: integer
+ *                       tableName:
+ *                         type: string
+ *                 summary:
+ *                   type: object
+ *                   properties:
+ *                     totalTickets:
+ *                       type: integer
+ *                     totalAmount:
+ *                       type: number
+ *       500:
+ *         description: Database error
+ */
+app.get('/internal-api/active-tickets', async (req, res) => {
+    const requestId = req.requestId || 'unknown';
+    try {
+        const forceRefresh = req.query.forceRefresh === 'true';
+
+        debug(`🎫 [${requestId}] Fetching active tickets (forceRefresh: ${forceRefresh})`);
+        const db = require('./lib/db');
+
+        // Query active tickets from SambaPOS database
+        const tickets = await db.query(`
+            SELECT 
+                t.Id as TicketId,
+                t.TicketNumber,
+                t.TicketUid,
+                t.Date as OpenedAt,
+                t.LastUpdateTime,
+                t.TotalAmount,
+                t.RemainingAmount,
+                t.DepartmentId,
+                t.TerminalName as TerminalId,
+                t.TicketStates,
+                t.TicketTags,
+                t.IsClosed,
+                -- Table/Entity information
+                e.Id as TableId,
+                e.Name as TableName,
+                et.Name as EntityType,
+                -- Calculate time elapsed
+                DATEDIFF(MINUTE, t.Date, GETDATE()) as TimeElapsedMinutes
+            FROM Tickets t
+            LEFT JOIN Entities e ON e.Id = t.Id  -- This might need adjustment based on your schema
+            LEFT JOIN EntityTypes et ON et.Id = e.EntityTypeId
+            WHERE t.IsClosed = 0 
+            AND t.RemainingAmount > 0
+            ORDER BY t.Date DESC
+        `);
+
+        debug(`🔍 [${requestId}] Raw query returned ${tickets.length} active ticket records`);
+
+        // Process the results
+        const processedTickets = tickets.map(row => ({
+            ticketId: row.TicketId,
+            ticketNumber: row.TicketNumber,
+            ticketUid: row.TicketUid,
+            totalAmount: row.TotalAmount || 0,
+            remainingAmount: row.RemainingAmount || 0,
+            openedAt: row.OpenedAt,
+            lastUpdateTime: row.LastUpdateTime,
+            departmentId: row.DepartmentId,
+            terminalId: row.TerminalId,
+            ticketStates: row.TicketStates,
+            ticketTags: row.TicketTags,
+            isClosed: row.IsClosed,
+            tableId: row.TableId,
+            tableName: row.TableName,
+            entityType: row.EntityType,
+            timeElapsedMinutes: row.TimeElapsedMinutes
+        }));
+
+        const totalAmount = processedTickets.reduce((sum, ticket) => sum + (ticket.totalAmount || 0), 0);
+
+        debug(`✅ [${requestId}] Found ${processedTickets.length} active tickets, total: $${totalAmount}`);
+
+        res.json({
+            tickets: processedTickets,
+            summary: {
+                totalTickets: processedTickets.length,
+                totalAmount
+            }
+        });
+
+    } catch (err) {
+        debug(`❌ [${requestId}] Error fetching active tickets: ${err.message}`);
+        res.status(500).json({ error: err.message, details: err.message });
+    }
+});
+
+/**
+ * @swagger
+ * /internal-api/menu-items:
+ *   get:
+ *     summary: Get menu items with categories and portions
+ *     description: Retrieve all menu items with their categories, portions, and pricing information
+ *     parameters:
+ *       - in: query
+ *         name: category
+ *         schema:
+ *           type: string
+ *         description: Filter by category name
+ *       - in: query
+ *         name: includePortions
+ *         schema:
+ *           type: boolean
+ *         description: Include portion information
+ *     responses:
+ *       200:
+ *         description: Menu items data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 categories:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       name:
+ *                         type: string
+ *                       sortOrder:
+ *                         type: integer
+ *                       color:
+ *                         type: string
+ *                       menuItems:
+ *                         type: array
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             id:
+ *                               type: integer
+ *                             name:
+ *                               type: string
+ *                             price:
+ *                               type: number
+ *                             portions:
+ *                               type: array
+ *                               items:
+ *                                 type: object
+ *                                 properties:
+ *                                   name:
+ *                                     type: string
+ *                                   price:
+ *                                     type: number
+ *                 summary:
+ *                   type: object
+ *                   properties:
+ *                     totalCategories:
+ *                       type: integer
+ *                     totalMenuItems:
+ *                       type: integer
+ *       500:
+ *         description: Database error
+ */
+app.get('/internal-api/menu-items', async (req, res) => {
+    const requestId = req.requestId || 'unknown';
+    try {
+        const categoryFilter = req.query.category;
+        const includePortions = req.query.includePortions === 'true';
+
+        debug(`🍽️ [${requestId}] Fetching menu items (category: ${categoryFilter || 'all'}, portions: ${includePortions})`);
+        const db = require('./lib/db');
+
+        // Query menu items with categories from SambaPOS database
+        let query = `
+            SELECT 
+                mg.Id as CategoryId,
+                mg.Name as CategoryName,
+                mg.SortOrder as CategorySortOrder,
+                mg.Color as CategoryColor,
+                mi.Id as MenuItemId,
+                mi.Name as MenuItemName,
+                mi.GroupCode as MenuItemGroupCode,
+                -- Default price from MenuItems
+                COALESCE(mip.Price, 0) as Price,
+                -- Portion information if requested
+                p.Name as PortionName,
+                mip.Price as PortionPrice
+            FROM MenuItemGroups mg
+            LEFT JOIN MenuItems mi ON mi.GroupCode = mg.GroupCode
+            LEFT JOIN MenuItemPrices mip ON mip.MenuItemId = mi.Id
+            LEFT JOIN Portions p ON p.Id = mip.PortionId
+        `;
+
+        const params = {};
+        if (categoryFilter) {
+            query += ` WHERE mg.Name = @category`;
+            params.category = categoryFilter;
+        }
+
+        query += ` ORDER BY mg.SortOrder, mg.Name, mi.Name, p.Name`;
+
+        const menuData = await db.query(query, params);
+
+        debug(`🔍 [${requestId}] Raw query returned ${menuData.length} menu item records`);
+
+        // Group by categories and menu items
+        const categoriesMap = {};
+
+        menuData.forEach(row => {
+            const categoryId = row.CategoryId;
+            const menuItemId = row.MenuItemId;
+
+            // Create category if not exists
+            if (!categoriesMap[categoryId]) {
+                categoriesMap[categoryId] = {
+                    id: categoryId,
+                    name: row.CategoryName,
+                    sortOrder: row.CategorySortOrder || 0,
+                    color: row.CategoryColor,
+                    menuItems: {}
+                };
+            }
+
+            // Create menu item if not exists
+            if (menuItemId && !categoriesMap[categoryId].menuItems[menuItemId]) {
+                categoriesMap[categoryId].menuItems[menuItemId] = {
+                    id: menuItemId,
+                    name: row.MenuItemName,
+                    groupCode: row.MenuItemGroupCode,
+                    price: row.Price || 0,
+                    portions: []
+                };
+            }
+
+            // Add portion if exists and requested
+            if (includePortions && row.PortionName && menuItemId) {
+                const existingPortion = categoriesMap[categoryId].menuItems[menuItemId].portions
+                    .find(p => p.name === row.PortionName);
+
+                if (!existingPortion) {
+                    categoriesMap[categoryId].menuItems[menuItemId].portions.push({
+                        name: row.PortionName,
+                        price: row.PortionPrice || 0
+                    });
+                }
+            }
+        });
+
+        // Convert to final format
+        const categories = Object.values(categoriesMap).map(category => ({
+            ...category,
+            menuItems: Object.values(category.menuItems)
+        }));
+
+        const totalMenuItems = categories.reduce((sum, cat) => sum + cat.menuItems.length, 0);
+
+        debug(`✅ [${requestId}] Found ${categories.length} categories with ${totalMenuItems} menu items`);
+
+        res.json({
+            categories,
+            summary: {
+                totalCategories: categories.length,
+                totalMenuItems
+            }
+        });
+
+    } catch (err) {
+        debug(`❌ [${requestId}] Error fetching menu items: ${err.message}`);
+        res.status(500).json({ error: err.message, details: err.message });
     }
 });
 
