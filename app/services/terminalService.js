@@ -5,6 +5,7 @@
 
 import Debug from 'debug';
 import { graphqlSimple, gqlEscape } from './graphqlService';
+import { appconfig } from '../config';
 
 const debug = Debug('pmpos:terminal');
 
@@ -180,12 +181,18 @@ class TerminalService {
     async _performRegistration(user) {
         // Registrar terminal usando los parámetros correctos según documentación real
         try {
+            const cfg = appconfig();
+            const terminalName = cfg?.terminalName || 'SERVIDOR';
+            const departmentName = cfg?.departmentName || 'MESAS';
+            const ticketTypeName = cfg?.ticketTypeName || 'COMEDOR';
+            const userName = user || cfg?.userName || 'CAJERO';
+
             const query = `mutation { 
                 registerTerminal(
-                    ticketType: "COMEDOR",
-                    terminal: "SERVIDOR",
-                    department: "MESAS",
-                    user: "${gqlEscape(user || 'CAJERO')}"
+                    ticketType: "${gqlEscape(ticketTypeName)}",
+                    terminal: "${gqlEscape(terminalName)}",
+                    department: "${gqlEscape(departmentName)}",
+                    user: "${gqlEscape(userName)}"
                 )
             }`;
 

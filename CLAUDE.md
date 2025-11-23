@@ -4,274 +4,299 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-PMPOS is a React-based web POS application for SambaPOS that provides mobile server and cashier functionality with inherited permissions and functions as if operating directly within SambaPOS. This is a mobile command system that integrates with SambaPOS via GraphQL API and SignalR for real-time functionality.
+PMPOS is a React-based mobile POS application for SambaPOS that integrates via GraphQL API and SignalR. It provides server/cashier functionality with inherited SambaPOS permissions, acting as if operating directly within SambaPOS. This is a mobile command system for restaurant/retail operations with table management, ticket handling, and real-time synchronization.
 
 ## Development Commands
 
-- `npm start` - Run development server with HMR on port 8081
-- `npm run debug` - Development server with additional debug flags  
-- `npm run debug:api` - Local API/GraphQL debug helper for SambaPOS testing
+### Core Development
+- `npm start` (alias `npm run dev`) - Webpack dev server with HMR on port 8081
+- `npm run debug` - Development server with debug logging enabled
 - `npm run build` - Production build to `dist/` directory
-- `npm test` - Run Karma/Mocha test suite with coverage reports
-- `npm run test:tdd` - Run tests in watch mode for development
-- `npm run test:lint` - Run ESLint on `app/` and `tests/` directories
 - `npm run clean` - Remove `dist/` build directory
+
+### Testing
+- `npm test` - Single-run Karma + Mocha test suite with coverage
+- `npm run test:tdd` - Watch mode for continuous testing
+- `npm run test:lint` - ESLint on `app/` and `tests/` directories
+
+### Utilities
 - `npm run analyze` - Bundle analysis and stats generation
+- `npm run debug:api` - GraphQL diagnostic helper for SambaPOS connectivity
+- `npm run smoke:mesa1:new` - Smoke test for new ticket flow (see package.json for full suite)
+
+### Read Service (SQL API)
+- `cd server && npm install && npm start` - Standalone Express API for direct SQL reads with caching
 
 ## Architecture Overview
 
-### Core Technologies
-- **Frontend**: React 17 + Redux with Immutable.js for state management
-- **UI Framework**: Material-UI (MUI) v5 with custom dark theme
-- **Routing**: React Router v6 with HashRouter for mobile compatibility
-- **Data Layer**: GraphQL via Apollo Client + direct GraphQL requests
-- **Real-time**: SignalR client for live updates from SambaPOS
-- **Authentication**: JWT token-based with automatic refresh
-- **Build System**: Webpack 5 with development and production configurations
+### Core Stack
+- **Frontend**: React 17 + Redux with Immutable.js
+- **UI**: Material-UI v5 with custom dark theme
+- **Routing**: React Router v6 with HashRouter
+- **Data**: GraphQL (custom implementation) + SignalR for real-time updates
+- **Auth**: JWT token-based with automatic refresh
+- **Build**: Webpack 5 with dev/production configs
 
-### Application Structure
+### Application Entry and Routes
 
 **Entry Point**: `app/index.jsx` → `app/components/App.jsx`
 
 **Main Routes**:
-- `/pinpad` - Authentication/login screen
-- `/tables` - Table management and ticket overview  
+- `/pinpad` - Login with sales mode selector (Mesas/Mostrador/Reparto)
+- `/tables` - Table/entity management and ticket overview
 - `/pos/:ticketId?` - POS interface for order management
 
-**Key Directories**:
-- `app/components/` - React components (PascalCase naming)
-- `app/services/` - Business logic and API communication
-- `app/reducers/` - Redux state management
+### Key Directory Structure
+
+- `app/components/` - React components (PascalCase)
+- `app/services/` - Business logic, API communication, SignalR integration
+- `app/graphql/` - Canonical GraphQL query strings (single source of truth)
+- `app/reducers/` - Redux state management with Immutable.js
 - `app/actions/` - Redux action creators
-- `app/constants/` - Application constants and enums
-- `app/utils/` - Utility functions and helpers
-- `tests/` - Test files using Karma + Mocha
+- `app/config/` - Configuration including sales mode presets
+- `app/utils/` - Helper functions and utilities
+- `server/` - Express read-service for MSSQL with caching and Swagger
+- `scripts/` - Smoke tests (mesa1 flows), diagnostics, utilities
+- `docs/` - Operational guides, GraphQL documentation, schema references
+- `tests/` - Karma + Mocha specs (`*_test.js`)
 
-### State Management Architecture
+### State Management
 
-**Redux Store Structure** (`app/store.js`):
-- `app` - Main application state (tables, tickets, menu, entities)  
-- `auth` - Authentication state (token, user, login status)
+**Redux Store** (`app/store.js`):
+- `app` - Main application state (tables, tickets, menu, entities)
+- `auth` - Authentication (token, user, login status)
 
-**Key Reducers**:
-- `app/reducers/app.js` - Central app state combining multiple domain reducers
-- Auth reducer in `store.js` - Handles login/logout and token management
+**Patterns**:
+- Immutable.js for predictable state updates
+- Thunk middleware for async operations
+- Action creators in `app/actions/`
+- Services handle side effects and API calls
+
+### Configuration System
+
+**Dynamic Configuration** (`app/config.js`):
+- Multi-source priority: Query params → localStorage → .env → auto-detected
+- Auto-discovery of SambaPOS server on local network
+- Sales mode presets (`app/config/salesModes.js`): mesas, mostrador, reparto
+- Runtime overrides via URL params: `?api=`, `?port=`, `?user=`, `?mode=`, etc.
+- Persistent configuration in localStorage for mobile devices
+
+**Environment Files**:
+- `.env.development` - Development defaults (used by webpack-dev-server)
+- `.env.production` - Production deployment settings
+- See `.env.development` for full list of configurable variables
+
+**Required SambaPOS Integration Settings**:
+- `terminalName` - Must exist in SambaPOS terminals
+- `departmentName` - Department for ticket operations
+- `ticketTypeName` - Ticket type (e.g., "COMEDOR", "TICKET")
+- `entityScreenName` - Entity screen (e.g., "MESAS", "CLIENTES")
+- `entityTypeName` - Entity type (e.g., "Mesas", "Clientes")
+- `menuName` - Menu to display products from
+
+### Critical Services
+
+**GraphQL Service** (`app/services/graphqlService.js`):
+- Single executor for all GraphQL operations: `gql()`, `graphqlRequest()`
+- Token management via `tokenService.getValidAccessToken()`
+- Canonical queries live in `app/graphql/queries.js` (DO NOT duplicate elsewhere)
+
+**Data Manager** (`app/services/dataManager.js`):
+- Centralized data loading with multi-level caching (Static, Semi-static, Dynamic, Specific)
+- SignalR integration for real-time updates
+- 70% reduction in GraphQL queries via intelligent caching
+- Debug helper: `window.debugDataManager()`, `window.refreshData('menu'|'tables'|'tickets'|'all')`
+
+**Terminal Service** (`app/services/terminalService.js`):
+- Terminal registration with exponential backoff retry (3 attempts: 1s, 2s, 4s)
+- Multi-user terminal management
+- Event-driven callbacks for registration lifecycle
+- Debug helper: `window.debugTerminal()`, `window.registerTerminalManual('user')`
+
+**Ticket Promotion Service** (`app/services/ticketPromotionService.js`):
+- Automatic promotion of local tickets to server tickets
+- Idempotent operations with persistence and replay
+- Exponential backoff for failed promotions
+- Debug helpers: `window.debugTicketPromotion()`, `window.retryTicketPromotion('uid')`, `window.clearFailedTickets()`
+
+**Token Service** (`app/services/tokenService.js`):
+- JWT acquisition, validation, and automatic refresh
+- Secure encrypted storage
+- Automatic renewal before expiry
+
+**Read Service** (`server/index.js`):
+- Express API for direct MSSQL reads (port 4005 by default)
+- Bypasses GraphQL for heavy read operations (tables, tickets, menu)
+- Swagger documentation at `/api-docs`
+- API key authentication for internal endpoints
+- Caching layer with configurable TTLs
 
 ### SambaPOS Integration
 
-**Configuration** (`app/config.js`):
-- Dynamic API URL detection based on hostname or environment variables
-- Query parameter overrides for mobile devices (`?api=`, `?port=`, `?user=`, etc.)
-- Support for both development proxy and direct API connections
-
 **API Endpoints**:
-- GraphQL: `/api/graphql` - Main data operations
-- Authentication: `/Token` - OAuth-style token endpoint  
+- GraphQL: `/api/graphql` - Mutations and queries
+- Authentication: `/Token` - OAuth-style JWT endpoint
 - SignalR: `/signalr` - Real-time notifications
 
 **Required SambaPOS Setup**:
 - Message Server API mode enabled (port with `+` suffix, e.g., `9000+`)
-- Application client registered (`pmpos` client_id)
-- GraphQL API accessible and configured
-- Proper firewall rules for remote access
+- Application client registered (default `client_id`: `pmpos`)
+- GraphQL API accessible
+- Firewall rules configured for remote access
 
-### Critical Services
-
-**Authentication** (`app/services/tokenService.js`):
-- JWT token acquisition and refresh
-- Automatic token validation and renewal
-- Secure token storage with encryption
-
-**Data Manager** (`app/services/dataManager.js`) - NEW:
-- Centralized data loading and caching
-- Optimized GraphQL flows with 70% fewer queries
-- Multi-level caching strategy (Static, Semi-static, Dynamic, Specific)
-- SignalR integration for real-time updates
-- Automatic initialization on app startup
-
-**Terminal Service** (`app/services/terminalService.js`) - ENHANCED:
-- Robust terminal registration with exponential backoff
-- Multi-user terminal management
-- Automatic retry on network failures
-- Event-driven callbacks for registration events
-
-**Ticket Promotion Service** (`app/services/ticketPromotionService.js`) - NEW:
-- Automatic promotion of local tickets to server tickets
-- Persistence and replay with idempotent operations
-- Exponential backoff retry mechanism
-- Failed ticket tracking and manual retry options
-
-**GraphQL Operations** (`app/queries.js`):
-- Terminal registration and management
-- Ticket creation and modification  
-- Order management and payment processing
-- Entity (table) operations
-- Enhanced payloads with better error handling
-
-**Real-time Communication** (via DataManager):
-- SignalR integration with automatic reconnection
-- Live updates for ticket changes
-- Table status synchronization
-- Order state notifications
-- Cache invalidation events
-
-## Development Guidelines
-
-### Code Style
-- 2-space indentation, ~100 character line width
-- Single quotes for strings (ESLint enforced)  
-- PascalCase for React components
-- camelCase for functions and variables
-- UPPER_SNAKE_CASE for constants
-- Allow `console.*` for diagnostic logging
-
-### Component Patterns
-- Lazy loading for route components using `React.lazy()`
-- Material-UI components with consistent theming
-- Error boundaries for graceful failure handling
-- Suspense fallbacks with loading indicators
-
-### State Management Patterns
-- Immutable.js for Redux state to ensure predictable updates
-- Thunk middleware for async actions
-- Action creators in `app/actions/` 
-- Selector patterns for accessing nested state
-
-### Authentication Flow
-1. Token acquisition via username/password
-2. Token validation and refresh handling
-3. Automatic retry with fallback mechanisms
-4. Protected routes using `PrivateRoute` wrapper
-
-## SambaPOS-Specific Configuration
-
-### Required Configuration Values
-Update `app/config.js` with SambaPOS-specific values:
-- `terminalName` - Must exist in SambaPOS terminals
-- `userName` - Valid SambaPOS user
-- `departmentName` - Department for ticket operations  
-- `ticketTypeName` - Ticket type for orders
-- `menuName` - Menu to display products from
-- `entityScreenName` - Entity screen (typically "MESAS")
-
-### GraphQL Integration Notes
-- Some GraphQL endpoints may return HTTP 500 in certain SambaPOS installations
-- Implement fallback mechanisms and cache strategies
-- Expected failing endpoints: `registerTerminal`, `getPaymentTypes`, `getTickets`
-- Treat 500 responses as warnings rather than errors
-
-### Ticket Operations Workflow
-1. `registerTerminal()` - Register POS terminal (with retry/backoff)
+**Ticket Operations Workflow**:
+1. `registerTerminal()` - Register POS terminal (auto-retry with backoff)
 2. `createTerminalTicket()` - Create new ticket
 3. `changeEntityOfTerminalTicket()` - Assign table/entity
 4. `addOrderToTerminalTicket()` - Add products
-5. `closeTerminalTicket()` - Complete transaction
-6. `unregisterTerminal()` - Clean up
+5. `payTerminalTicket()` / `executePayment()` - Process payments
+6. `closeTerminalTicket()` - Complete transaction
+7. `unregisterTerminal()` - Clean up on logout
 
-### RegisterTerminal Payload Structure
+**GraphQL Quirks**:
+- Some endpoints may return HTTP 500 in certain SambaPOS installations
+- Implement graceful degradation and fallback strategies
+- Expected potentially-failing endpoints: `registerTerminal`, `getPaymentTypes`, `getTickets`
+- Treat 500s as warnings; retry with backoff where appropriate
 
-**GraphQL Mutation:**
-```graphql
-mutation RegisterTerminal($ticketType: String!, $terminal: String!, $department: String!, $user: String!) {
-    registerTerminal(
-        ticketType: $ticketType
-        terminal: $terminal
-        department: $department
-        user: $user
-    )
-}
-```
+## Code Style and Conventions
 
-**Required Variables:**
-```javascript
-{
-    ticketType: "COMEDOR",     // From config.ticketTypeName
-    terminal: "SERVIDOR",      // From config.terminalName  
-    department: "MESAS",       // From config.departmentName
-    user: "graphiql"          // From config.userName or user override
-}
-```
+### Naming
+- **React Components**: PascalCase filenames and exports
+- **Functions/Variables**: camelCase
+- **Constants**: UPPER_SNAKE_CASE
+- **GraphQL queries**: Descriptive names in `app/graphql/queries.js`
 
-**Retry Configuration:**
-- Max attempts: 3
-- Exponential backoff: 1s, 2s, 4s
-- Retryable errors: Network timeouts, 5xx HTTP errors
-- Non-retryable: 4xx errors, GraphQL schema errors
+### ESLint Rules
+- 2-space indentation
+- Single quotes for strings
+- ~100 character line width
+- `console.*` allowed (diagnostic logging is expected)
 
-**Response Format:**
-```javascript
-{
-    "data": {
-        "registerTerminal": "terminal-uuid-string"
-    }
-}
-```
+### Component Patterns
+- Lazy loading with `React.lazy()` for route components
+- Material-UI theming via `@mui/material` and `@mui/styles`
+- Error boundaries for graceful failure handling
+- Suspense fallbacks with loading indicators
 
-## Testing Approach
+### GraphQL Best Practices
+- **Single Source of Truth**: All queries in `app/graphql/queries.js`
+- **Never duplicate**: Import from canonical file in services
+- **Reference Guide**: `docs/GRAPHQL_CANONICAL_GUIDE.md` for tested flows and payloads
+- **Use GraphQL Service**: Always use `app/services/graphqlService.js` executor
+- **Token Management**: Use `tokenService.getValidAccessToken()` for auth
 
-**Test Framework**: Karma + Mocha with webpack preprocessing
-**Test Location**: `tests/` directory with `*_test.js` naming
-**Coverage**: HTML reports generated in `coverage/`
-**Test Types**:
-- Unit tests for reducers and services
-- Integration tests for critical user flows
-- Browser functional tests for end-to-end scenarios
+## Sales Modes System
 
-## Environment Configuration
+**Presets** (`app/config/salesModes.js`):
+- **mesas**: Traditional table service (entityType: "Mesas")
+- **mostrador**: Counter/cashier service (no entity)
+- **reparto**: Delivery service (entityType: "Clientes")
 
-### Development
-- Uses webpack dev server proxy for SambaPOS API
-- Debug logging enabled via `Debug('pmpos:*')`
-- Hot module replacement for faster development
+Each mode overrides `departmentName`, `ticketTypeName`, `entityTypeName`, `entityScreenName`, and `menuName`. Users select mode at login; settings persist to localStorage.
 
-### Production  
-- Optimized webpack build with content hashing
-- Environment variable injection for API endpoints
+## Development Workflow
+
+### Webpack Dev Server
+- Runs on port 8081 with HMR
+- Proxies API requests to SambaPOS server
+- Uses `.env.development` for configuration
+- Auto-detects local network IP for mobile access
+
+### Production Build
+- Optimized bundle with content hashing
+- Environment variable injection
 - Asset optimization and minification
+- Deploy `dist/` directory to web server
 
 ### Mobile/Remote Access
-- Dynamic host detection for mobile devices
-- Query parameter configuration overrides
+- Dynamic host detection for IP-based connections
+- Query parameter configuration: `?api=http://192.168.1.10:9000&mode=mesas`
 - localStorage persistence for connection settings
+- Auto-discovery scans common ports (9000, 8080, 3000)
 
-## Common Issues and Solutions
+## Testing Strategy
 
-### GraphQL API Limitations
-- Implement graceful degradation for failing endpoints
-- Use caching service (`app/services/cacheService.js`) for offline capability
-- Log GraphQL errors as informational rather than blocking
+**Framework**: Karma + Mocha with webpack preprocessing
 
-### Authentication Issues
-- Verify SambaPOS client application is registered
-- Ensure Message Server API mode is enabled
-- Check firewall settings for remote access
-- Validate username/password credentials
+**Test Location**: `tests/` directory with `*_test.js` naming
+
+**Coverage**: HTML reports in `coverage/` directory
+
+**Smoke Tests**: Available in `scripts/` for critical flows:
+- New ticket creation
+- Add/void/gift orders
+- Payment processing (partial, mixed)
+- Ticket closing and reopening
+- See `package.json` scripts section for full suite
+
+## Common Issues
+
+### GraphQL Connectivity
+- Verify SambaPOS Message Server API is enabled (port suffix `+`)
+- Check client application registration in SambaPOS
+- Validate firewall rules for remote access
+- Use `npm run debug:api` for diagnostics
 
 ### Development Environment
-- Clear node_modules and npm cache if dev server fails to start
-- Verify SambaPOS API accessibility before frontend development
-- Use `npm run debug:api` for API connectivity testing
+- If dev server fails: clear `node_modules`, `npm cache clean --force`, `npm install`
+- Verify SambaPOS API is accessible before starting frontend
+- Check `.env.development` for correct server IP/port
+- Use browser console debug helpers to verify state
 
-### Debug Helpers (Available in Browser Console)
+### Authentication
+- Ensure username/password match SambaPOS user credentials
+- Verify `client_id` is registered in SambaPOS applications
+- Check token expiry settings (default: 365 days validity)
+- Token is encrypted and stored in localStorage
 
-**DataManager Debugging:**
+### Read Service
+- Start separately: `cd server && npm start`
+- Requires MSSQL connection details in `server/.env`
+- Default port 4005 (configurable via `READ_SERVICE_URL`)
+- API key required for internal endpoints (header: `X-INTERNAL-API-KEY`)
+
+## Documentation References
+
+**Primary Docs**:
+- `docs/GRAPHQL_CANONICAL_GUIDE.md` - Tested GraphQL flows and payloads (source of truth)
+- `docs/Guia_Flujo_Terminal.md` - Terminal ticket flow guide
+- `AGENTS.md` - Repository guidelines and conventions
+- `README.md` - Installation and basic configuration
+
+**Schema and Contracts**:
+- `docs/sambapos_schema.md` - SambaPOS database schema
+- `docs/sambapos_payload_examples.md` - Example GraphQL payloads
+- `docs/sambapos_ingest_contracts.md` - API contract definitions
+
+## Debug Helpers (Browser Console)
+
+**Data Manager**:
 ```javascript
-window.debugDataManager()           // Show DataManager status
-window.refreshData('menu')          // Refresh menu data
-window.refreshData('tables')        // Refresh tables data  
-window.refreshData('tickets')       // Refresh tickets data
-window.refreshData('all')           // Refresh all data
+window.debugDataManager()           // Show cache status and statistics
+window.refreshData('menu')          // Force refresh menu data
+window.refreshData('tables')        // Force refresh tables
+window.refreshData('tickets')       // Force refresh tickets
+window.refreshData('all')           // Full data refresh
 ```
 
-**Ticket Promotion Debugging:**
+**Ticket Promotion**:
 ```javascript
-window.debugTicketPromotion()             // Show promotion status
-window.retryTicketPromotion('ticket-uid') // Manual retry
-window.clearFailedTickets()               // Clear failed tickets
+window.debugTicketPromotion()             // Show promotion queue status
+window.retryTicketPromotion('ticket-uid') // Manual retry failed promotion
+window.clearFailedTickets()               // Clear failed ticket queue
 ```
 
-**Terminal Debugging (Legacy):**
+**Terminal Registration**:
 ```javascript
-window.debugTerminal()                    // Show terminal status
-window.registerTerminalManual('user')     // Manual registration
+window.debugTerminal()                    // Show terminal registration status
+window.registerTerminalManual('username') // Force terminal registration
 ```
+
+## Known Limitations
+
+- Some GraphQL endpoints return HTTP 500 in certain SambaPOS versions (expected)
+- Terminal registration may require retry on first connection
+- SignalR reconnection is automatic but may have brief delays
+- Read service requires separate MSSQL connection (optional optimization)
+- Smoke tests require manual execution (no CI integration yet)

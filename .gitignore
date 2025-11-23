@@ -7,4 +7,5 @@ coverage/
 .env
 .env.local
 .env.*.local
+server/sql-config.json
 

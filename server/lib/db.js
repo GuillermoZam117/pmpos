@@ -1,15 +1,44 @@
 const sql = require('mssql');
 const Debug = require('debug');
+const { getConnectionString } = require('./sqlConfig');
 const debug = Debug('pmpos:read-service:db');
 
 let pool = null;
+let currentConn = null;
+
+async function connectPool(connString) {
+    debug('🔌 Opening SQL connection...');
+    const newPool = await sql.connect(connString);
+    currentConn = connString;
+    return newPool;
+}
 
 async function getPool() {
-    if (pool) return pool;
-    const conn = process.env.DB_CONN;
-    if (!conn) throw new Error('DB_CONN not set');
-    pool = await sql.connect(conn);
+    const conn = getConnectionString();
+    if (!conn) {
+        throw new Error('DB connection string not configured. Define DB_CONN or use /internal-api/sql-config.');
+    }
+    if (!pool) {
+        pool = await connectPool(conn);
+        return pool;
+    }
+    if (currentConn !== conn) {
+        await resetPool();
+        pool = await connectPool(conn);
+    }
     return pool;
+}
+
+async function resetPool() {
+    if (pool) {
+        try {
+            await pool.close();
+        } catch (err) {
+            debug('⚠️ Error closing SQL pool', err?.message);
+        }
+    }
+    pool = null;
+    currentConn = null;
 }
 
 async function query(text, params = {}) {
@@ -22,4 +51,4 @@ async function query(text, params = {}) {
     return res.recordset || [];
 }
 
-module.exports = { query };
+module.exports = { query, resetPool };

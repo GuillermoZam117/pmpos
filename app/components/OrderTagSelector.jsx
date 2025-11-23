@@ -21,6 +21,23 @@ import orderTagService from '../services/orderTagService';
 import productOrderTagsIndex from '../services/productOrderTagsIndex';
 import Debug from 'debug';
 
+// CRITICAL: Debug the imported orderTagService to see what version we got
+console.log('🚨 [ORDERTAG SELECTOR] orderTagService imported:', {
+    orderTagService: orderTagService,
+    hasGetGroups: typeof orderTagService.getGroups === 'function',
+    hasCache: orderTagService.cache instanceof Map,
+    getGroupsString: orderTagService.getGroups ? orderTagService.getGroups.toString().substring(0, 200) : 'NO FUNCTION'
+});
+
+// CRITICAL: Test the function directly
+console.log('🚨 [ORDERTAG SELECTOR] Testing orderTagService.getGroups directly...');
+try {
+    const testResult = orderTagService.getGroups(999, 'TestPortion');
+    console.log('🚨 [ORDERTAG SELECTOR] Direct test result:', testResult);
+} catch (error) {
+    console.error('🚨 [ORDERTAG SELECTOR] Direct test error:', error);
+}
+
 const debug = Debug('pmpos:order-tag-selector');
 
 const OrderTagSelector = ({
@@ -78,7 +95,21 @@ const OrderTagSelector = ({
                 const portion = product.Portion || 'Normal';
 
                 try {
+                    console.log('🚨 [ORDERTAG SELECTOR] ABOUT TO CALL orderTagService.getGroups with:', {
+                        productId: productId,
+                        portion: portion,
+                        serviceFunction: orderTagService.getGroups
+                    });
+
                     const flatTags = await orderTagService.getGroups(productId, portion);
+
+                    console.log('🚨 [ORDERTAG SELECTOR] orderTagService.getGroups RETURNED:', {
+                        flatTags: flatTags,
+                        isArray: Array.isArray(flatTags),
+                        length: flatTags?.length || 0,
+                        type: typeof flatTags
+                    });
+
                     debug('📋 Tags desde service (flat):', flatTags?.length || 0);
                     console.log('📋 DEBUG - Tags desde service (raw):', flatTags);
 

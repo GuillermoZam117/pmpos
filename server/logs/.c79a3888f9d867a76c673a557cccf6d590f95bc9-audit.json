@@ -6,39 +6,24 @@
     "auditLog": "C:\\PMPOS\\pmpos\\server\\logs\\.c79a3888f9d867a76c673a557cccf6d590f95bc9-audit.json",
     "files": [
         {
-            "date": 1756923473171,
-            "name": "C:\\PMPOS\\pmpos\\server\\logs\\graphql-2025-09-03.log",
-            "hash": "955ee95c988f2309a04c44d45737789516162c012b76464d9ceb81ed93cae820"
+            "date": 1763436341390,
+            "name": "C:\\PMPOS\\pmpos\\server\\logs\\graphql-2025-11-17.log",
+            "hash": "af65bb1a951f743645ce807cd89e26f27c1010337cfc234a09cc37e3e7b87054"
         },
         {
-            "date": 1757001038197,
-            "name": "C:\\PMPOS\\pmpos\\server\\logs\\graphql-2025-09-04.log",
-            "hash": "c306546a47974c32f4cc5eb9bab06e15d2cac6f88addc92c1f674b1753f6e22c"
+            "date": 1763474983733,
+            "name": "C:\\PMPOS\\pmpos\\server\\logs\\graphql-2025-11-18.log",
+            "hash": "e1fbc35a99aa686ae4a94421dabddf7427a717535bbb3d178e12e80bf2c6aed5"
         },
         {
-            "date": 1757094219772,
-            "name": "C:\\PMPOS\\pmpos\\server\\logs\\graphql-2025-09-05.log",
-            "hash": "fee1b337c38eaf5751388ab7eee5fb905cd03bd68718fae7a0f4eff8bc592e8a"
+            "date": 1763565774335,
+            "name": "C:\\PMPOS\\pmpos\\server\\logs\\graphql-2025-11-19.log",
+            "hash": "8fc37d9a705cd5e94d1106af2f5503ea37b96785c5ed5252bbea10e14eb0bfe5"
         },
         {
-            "date": 1757301934071,
-            "name": "C:\\PMPOS\\pmpos\\server\\logs\\graphql-2025-09-07.log",
-            "hash": "592f8f91fd40a53d85cd1e7c015a714b878864bf7bf84113f214a8dd262d0692"
-        },
-        {
-            "date": 1757355450367,
-            "name": "C:\\PMPOS\\pmpos\\server\\logs\\graphql-2025-09-08.log",
-            "hash": "5677d3cd363d5c5d1b1a35b4b5675d5d95c8181fd6ecc468c6ee180af8fd59ba"
-        },
-        {
-            "date": 1757461680946,
-            "name": "C:\\PMPOS\\pmpos\\server\\logs\\graphql-2025-09-09.log",
-            "hash": "2e54a2f1f84fe638b3883743deeb86ffcdee283e76a133323ca689a6c50165f4"
-        },
-        {
-            "date": 1757522142273,
-            "name": "C:\\PMPOS\\pmpos\\server\\logs\\graphql-2025-09-10.log",
-            "hash": "e179a0a256587eec7947bfef9c13b640edce257406bfcc00fa1d70267bf78cab"
+            "date": 1763838657503,
+            "name": "C:\\PMPOS\\pmpos\\server\\logs\\graphql-2025-11-22.log",
+            "hash": "c672c4d7b9d4e7dff0ec9c580838829fc28940d2f17c8876d8661da8d297d61e"
         }
     ],
     "hashType": "sha256"

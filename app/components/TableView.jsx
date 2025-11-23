@@ -38,6 +38,7 @@ import { TABLE_STATUS } from '../constants/tableStatus';
 import { appconfig } from '../config';
 import cacheService from '../services/cacheService';
 import logo from '../../public/favicon.ico';  // Add this import
+import SalesModeDashboard from './SalesModeDashboard';
 
 const debug = Debug('pmpos:tables');
 
@@ -67,6 +68,9 @@ const TableView = () => {
         refresh: refreshData
     } = useDataManager();
 
+    const config = appconfig();
+    const salesModeKey = config?.salesMode?.key || 'mesas';
+
     // Theme context
     const { toggleTheme, isDarkMode } = useCustomTheme();
 
@@ -86,6 +90,19 @@ const TableView = () => {
         return () => { isMountedRef.current = false; };
     }, []);
     const [manualRefreshing, setManualRefreshing] = useState(false);
+
+    if (salesModeKey !== 'mesas') {
+        return (
+            <SalesModeDashboard
+                modeKey={salesModeKey}
+                config={config}
+                tickets={allTickets}
+                loading={loading || dataLoading}
+                error={error || dataError}
+                onRefresh={refreshData}
+            />
+        );
+    }
 
     // Error handler first
     const handleError = useCallback((err) => {

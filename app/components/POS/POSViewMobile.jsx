@@ -2,7 +2,7 @@
  * Mobile-Optimized POSView Component
  * Redesigned for mobile devices with space optimization and modern UX
  */
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import {
@@ -41,6 +41,7 @@ import {
     Grid,
     Stack,
     Tooltip,
+    InputAdornment,
 } from '@mui/material';
 import {
     ArrowBackOutlined as BackIcon,
@@ -68,6 +69,9 @@ import {
     WifiOffOutlined as DisconnectedIcon,
     CheckCircleOutlined as ReadyIcon,
     PendingOutlined as PendingIcon,
+    Search as SearchIcon,
+    QrCodeScanner as ScannerIcon,
+    LogoutOutlined as LogoutIcon,
 } from '@mui/icons-material';
 import { formatMXN } from '../../utils/currencyFormatter';
 import MobileMenu from '../Menu/MobileMenu';
@@ -88,7 +92,9 @@ import { userService } from '../../services/userService';
 import orderTagService from '../../services/orderTagService';
 import adminService from '../../services/adminService';
 import { closeTerminalTicket, getTicketById } from '../../queries';
+import { logout } from '../../actions/auth';
 import Debug from 'debug';
+import { appconfig } from '../../config';
 
 const debug = Debug('pmpos:pos-mobile');
 const LABEL_SUBMIT = process.env.SAMBAPOS_LABEL_SUBMIT || 'Comandar';
@@ -250,6 +256,9 @@ const POSViewMobile = () => {
     const isAdminLocal = storedIsAdmin === '1' || (storedIsAdmin && storedIsAdmin.toLowerCase && ['1', 'true', 'yes', 'si', 'sí'].includes(storedIsAdmin.toLowerCase())) || (storedUserObj && storedUserObj.isAdmin === true);
     const canPay = !!(isAdminFlagFromState || isAdminLocal || roleUpper === 'ADMIN' || roleUpper.startsWith('ADMIN'));
     const isAdmin = canPay;
+    const config = appconfig();
+    const salesModeKey = config?.salesMode?.key || 'mesas';
+    const quickSaleFlow = salesModeKey === 'mostrador';
     debug('auth-gating', { userRole, roleUpper, isAdminFlagFromState, isAdminLocal, canPay });
 
     // Ensure admin flag via SQL read-service (does not affect token)
@@ -299,6 +308,8 @@ const POSViewMobile = () => {
     const [reasonsLoading, setReasonsLoading] = useState(false);
     const [allowedOrderCmds, setAllowedOrderCmds] = useState({}); // { [uid]: Set([...names]) }
     const [selectedCategory, setSelectedCategory] = useState('Todos');
+    const [searchText, setSearchText] = useState('');
+    const barcodeBufferRef = useRef('');
     const [terminalReady, setTerminalReady] = useState(false);
     const [page, setPage] = useState(0);
 
@@ -307,6 +318,10 @@ const POSViewMobile = () => {
     const [selectedOrderForTags, setSelectedOrderForTags] = useState(null);
     const [gridRows, setGridRows] = useState(4);
     const [ticketTotals, setTicketTotals] = useState({ totalAmount: 0, remainingAmount: 0 });
+    const [openTicketsDialogOpen, setOpenTicketsDialogOpen] = useState(false);
+    const [openTicketsLoading, setOpenTicketsLoading] = useState(false);
+    const [openTicketsList, setOpenTicketsList] = useState([]);
+    const [resumingTicketId, setResumingTicketId] = useState(null);
 
     // Estados para indicadores de estado
     const [terminalStatus, setTerminalStatus] = useState('disconnected'); // 'connected', 'connecting', 'disconnected'
@@ -315,6 +330,7 @@ const POSViewMobile = () => {
 
     const productsBoxRef = useRef(null);
     const [actionsModalOpen, setActionsModalOpen] = useState(false);
+    const [categoryPanelOpen, setCategoryPanelOpen] = useState(true);
     const isMountedRef = useRef(true);
 
     // Prevent infinite loops
@@ -382,6 +398,178 @@ const POSViewMobile = () => {
         const key = String(pid);
         return productNameById.get(key) || null;
     }, [productNameById]);
+
+    const handleProductClick = useCallback((product) => {
+        console.log('🖱️ [PRODUCTO CLICKEADO] Usuario hizo click en producto:', {
+            name: product.name,
+            caption: product.caption,
+            id: product.id,
+            productId: product.productId,
+            portions: product.portions,
+            orderTags: product.orderTags,
+            defaultOrderTags: product.defaultOrderTags,
+            hasOrderTags: !!(product.orderTags && product.orderTags.length > 0),
+            hasDefaultOrderTags: !!(product.defaultOrderTags && product.defaultOrderTags.length > 0),
+            fullProduct: product
+        });
+
+        if (ticketBlocked && !isAdmin) {
+            console.log('🚫 [PRODUCTO CLICKEADO] Bloqueado por cuenta solicitada');
+            setSnackbar({ open: true, severity: 'warning', message: 'Cuenta solicitada: requiere autorización' });
+            return;
+        }
+
+        console.log('✅ [PRODUCTO CLICKEADO] Abriendo modal de producto');
+        debug('🟣 Product clicked:', product.name);
+        setSelectedProduct(product);
+        setProductModalOpen(true);
+    }, [isWaiter, ticketBlocked, isAdmin]);
+
+    const ensureTerminalContext = useCallback(async () => {
+        let terminalId = terminalService.getTerminalId();
+        if (!terminalId) {
+            const userName = authUser?.name || null;
+            terminalId = await terminalService.ensureTerminalRegistered(userName);
+        }
+        try {
+            if (terminalId && ticket?.id) {
+                // Validate that the ticket still exists and is active before loading
+                console.log('🔍 [ensureTerminalContext] Validating ticket:', ticket.id);
+                try {
+                    const ticketValidation = await getTicketById(ticket.id);
+                    if (ticketValidation && (!ticketValidation.isClosed)) {
+                        console.log('✅ [ensureTerminalContext] Ticket is valid, loading into terminal');
+                        await ticketService.loadTerminalTicketWithOrders(terminalId, String(ticket.id));
+                    } else {
+                        console.log('⚠️ [ensureTerminalContext] Ticket is closed/invalid, skipping load:', {
+                            exists: !!ticketValidation,
+                            isClosed: ticketValidation?.isClosed
+                        });
+                    }
+                } catch (ticketError) {
+                    console.log('⚠️ [ensureTerminalContext] Ticket validation failed, treating as invalid:', ticketError.message);
+                    // Continue with table-only binding below
+                }
+            } else if (terminalId && tableId) {
+                // Do not create ticket here to avoid duplicates; binding happens during add
+                // If there's already a terminal ticket bound, changeEntity will succeed; otherwise submit will create
+                try { await ticketService.changeEntityOfTerminalTicket(terminalId, tableId); } catch (e) { /* ignore */ }
+            }
+        } catch (e) {
+            debug('?? ensureTerminalContext failed (non-critical):', e);
+        }
+        return terminalId;
+    }, [authUser, ticket?.id, tableId]);
+
+    const handleShowOpenTickets = useCallback(async () => {
+        setOpenTicketsDialogOpen(true);
+        setOpenTicketsLoading(true);
+        setResumingTicketId(null);
+        try {
+            let tickets = await dataManager.getActiveTickets(true);
+            if (quickSaleFlow && config?.departmentName) {
+                tickets = tickets.filter(t => (t.departmentName || '').toLowerCase() === config.departmentName.toLowerCase());
+            }
+            setOpenTicketsList(tickets);
+        } catch (error) {
+            console.error('❌ Error fetching open tickets:', error);
+            setSnackbar({ open: true, severity: 'error', message: 'No se pudieron cargar los tickets' });
+            setOpenTicketsList([]);
+        } finally {
+            setOpenTicketsLoading(false);
+        }
+    }, [quickSaleFlow, config?.departmentName]);
+
+    const handleResumeTicket = useCallback(async (ticketSummary) => {
+        if (!ticketSummary?.id || resumingTicketId) return;
+        try {
+            setResumingTicketId(ticketSummary.id);
+            const terminalId = await ensureTerminalContext();
+            if (!terminalId) {
+                throw new Error('Terminal no disponible');
+            }
+            await ticketService.loadTerminalTicketWithOrders(terminalId, String(ticketSummary.id));
+            let detailedTicket = null;
+            try {
+                detailedTicket = await ticketService.fetchTicketDetails(String(ticketSummary.id));
+            } catch (detailErr) {
+                debug('⚠️ Failed to fetch detailed ticket info:', detailErr?.message || detailErr);
+            }
+            const mesaEntity = (ticketSummary.entities || []).find(entity =>
+                (entity?.type || '').toLowerCase().includes('mesa')
+            );
+            setOpenTicketsDialogOpen(false);
+            setSnackbar({
+                open: true,
+                severity: 'success',
+                message: `Ticket #${ticketSummary.number || ticketSummary.id} listo`
+            });
+            navigate('/pos', {
+                replace: true,
+                state: {
+                    ticket: detailedTicket || ticketSummary,
+                    tableId: mesaEntity?.name || tableId || null,
+                    isNew: false
+                }
+            });
+        } catch (err) {
+            console.error('❌ Error al reanudar ticket:', err);
+            setSnackbar({
+                open: true,
+                severity: 'error',
+                message: err?.message || 'No se pudo cargar el ticket seleccionado'
+            });
+        } finally {
+            setResumingTicketId(null);
+        }
+    }, [ensureTerminalContext, navigate, resumingTicketId, tableId]);
+
+    const handleBarcodeMatch = useCallback((code) => {
+        if (!code || !menuJS) return false;
+        const target = (menuJS.categories || [])
+            .flatMap(c => c.menuItems || [])
+            .find(item => {
+                const barcode = item.product?.barcode || item.barcode;
+                return barcode && barcode.toLowerCase() === code.toLowerCase();
+            });
+        if (target) {
+            handleProductClick(target);
+            setSnackbar({ open: true, message: `Producto agregado: ${target.name}`, severity: 'success' });
+            return true;
+        }
+        return false;
+    }, [menuJS, handleProductClick]);
+
+    useEffect(() => {
+        if (salesModeKey !== 'mostrador') return;
+        let timeoutId = null;
+        const resetBuffer = () => {
+            barcodeBufferRef.current = '';
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+        };
+        const handleKeyDown = (event) => {
+            if (event.target && ['INPUT', 'TEXTAREA'].includes(event.target.tagName)) return;
+            if (event.key === 'Enter') {
+                const buffer = barcodeBufferRef.current.trim();
+                if (buffer) handleBarcodeMatch(buffer);
+                resetBuffer();
+                return;
+            }
+            if (event.key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey) {
+                barcodeBufferRef.current += event.key;
+                if (timeoutId) clearTimeout(timeoutId);
+                timeoutId = setTimeout(resetBuffer, 300);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            if (timeoutId) clearTimeout(timeoutId);
+        };
+    }, [salesModeKey, handleBarcodeMatch]);
 
     // Load menu on mount - Optimized to use pre-loaded data
     useEffect(() => {
@@ -781,28 +969,19 @@ const POSViewMobile = () => {
 
     // Guard: prevent add when ticket is blocked and role is Mesero
 
+    const handleLogout = useCallback(() => {
+        dispatch(logout());
+        navigate('/pinpad', { replace: true });
+    }, [dispatch, navigate]);
+
     const handleBack = () => {
-        navigate('/tables');
+        if (quickSaleFlow) {
+            handleLogout();
+        } else {
+            navigate('/tables');
+        }
     };
 
-    const handleProductClick = useCallback((product) => {
-        console.log('🖱️ [PRODUCTO CLICKEADO] Usuario hizo click en producto:', {
-            name: product.name,
-            caption: product.caption,
-            id: product.id
-        });
-
-        if (ticketBlocked && !isAdmin) {
-            console.log('🚫 [PRODUCTO CLICKEADO] Bloqueado por cuenta solicitada');
-            setSnackbar({ open: true, severity: 'warning', message: 'Cuenta solicitada: requiere autorización' });
-            return;
-        }
-
-        console.log('✅ [PRODUCTO CLICKEADO] Abriendo modal de producto');
-        debug('??? Product clicked:', product.name);
-        setSelectedProduct(product);
-        setProductModalOpen(true);
-    }, [isWaiter, ticketBlocked]);
 
     const handleAddToOrder = useCallback(async (orderData) => {
         console.log('📦 [MODAL CONFIRMADO] handleAddToOrder called with:', {
@@ -832,7 +1011,13 @@ const POSViewMobile = () => {
             quantity: orderData.quantity,
             price: orderData.price,
             portion: orderData.portion?.name || 'Normal',
-            orderTags: orderData.orderTags.map(tag => tag.name),
+            orderTags: orderData.orderTags.map(tag => ({
+                name: tag.name,
+                value: tag.name, // Tag value can be same as name for simple tags
+                price: tag.price || 0,
+                tagName: tag.group || 'CUSTOM', // Use group as tagName for SambaPOS
+                tag: tag.name // SambaPOS expects 'tag' field
+            })),
             comments: orderData.comments,
             isExisting: false, // NUEVA orden - debe ser enviada
             status: 'pending'  // Status inicial
@@ -1051,42 +1236,6 @@ const POSViewMobile = () => {
             }
         } catch { }
     }, [orders, tableId]);
-
-    const ensureTerminalContext = useCallback(async () => {
-        let terminalId = terminalService.getTerminalId();
-        if (!terminalId) {
-            const userName = authUser?.name || null;
-            terminalId = await terminalService.ensureTerminalRegistered(userName);
-        }
-        try {
-            if (terminalId && ticket?.id) {
-                // Validate that the ticket still exists and is active before loading
-                console.log('🔍 [ensureTerminalContext] Validating ticket:', ticket.id);
-                try {
-                    const ticketValidation = await getTicketById(ticket.id);
-                    if (ticketValidation && (!ticketValidation.isClosed)) {
-                        console.log('✅ [ensureTerminalContext] Ticket is valid, loading into terminal');
-                        await ticketService.loadTerminalTicketWithOrders(terminalId, String(ticket.id));
-                    } else {
-                        console.log('⚠️ [ensureTerminalContext] Ticket is closed/invalid, skipping load:', {
-                            exists: !!ticketValidation,
-                            isClosed: ticketValidation?.isClosed
-                        });
-                    }
-                } catch (ticketError) {
-                    console.log('⚠️ [ensureTerminalContext] Ticket validation failed, treating as invalid:', ticketError.message);
-                    // Continue with table-only binding below
-                }
-            } else if (terminalId && tableId) {
-                // Do not create ticket here to avoid duplicates; binding happens during add
-                // If there's already a terminal ticket bound, changeEntity will succeed; otherwise submit will create
-                try { await ticketService.changeEntityOfTerminalTicket(terminalId, tableId); } catch (e) { /* ignore */ }
-            }
-        } catch (e) {
-            debug('?? ensureTerminalContext failed (non-critical):', e);
-        }
-        return terminalId;
-    }, [authUser, ticket?.id, tableId]);
 
     // Load allowed automation commands per existing order to toggle buttons
     useEffect(() => {
@@ -1503,14 +1652,16 @@ const POSViewMobile = () => {
                         });
 
                         // CRÍTICO: Solo la primera orden carga el ticket, las siguientes lo preservan
-                        console.log(`🚀 [ENVÍO] About to call orderService.addOrder for: ${order.name}, skipReload: ${!isFirstOrder}`);
+                        console.log(`🚀 [ENVÍO] About to call orderService.addOrder for: ${order.name}, skipReload: ${!isFirstOrder}, tags: ${order.orderTags?.length || 0}`);
                         const orderResult = await orderService.addOrder(
                             terminalId,
                             order.name,
                             order.quantity,
                             order.portion,
-                            tableId,
-                            !isFirstOrder // skipTicketReload = true para órdenes después de la primera
+                            quickSaleFlow ? null : tableId,
+                            !isFirstOrder, // skipTicketReload = true para órdenes después de la primera
+                            order.orderTags || [],
+                            quickSaleFlow
                         );
 
                         console.log(`✅ [POSViewMobile] Order ${i + 1} sent successfully:`, orderResult);
@@ -2036,8 +2187,10 @@ const POSViewMobile = () => {
         </Box>
     );
 
-    // Category bar and product grid (restaurant style)
     useEffect(() => { setPage(0); }, [selectedCategory]);
+    useEffect(() => {
+        setCategoryPanelOpen(!isMobile ? true : false);
+    }, [isMobile, quickSaleFlow]);
     useEffect(() => {
         const calcRows = () => {
             const h = productsBoxRef.current?.clientHeight || 0;
@@ -2053,11 +2206,66 @@ const POSViewMobile = () => {
         return () => window.removeEventListener('resize', calcRows);
     }, [isMobile]);
     const CategoryBar = () => {
-        const cats = (menuJS?.categories || []).map(c => c.name);
-        const items = ['Todos', ...cats];
+        const categories = menuJS?.categories || [];
+        if (!categories.length) return null;
+        const items = ['Todos', ...categories.map(c => c.name)];
         const paletteColors = ['primary', 'secondary', 'success', 'warning', 'info', 'error'];
+        if (quickSaleFlow) {
+            return (
+                <Box sx={{ mb: 1 }}>
+                    <Button
+                        fullWidth
+                        variant="outlined"
+                        onClick={() => setCategoryPanelOpen((prev) => !prev)}
+                        sx={{ mb: 1, justifyContent: 'space-between' }}
+                    >
+                        Categorías {categoryPanelOpen ? <CollapseIcon /> : <ExpandIcon />}
+                    </Button>
+                    <Collapse in={categoryPanelOpen}>
+                        <Box sx={{
+                            display: 'grid',
+                            gridTemplateColumns: {
+                                xs: 'repeat(auto-fill, minmax(110px, 1fr))',
+                                sm: 'repeat(auto-fill, minmax(140px, 1fr))'
+                            },
+                            gap: 1,
+                            pb: 1,
+                            maxHeight: { xs: 260, sm: 300 },
+                            overflowY: 'auto',
+                            pr: 0.5
+                        }}>
+                            {items.map((cat) => {
+                                const isSelected = selectedCategory === cat;
+                                return (
+                                    <Button
+                                        key={cat}
+                                        variant={isSelected ? 'contained' : 'outlined'}
+                                        color={isSelected ? 'primary' : 'inherit'}
+                                        onClick={() => setSelectedCategory(cat)}
+                                        sx={{
+                                            justifyContent: 'flex-start',
+                                            fontWeight: 600,
+                                            borderRadius: 2,
+                                            textTransform: 'none',
+                                            fontSize: { xs: '0.9rem', sm: '1rem' }
+                                        }}
+                                    >
+                                        {cat}
+                                    </Button>
+                                );
+                            })}
+                        </Box>
+                    </Collapse>
+                </Box>
+            );
+        }
         return (
-            <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto', pb: 1 }}>
+            <Box sx={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 1,
+                pb: 1
+            }}>
                 {items.map((cat, idx) => {
                     const color = paletteColors[idx % paletteColors.length];
                     const isSelected = selectedCategory === cat;
@@ -2068,7 +2276,7 @@ const POSViewMobile = () => {
                             color={isSelected ? 'primary' : color}
                             onClick={() => setSelectedCategory(cat)}
                             variant={isSelected ? 'filled' : 'outlined'}
-                            sx={{ flexShrink: 0, fontSize: { xs: 18, sm: 20 }, fontWeight: 700, px: 2, height: 44 }}
+                            sx={{ fontSize: { xs: 16, sm: 18 }, fontWeight: 600, px: 2, height: 40 }}
                         />
                     );
                 })}
@@ -2076,11 +2284,174 @@ const POSViewMobile = () => {
         );
     };
 
-    const ProductGrid = () => {
+    const ProductSearchBar = () => {
+        if (salesModeKey !== 'mostrador') return null;
+        return (
+            <Box sx={{ display: 'flex', gap: 1, mb: 1, flexWrap: 'wrap' }}>
+                <TextField
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleSearchSubmit(); }}
+                    size="small"
+                    placeholder="Buscar producto o escanear código"
+                    sx={{ flex: { xs: '1 1 100%', sm: '1 1 70%' } }}
+                    InputProps={{
+                        startAdornment: (
+                            <InputAdornment position="start">
+                                <SearchIcon fontSize="small" />
+                            </InputAdornment>
+                        ),
+                        endAdornment: (
+                            <InputAdornment position="end">
+                                <ScannerIcon fontSize="small" color="action" />
+                            </InputAdornment>
+                        )
+                    }}
+                />
+                <Button variant="outlined" onClick={handleSearchSubmit} disabled={!searchText.trim()}>
+                    Buscar
+                </Button>
+            </Box>
+        );
+    };
+
+    const renderQuickSaleActions = useCallback((options = {}) => {
+        const hasOrders = orders.length > 0;
+        const widthStyles = options.fullWidth
+            ? { width: { xs: '100%', md: 'auto' } }
+            : {};
+        return (
+            <Stack
+                direction={{ xs: 'column', sm: 'row', md: 'row' }}
+                spacing={1}
+                sx={{ ...widthStyles, ...(options.sx || {}) }}
+            >
+                <Button
+                    variant="contained"
+                    color="primary"
+                    fullWidth
+                    disabled={!hasOrders}
+                    onClick={handleSendToKitchen}
+                >
+                    Enviar
+                </Button>
+                <Button
+                    variant="contained"
+                    color="success"
+                    fullWidth
+                    disabled={!hasOrders}
+                    onClick={handleOpenPaymentProcessor}
+                >
+                    Cobrar
+                </Button>
+            </Stack>
+        );
+    }, [orders.length, handleSendToKitchen, handleOpenPaymentProcessor]);
+
+    const QuickSaleSummary = () => {
+        if (!quickSaleFlow) return null;
+        const totalItems = orders.reduce((sum, order) => sum + (order.quantity || 0), 0);
+        const pendingCount = orders.filter(order => !order.isExisting).length;
+        return (
+            <Paper sx={{ p: 2, mb: 2, borderRadius: 2, background: 'linear-gradient(128deg, rgba(25,118,210,0.08), rgba(21,101,192,0.08))' }}>
+                <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="flex-start" justifyContent="space-between">
+                    <Box>
+                        <Typography variant="subtitle2" color="text.secondary">
+                            Venta mostrador
+                        </Typography>
+                        <Typography variant="h4" fontWeight="bold">
+                            {formatMXN(displayTotal)}
+                        </Typography>
+                        <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                            <Chip label={`${totalItems} producto(s)`} />
+                            <Chip label={`${pendingCount} sin enviar`} color={pendingCount ? 'warning' : 'default'} variant="outlined" />
+                        </Stack>
+                    </Box>
+                    {renderQuickSaleActions({ fullWidth: true })}
+                </Stack>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 1 }}>
+                    <Button
+                        variant="outlined"
+                        color="inherit"
+                        onClick={() => setActiveTab(1)}
+                        sx={{ flex: 1 }}
+                    >
+                        Ver carrito
+                    </Button>
+                    <Button
+                        variant="text"
+                        color="inherit"
+                        onClick={handleShowOpenTickets}
+                        sx={{ flex: 1 }}
+                    >
+                        Tickets pendientes
+                    </Button>
+                </Stack>
+                <Button
+                    variant="text"
+                    color="error"
+                    startIcon={<LogoutIcon />}
+                    onClick={handleLogout}
+                    sx={{ mt: 1 }}
+                >
+                    Cerrar sesión
+                </Button>
+            </Paper>
+        );
+    };
+
+    const filteredProductsMemo = useMemo(() => {
         const categories = menuJS?.categories || [];
-        const productsAll = selectedCategory === 'Todos'
+        const base = selectedCategory === 'Todos'
             ? categories.flatMap(c => c.menuItems || [])
             : (categories.find(c => c.name === selectedCategory)?.menuItems || []);
+        const text = searchText.trim().toLowerCase();
+        if (!text) return base;
+        return base.filter(item => {
+            const nameMatch = (item.name || item.product?.name || '').toLowerCase().includes(text);
+            const barcode = (item.product?.barcode || item.barcode || '').toLowerCase();
+            return nameMatch || (barcode && barcode.includes(text));
+        });
+    }, [menuJS, selectedCategory, searchText]);
+
+    const handleSearchSubmit = useCallback(() => {
+        const text = searchText.trim().toLowerCase();
+        if (!text || !menuJS) return;
+        const categories = menuJS.categories || [];
+        for (const cat of categories) {
+            for (const item of cat.menuItems || []) {
+                const name = (item.name || item.product?.name || '').toLowerCase();
+                const barcode = (item.product?.barcode || item.barcode || '').toLowerCase();
+                if (name.includes(text) || (barcode && barcode.includes(text))) {
+                    setSelectedCategory(cat.name || 'Todos');
+                    handleProductClick(item);
+                    setSnackbar({ open: true, message: `Producto agregado: ${item.name}`, severity: 'success' });
+                    return;
+                }
+            }
+        }
+        setSnackbar({ open: true, message: 'Producto no encontrado', severity: 'warning' });
+    }, [searchText, menuJS, handleProductClick]);
+
+    const ProductGrid = () => {
+        const categories = menuJS?.categories || [];
+        const productsAll = filteredProductsMemo;
+
+        // DEBUGGING: Log products and their structure
+        console.log('🔍 [PRODUCT GRID] Products loaded for category:', {
+            selectedCategory: selectedCategory,
+            totalProducts: productsAll.length,
+            sampleProducts: productsAll.slice(0, 3).map(p => ({
+                name: p.name,
+                id: p.id,
+                productId: p.productId,
+                hasOrderTags: !!(p.orderTags && p.orderTags.length > 0),
+                hasDefaultOrderTags: !!(p.defaultOrderTags && p.defaultOrderTags.length > 0),
+                orderTags: p.orderTags,
+                defaultOrderTags: p.defaultOrderTags,
+                fullStructure: p
+            }))
+        });
         // Category color mapping: prefer color coming from SambaPOS category fields
         const paletteColors = ['primary', 'secondary', 'success', 'warning', 'info', 'error'];
         const catColorByName = new Map();
@@ -2112,35 +2483,45 @@ const POSViewMobile = () => {
         const pageItems = productsAll.slice(start, start + itemsPerPage);
         return (
             <>
-                <Grid container spacing={1}>
+                <Box sx={{
+                    display: 'grid',
+                    gridTemplateColumns: {
+                        xs: 'repeat(auto-fill, minmax(140px, 1fr))',
+                        md: `repeat(${cols}, minmax(140px, 1fr))`
+                    },
+                    gap: 1
+                }}>
                     {pageItems.map(p => {
                         const neon = getNeonColor(p);
                         return (
-                            <Grid item xs={12 / cols} sm={12 / cols} md={12 / cols} key={`${p.id || p.name}-${selectedCategory}-${start}`}>
-                                <Card onClick={() => handleProductClick(p)} sx={{
+                            <Card
+                                key={`${p.id || p.name}-${selectedCategory}-${start}`}
+                                onClick={() => handleProductClick(p)}
+                                sx={{
                                     cursor: 'pointer',
-                                    height: isMobile ? 120 : 128,
-                                    display: 'flex', alignItems: 'center', position: 'relative',
+                                    minHeight: 120,
+                                    display: 'flex',
+                                    alignItems: 'center',
                                     border: `1.5px solid ${neon}`,
-                                    boxShadow: `0 0 10px ${neon}88`
-                                }}>
-                                    <CardContent sx={{ p: 1, width: '100%', py: 1 }}>
-                                        <Typography variant="subtitle1" fontWeight="bold" sx={{
-                                            fontSize: { xs: '1.2rem', sm: '1.3rem' },
-                                            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-                                            overflow: 'hidden', lineHeight: 1.2
-                                        }}>
-                                            {p.name || p.caption}
-                                        </Typography>
-                                        <Typography color="text.secondary" sx={{ mt: 0.5, fontWeight: 700, fontSize: { xs: '1.3rem', sm: '1.5rem' } }}>
-                                            {formatMXN((p.portions && p.portions[0]?.price) || (p.product?.portions && p.product.portions[0]?.price) || 0)}
-                                        </Typography>
-                                    </CardContent>
-                                </Card>
-                            </Grid>
+                                    boxShadow: `0 0 10px ${neon}66`
+                                }}
+                            >
+                                <CardContent sx={{ p: 1.5, width: '100%' }}>
+                                    <Typography variant="subtitle1" fontWeight="bold" sx={{
+                                        fontSize: { xs: '1rem', sm: '1.2rem' },
+                                        display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                                        overflow: 'hidden', lineHeight: 1.2
+                                    }}>
+                                        {p.name || p.caption}
+                                    </Typography>
+                                    <Typography color="text.secondary" sx={{ mt: 0.5, fontWeight: 700, fontSize: { xs: '1.1rem', sm: '1.3rem' } }}>
+                                        {formatMXN((p.portions && p.portions[0]?.price) || (p.product?.portions && p.product.portions[0]?.price) || 0)}
+                                    </Typography>
+                                </CardContent>
+                            </Card>
                         );
                     })}
-                </Grid>
+                </Box>
                 {totalPages > 1 && (
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
                         <Button size="small" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Anterior</Button>
@@ -2152,10 +2533,12 @@ const POSViewMobile = () => {
         );
     };
 
-    // Mobile cart component - Fixed to use full available space
+    // Mobile cart component - CORREGIDO: Altura limitada para zona segura de botones
     const MobileCart = () => (
         <Paper sx={{
+            // CRÍTICO: Altura calculada para dejar espacio garantizado a botones fijos
             height: '100%',
+            maxHeight: 'calc(100vh - 160px)', // LÍMITE SÚPER AGRESIVO: Garantizar botones visibles
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
@@ -2202,10 +2585,14 @@ const POSViewMobile = () => {
                             {/* First row: Mesa and Ticket */}
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <Typography variant="h6" fontWeight="bold" sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
-                                    Mesa {tableId}
+                                    {quickSaleFlow ? 'Venta mostrador' : `Mesa ${tableId}`}
                                 </Typography>
                                 <Typography variant="body1" fontWeight="600" sx={{ fontSize: { xs: '0.9rem', sm: '1rem' } }}>
-                                    {isNew ? 'Nuevo Ticket' : (ticket?.number ? `Ticket #${ticket.number}` : (ticket?.id ? `Ticket #${ticket.id}` : 'Ticket Pendiente'))}
+                                    {quickSaleFlow && !ticket
+                                        ? 'Venta mostrador'
+                                        : isNew
+                                            ? 'Nuevo Ticket'
+                                            : (ticket?.number ? `Ticket #${ticket.number}` : (ticket?.id ? `Ticket #${ticket.id}` : 'Ticket Pendiente'))}
                                 </Typography>
                             </Box>
 
@@ -2218,16 +2605,29 @@ const POSViewMobile = () => {
                                     Total: {formatMXN(displayTotal)}
                                 </Typography>
                             </Box>
-                        </Box>
                     </Box>
+                </Box>
 
-                    {/* Scrollable orders list - takes full available space, with bottom padding for sticky buttons */}
-                    <Box sx={{
+                {quickSaleFlow && orders.length > 0 && (
+                    <Box sx={{ px: { xs: 1.5, sm: 2 }, pb: 1, borderBottom: 1, borderColor: 'divider' }}>
+                        <Typography variant="subtitle2" color="text.secondary">
+                            Total mostrado
+                        </Typography>
+                        <Typography variant="h5" fontWeight="bold">
+                            {formatMXN(displayTotal)}
+                        </Typography>
+                        {renderQuickSaleActions({ fullWidth: true, sx: { mt: 1 } })}
+                    </Box>
+                )}
+
+                {/* Scrollable orders list - ALTURA LIMITADA para zona segura de botones */}
+                <Box sx={{
                         flex: 1,
                         overflowY: 'auto',
                         p: 1,
-                        // ZONA SEGURA CRÍTICA: Espacio generoso para que los botones NUNCA tapen contenido
-                        pb: isMobile ? 'calc(160px + env(safe-area-inset-bottom, 0px))' : 'calc(180px + 16px)' // Zona segura amplia
+                        // ZONA SEGURA CRÍTICA: Altura máxima agresiva para garantizar espacio de botones fijos
+                        maxHeight: isMobile ? 'calc(100vh - 180px)' : 'none', // Límite MUCHO más agresivo en mobile
+                        pb: isMobile ? 'calc(10px + env(safe-area-inset-bottom, 0px))' : 'calc(40px + 16px)' // Padding mínimo ya que el contenedor está muy limitado
                     }}>
                         <List sx={{ py: 0 }}>
                             {orders.map((order, index) => (
@@ -2484,8 +2884,8 @@ const POSViewMobile = () => {
         </Paper>
     );
 
-    // If neither ticket nor tableId is provided, nothing to render
-    if (!ticket && !tableId) {
+    // If neither ticket nor tableId is provided, nothing to render unless quick sale mode
+    if (!ticket && !tableId && !quickSaleFlow) {
         return null;
     }
 
@@ -2534,7 +2934,7 @@ const POSViewMobile = () => {
                                     fontWeight: 'bold',
                                     fontSize: { xs: '1.3rem', sm: '1.5rem' }
                                 }}>
-                                    Mesa {tableId}
+                                    {quickSaleFlow ? 'Venta mostrador' : `Mesa ${tableId}`}
                                 </Typography>
                                 {/* Enhanced Status indicators with better contrast */}
                                 <Stack direction="row" spacing={0.5} sx={{ mt: 0.5 }}>
@@ -2617,6 +3017,36 @@ const POSViewMobile = () => {
                         </Box>
 
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            {quickSaleFlow && (
+                                <>
+                                    <Button
+                                        variant="outlined"
+                                        color="inherit"
+                                        size="small"
+                                        onClick={handleShowOpenTickets}
+                                        sx={{
+                                            borderColor: 'rgba(255,255,255,0.7)',
+                                            color: 'common.white',
+                                            textTransform: 'none',
+                                            fontWeight: 600
+                                        }}
+                                    >
+                                        Tickets pendientes
+                                    </Button>
+                                    <Tooltip title="Cerrar sesión">
+                                        <IconButton
+                                            color="inherit"
+                                            onClick={handleLogout}
+                                            sx={{
+                                                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                                '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.2)' }
+                                            }}
+                                        >
+                                            <LogoutIcon />
+                                        </IconButton>
+                                    </Tooltip>
+                                </>
+                            )}
                             <Tooltip title="Cambiar tema">
                                 <IconButton
                                     color="inherit"
@@ -2663,7 +3093,11 @@ const POSViewMobile = () => {
                             fontWeight: 600,
                             fontSize: { xs: '0.8rem', sm: '0.875rem' }
                         }}>
-                            {isNew ? 'Nuevo Ticket' : (ticket?.number ? `Ticket #${ticket.number}` : (ticket?.id ? `Ticket #${ticket.id}` : 'Ticket Pendiente'))}
+                            {quickSaleFlow && !ticket
+                                ? 'Venta mostrador'
+                                : isNew
+                                    ? 'Nuevo Ticket'
+                                    : (ticket?.number ? `Ticket #${ticket.number}` : (ticket?.id ? `Ticket #${ticket.id}` : 'Ticket Pendiente'))}
                         </Typography>
 
                         <Typography variant="body2" sx={{
@@ -2700,11 +3134,22 @@ const POSViewMobile = () => {
                     {isMobile ? (
                         // Mobile: two separate screens (Menu or Carrito), selected via state or Acciones menu
                         activeTab === 1 ? (
-                            <MobileCart />
+                            <Box sx={{
+                                height: '100%',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                // ZONA SEGURA CRÍTICA: Altura máxima súper agresiva para evitar desbordamiento de botones
+                                maxHeight: 'calc(100vh - 140px)', // Header ~60px + Botones ~80px = 140px mínimo
+                                overflow: 'hidden'
+                            }}>
+                                <MobileCart />
+                            </Box>
                         ) : (
-                            <Box sx={{ height: '100%', display: 'flex', p: 1 }}>
+                            <Box sx={{ height: '100%', display: 'flex', p: 1, flexDirection: 'column', gap: 1 }}>
+                                {quickSaleFlow && <QuickSaleSummary />}
                                 <Paper sx={{ p: 1, display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
                                     <CategoryBar />
+                                    <ProductSearchBar />
                                     <Box sx={{ mt: 1, flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }} ref={productsBoxRef}>
                                         <ProductGrid />
                                     </Box>
@@ -2714,10 +3159,16 @@ const POSViewMobile = () => {
                     ) : (
                         // md+ : two panels side-by-side
                         <Grid container spacing={2} sx={{ height: '100%', alignItems: 'stretch' }}>
+                            {quickSaleFlow && (
+                                <Grid item xs={12}>
+                                    <QuickSaleSummary />
+                                </Grid>
+                            )}
                             {/* Right panel (products) */}
                             <Grid item xs={12} md={7} order={{ xs: 1, md: 2 }} sx={{ display: 'flex' }}>
                                 <Paper sx={{ p: 1, display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
                                     <CategoryBar />
+                                    <ProductSearchBar />
                                     <Box sx={{ mt: 1, flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }} ref={productsBoxRef}>
                                         <ProductGrid />
                                     </Box>
@@ -2733,7 +3184,7 @@ const POSViewMobile = () => {
             )}
 
             {/* Sticky Bottom Action Bar + Actions Menu (mobile only) - MEJORADO */}
-            {isMobile && (
+            {isMobile && !quickSaleFlow && (
                 <>
                     <Paper elevation={8} sx={{
                         position: 'fixed', // CORREGIDO: Cambiado de sticky a fixed para mejor control
@@ -2820,7 +3271,7 @@ const POSViewMobile = () => {
                                 Acciones del Ticket
                             </Typography>
                             <Typography variant="body2" sx={{ opacity: 0.9, mt: 0.5 }}>
-                                Mesa {tableId} • {orderCount} {orderCount === 1 ? 'producto' : 'productos'} • {formatMXN(displayTotal)}
+                                {quickSaleFlow ? 'Venta mostrador' : `Mesa ${tableId}`} • {orderCount} {orderCount === 1 ? 'producto' : 'productos'} • {formatMXN(displayTotal)}
                             </Typography>
                         </Box>
                         <IconButton
@@ -2886,7 +3337,7 @@ const POSViewMobile = () => {
                         </Grid>
 
                         {/* Process Payment */}
-                        {canPay && (
+                        {salesModeKey !== 'mostrador' && canPay && (
                             <Grid item xs={12} sm={6}>
                                 <Card
                                     sx={{
@@ -2970,6 +3421,67 @@ const POSViewMobile = () => {
                         )}
                     </Grid>
                 </Box>
+            </Dialog>
+            <Dialog
+                open={openTicketsDialogOpen}
+                onClose={() => { setOpenTicketsDialogOpen(false); setResumingTicketId(null); }}
+                fullWidth
+                maxWidth="md"
+            >
+                <DialogTitle>Tickets pendientes</DialogTitle>
+                <DialogContent dividers>
+                    {openTicketsLoading ? (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                            <CircularProgress />
+                        </Box>
+                    ) : openTicketsList.length === 0 ? (
+                        <Alert severity="info">No hay tickets abiertos para este modo.</Alert>
+                    ) : (
+                        <Grid container spacing={2}>
+                            {openTicketsList.map(ticketItem => {
+                                const entities = (ticketItem.entities || []).map(entity => entity.name).join(', ') || 'Sin entidad';
+                                const dateLabel = ticketItem.date ? new Date(ticketItem.date).toLocaleString('es-MX') : 'Sin fecha';
+                                return (
+                                    <Grid item xs={12} sm={6} md={4} key={ticketItem.id}>
+                                        <Card variant="outlined" sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                                            <CardContent sx={{ flex: 1 }}>
+                                                <Typography variant="subtitle2" color="text.secondary">
+                                                    {ticketItem.user?.name || 'Terminal'}
+                                                </Typography>
+                                                <Typography variant="h6" fontWeight="bold">
+                                                    Ticket #{ticketItem.number || ticketItem.id}
+                                                </Typography>
+                                                <Typography variant="body2" color="text.secondary" gutterBottom>
+                                                    {entities}
+                                                </Typography>
+                                                <Typography variant="body1" fontWeight="bold">
+                                                    Pendiente: {formatMXN(ticketItem.remainingAmount || ticketItem.totalAmount || 0)}
+                                                </Typography>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    {dateLabel}
+                                                </Typography>
+                                            </CardContent>
+                                            <Box sx={{ p: 2, pt: 0 }}>
+                                                <Button
+                                                    fullWidth
+                                                    variant="contained"
+                                                    color="primary"
+                                                    disabled={!!resumingTicketId && resumingTicketId !== ticketItem.id}
+                                                    onClick={() => handleResumeTicket(ticketItem)}
+                                                >
+                                                    {resumingTicketId === ticketItem.id ? 'Abriendo…' : 'Continuar venta'}
+                                                </Button>
+                                            </Box>
+                                        </Card>
+                                    </Grid>
+                                );
+                            })}
+                        </Grid>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => { setOpenTicketsDialogOpen(false); setResumingTicketId(null); }}>Cerrar</Button>
+                </DialogActions>
             </Dialog>
             {/* Product Details Modal */}
             <ProductDetailsModal

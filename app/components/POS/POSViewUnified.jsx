@@ -6,12 +6,14 @@ import React from 'react';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import POSViewMobile from './POSViewMobile';
+import { appconfig } from '../../config';
 
 const POSViewUnified = () => {
+    const config = appconfig();
     const theme = useTheme();
-    const isMobile = useMediaQuery(theme.breakpoints.down('lg')); // Changed to lg to prefer mobile layout
+    const isMobile = useMediaQuery(theme.breakpoints.down('lg')); // prefer mobile layout by default
+    const modeKey = config?.salesMode?.key || 'mesas';
 
-    // Always use mobile layout for now since it's fully functional
     return <POSViewMobile />;
 };
 

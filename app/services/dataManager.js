@@ -26,6 +26,7 @@ class DataManager {
         this._pollingInterval = null;
         this._lastSignalRActivity = Date.now();
         this._signalRConnected = false;
+        this.salesModeKey = 'mesas';
     }
 
     /**
@@ -58,6 +59,11 @@ class DataManager {
         debug('🚀 Starting application initialization...');
 
         try {
+            const cfg = appconfig();
+            const salesModeKey = cfg?.salesMode?.key || 'mesas';
+            this.salesModeKey = salesModeKey;
+            menuService.setSalesMode(salesModeKey);
+            menuService.setMenuName(cfg?.menuName || 'MENU');
             // Step 0: Check network connectivity first
             debug('🌐 Step 0: Checking network connectivity...');
             const isConnected = await networkHealthService.checkSambaPOSConnectivity();
@@ -94,26 +100,32 @@ class DataManager {
                 debug('⚠️ productOrderTagsIndex build failed to start:', e?.message || e);
             }
 
-            // Step 2: Load Tables (Semi-static Cache - Level 2)
-            debug('🏠 Step 2: Loading tables...');
-            const tablesStartTime = performance.now();
+            let tables = [];
+            let tablesLoadTime = 0;
+            if (salesModeKey === 'mesas') {
+                // Step 2: Load Tables (Semi-static Cache - Level 2)
+                debug('🏠 Step 2: Loading tables...');
+                const tablesStartTime = performance.now();
 
-            // Prefer SQL read-service when enabled
-            const useSql = process.env.REACT_APP_USE_SQL_READS === 'true';
-            let tables;
-            if (useSql) {
-                try {
-                    tables = await this.fetchTablesSql();
-                } catch (err) {
-                    debug('\u26a0 fetchTables failed, falling back to previous loadTables()', err.message);
+                // Prefer SQL read-service when enabled
+                const useSql = process.env.REACT_APP_USE_SQL_READS === 'true';
+                if (useSql) {
+                    try {
+                        tables = await this.fetchTablesSql();
+                    } catch (err) {
+                        debug('\u26a0 fetchTables failed, falling back to previous loadTables()', err.message);
+                        tables = await this.loadTables();
+                    }
+                } else {
                     tables = await this.loadTables();
                 }
-            } else {
-                tables = await this.loadTables();
-            }
 
-            const tablesLoadTime = performance.now() - tablesStartTime;
-            debug(`✅ Tables loaded in ${tablesLoadTime.toFixed(2)}ms - ${tables?.length || 0} tables`);
+                tablesLoadTime = performance.now() - tablesStartTime;
+                debug(`✅ Tables loaded in ${tables?.length || 0} tables (${tablesLoadTime.toFixed(2)}ms)`);
+            } else {
+                debug('⚪ Skipping table load for sales mode:', salesModeKey);
+                cacheService.setTables([], 30 * 1000);
+            }
 
             // Step 3: Initialize SignalR (Real-time updates)
             debug('📡 Step 3: Initializing SignalR...');
@@ -152,6 +164,10 @@ class DataManager {
      */
     async loadTables(forceRefresh = false) {
         debug('🏠 Loading tables...', { forceRefresh });
+        if (this.salesModeKey && this.salesModeKey !== 'mesas') {
+            debug('⚪ loadTables skipped for sales mode:', this.salesModeKey);
+            return [];
+        }
 
         // Check cache first (Level 2 - Semi-static with TTL)
         if (!forceRefresh) {
@@ -1052,6 +1068,7 @@ class DataManager {
                 const resp = await fetch(endpoint, { method: 'GET', headers });
                 if (!resp.ok) {
                     lastErr = new Error(`HTTP ${resp.status}`);
+                    if (resp.status === 404) throw lastErr;
                     continue;
                 }
                 rows = await resp.json();
@@ -1163,10 +1180,18 @@ class DataManager {
      * Refresh specific data type
      */
     async refreshData(dataType) {
+        const cfg = appconfig();
+        const salesModeKey = cfg?.salesMode?.key || 'mesas';
+        menuService.setSalesMode(salesModeKey);
         switch (dataType) {
             case 'menu':
                 return await menuService.getMenu(true); // Force refresh
             case 'tables':
+                if (salesModeKey !== 'mesas') {
+                    debug('⚪ Skipping table refresh for sales mode:', salesModeKey);
+                    cacheService.setTables([], 30 * 1000);
+                    return [];
+                }
                 return await this.loadTables(true); // Force refresh
             case 'tickets':
                 return await this.getActiveTickets(true); // Force refresh
@@ -1175,7 +1200,7 @@ class DataManager {
                 debug('🔄 Refreshing all data...');
                 const results = {};
                 results.menu = await menuService.getMenu(true);
-                results.tables = await this.loadTables(true);
+                results.tables = salesModeKey === 'mesas' ? await this.loadTables(true) : [];
                 results.tickets = await this.getActiveTickets(true);
                 debug('✅ All data refreshed');
                 return results;
@@ -1256,10 +1281,12 @@ class DataManager {
                 debug('⚠️ Backup polling failed:', err.message);
             });
 
-            // Refresh tables every cycle (every 45s) to detect state changes like CUENTA
-            this.loadTables(true).catch(err => {
-                debug('⚠️ Backup table refresh failed:', err.message);
-            });
+            if (this.salesModeKey === 'mesas') {
+                // Refresh tables every cycle (every 45s) to detect state changes like CUENTA
+                this.loadTables(true).catch(err => {
+                    debug('⚠️ Backup table refresh failed:', err.message);
+                });
+            }
 
         }, 45000); // Check every 45 seconds (increased from 30s to prevent server overload)
     }

@@ -29,6 +29,8 @@
     "smoke:mesa1:pay:noclose": "node scripts/smoke-mesa1-pay-ticket.js --base http://localhost:9000 --user graphiql --pass graphiql --client graphiql --terminal SERVIDOR --department MESAS --ticketType COMEDOR --table 1 --entityType Mesas --payment Efectivo",
     "smoke:mesa1:new:tags": "node scripts/smoke-mesa1-new-with-tags.js --base http://localhost:9000 --user graphiql --pass graphiql --client graphiql --terminal SERVIDOR --department MESAS --ticketType COMEDOR --table 1 --entityType Mesas --qty 1 --close true",
     "smoke:mesa1:new:tags:noclose": "node scripts/smoke-mesa1-new-with-tags.js --base http://localhost:9000 --user graphiql --pass graphiql --client graphiql --terminal SERVIDOR --department MESAS --ticketType COMEDOR --table 1 --entityType Mesas --qty 1"
+    ,
+    "smoke:graphql:advanced": "node scripts/smoke-graphql-advanced.js"
   },
   "devDependencies": {
     "@babel/core": "^7.24.5",

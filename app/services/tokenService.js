@@ -168,7 +168,12 @@ class TokenService {
             console.log('Token request config:', {
                 authUrl: cfg.authUrl,
                 userName: cfg.userName,
-                clientId: cfg.auth.clientId
+                clientId: cfg.auth.clientId,
+                source: {
+                    user: cfg?._source?.user || 'unknown',
+                    client: cfg?._source?.client || 'unknown',
+                    pass: cfg?._source?.pass || 'unknown'
+                }
             });
 
             // Crear AbortController para timeout manual más confiable
@@ -185,9 +190,9 @@ class TokenService {
                 },
                 body: new URLSearchParams({
                     grant_type: cfg.auth.grantType || 'password',
-                    client_id: cfg.auth.clientId || 'pmpos',
-                    username: cfg.userName || 'graphiql',
-                    password: cfg.password || 'graphiql'
+                    client_id: cfg.auth.clientId,
+                    username: cfg.userName,
+                    password: cfg.password
                 }),
                 signal: controller.signal
             });

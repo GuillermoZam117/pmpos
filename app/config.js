@@ -1,3 +1,5 @@
+import { SALES_MODES, DEFAULT_SALES_MODE, resolveSalesMode } from './config/salesModes';
+
 // Dynamic server discovery utilities
 const discoverSambaPOSServer = async () => {
     // Configurable ports from environment, with fallbacks
@@ -72,6 +74,8 @@ export const appconfig = () => {
         : 'localhost';
 
     // Read overrides from query string and persist to localStorage for convenience
+    let queryMode = null;
+
     if (hasWindow) {
         try {
             const params = new URLSearchParams(window.location.search);
@@ -83,9 +87,13 @@ export const appconfig = () => {
             const clientParam = params.get('client'); // SambaPOS client_id (Application)
             const deptParam = params.get('dept'); // Department name
             const ttParam = params.get('tt');     // Ticket Type name
+            const entityTypeParam = params.get('entityType'); // Entity type override
+            const entityScreenParam = params.get('entityScreen'); // Entity screen override
             const discoverParam = params.get('discover'); // auto-discover SambaPOS server
             const rskeyParam = params.get('rskey'); // read-service apikey override
             const activeOnlyParam = params.get('activeOnly'); // force active-only tables
+            const modeParam = params.get('mode'); // sales mode preset
+            queryMode = modeParam;
 
             if (apiParam) localStorage.setItem('SAMBAPOS_API_URL', apiParam);
             if (ipParam) localStorage.setItem('SAMBAPOS_API_HOST', ipParam);
@@ -95,8 +103,11 @@ export const appconfig = () => {
             if (clientParam) localStorage.setItem('SAMBAPOS_CLIENT_ID', clientParam);
             if (deptParam) localStorage.setItem('SAMBAPOS_DEPARTMENT', deptParam);
             if (ttParam) localStorage.setItem('SAMBAPOS_TICKET_TYPE', ttParam);
+            if (entityTypeParam) localStorage.setItem('SAMBAPOS_ENTITY_TYPE', entityTypeParam);
+            if (entityScreenParam) localStorage.setItem('SAMBAPOS_ENTITY_SCREEN', entityScreenParam);
             if (rskeyParam) localStorage.setItem('READ_SERVICE_APIKEY', rskeyParam);
             if (activeOnlyParam) localStorage.setItem('READ_SERVICE_ACTIVE_ONLY', activeOnlyParam);
+            if (modeParam) localStorage.setItem('SAMBAPOS_SALES_MODE', modeParam);
 
             // Auto-discover SambaPOS server if requested
             if (discoverParam === 'true') {
@@ -111,22 +122,37 @@ export const appconfig = () => {
         } catch { }
     }
 
-    const storedApi = hasWindow ? localStorage.getItem('SAMBAPOS_API_URL') : null;
+    const storedApiRaw = hasWindow ? localStorage.getItem('SAMBAPOS_API_URL') : null;
+    const storedAuto = hasWindow ? localStorage.getItem('pmpos_api_url_auto') : null;
     const storedHost = hasWindow ? localStorage.getItem('SAMBAPOS_API_HOST') : null;
     const storedPort = hasWindow ? localStorage.getItem('SAMBAPOS_API_PORT') : null;
     const storedUser = hasWindow ? localStorage.getItem('SAMBAPOS_USERNAME') : null;
     const storedPass = hasWindow ? localStorage.getItem('SAMBAPOS_PASSWORD') : null;
     const storedClient = hasWindow ? localStorage.getItem('SAMBAPOS_CLIENT_ID') : null;
+    const storedMode = hasWindow ? localStorage.getItem('SAMBAPOS_SALES_MODE') : null;
 
     const envApi = process.env.SAMBAPOS_API_URL;
     const envHost = process.env.API_HOST;
     const envPort = process.env.SAMBAPOS_API_PORT;
 
-    // Priority: stored full URL > environment URL > constructed from host:port > default
+    // Dinámico: prioriza query/localStorage, luego host actual+puerto inferido, y último el .env
+    const currentPort = hasWindow && window.location && window.location.port ? window.location.port : null;
+    const inferredPort = currentPort && currentPort !== '8081' ? currentPort : '9000';
     const targetHost = storedHost || envHost || defaultHost;
-    const targetPort = storedPort || envPort || process.env.SAMBAPOS_API_PORT || '9000';
+    const targetPort = storedPort || envPort || inferredPort;
     const constructedApi = `http://${targetHost}:${targetPort}`;
-    let API_URL = storedApi || envApi || constructedApi;
+    // Si el stored api host no coincide con el host actual y no hay override, ignorar cache viejo
+    let storedApi = storedApiRaw;
+    if (hasWindow && storedApi) {
+        try {
+            const storedHostFromUrl = new URL(storedApi).hostname;
+            if (storedHostFromUrl && storedHostFromUrl !== defaultHost && !storedHost) {
+                storedApi = null;
+            }
+        } catch { storedApi = storedApiRaw; }
+    }
+
+    let API_URL = storedApi || storedAuto || envApi || constructedApi;
 
     // Prefer dev-server proxy when running on webpack-dev-server (port 8081)
     const isDevServer = hasWindow && /:8081$/.test(window.location.host);
@@ -152,16 +178,59 @@ export const appconfig = () => {
     }
 
     // All configuration values from environment variables (no hardcoded defaults)
-    const USERNAME = storedUser || process.env.SAMBAPOS_USERNAME || process.env.SAMBAPOS_USER || process.env.USER_NAME;
-    const PASSWORD = storedPass || process.env.SAMBAPOS_PASSWORD || process.env.PASSWORD;
+    let userSource = 'env';
+    let passSource = 'env';
+    let clientSource = 'env';
+
+    const USERNAME = (() => {
+        if (storedUser) { userSource = 'localStorage'; return storedUser; }
+        if (process.env.SAMBAPOS_USERNAME || process.env.SAMBAPOS_USER || process.env.USER_NAME) {
+            userSource = 'env';
+            return process.env.SAMBAPOS_USERNAME || process.env.SAMBAPOS_USER || process.env.USER_NAME;
+        }
+        return null;
+    })();
+
+    const PASSWORD = (() => {
+        if (storedPass) { passSource = 'localStorage'; return storedPass; }
+        if (process.env.SAMBAPOS_PASSWORD || process.env.PASSWORD) {
+            passSource = 'env';
+            return process.env.SAMBAPOS_PASSWORD || process.env.PASSWORD;
+        }
+        return null;
+    })();
     const TERMINAL = process.env.SAMBAPOS_TERMINAL;
     const storedDept = hasWindow ? localStorage.getItem('SAMBAPOS_DEPARTMENT') : null;
     const storedTT = hasWindow ? localStorage.getItem('SAMBAPOS_TICKET_TYPE') : null;
-    const DEPARTMENT = storedDept || process.env.SAMBAPOS_DEPARTMENT;
-    const TICKET_TYPE = storedTT || process.env.SAMBAPOS_TICKET_TYPE;
-    const ENTITY_SCREEN = process.env.SAMBAPOS_ENTITY_SCREEN;
-    const ENTITY_TYPE = process.env.SAMBAPOS_ENTITY_TYPE;
-    const CLIENT_ID = storedClient || process.env.SAMBAPOS_CLIENT_ID;
+    const storedEntityType = hasWindow ? localStorage.getItem('SAMBAPOS_ENTITY_TYPE') : null;
+    const storedEntityScreen = hasWindow ? localStorage.getItem('SAMBAPOS_ENTITY_SCREEN') : null;
+    const storedMenu = hasWindow ? localStorage.getItem('SAMBAPOS_MENU') : null;
+
+    let modeSource = 'default';
+    let currentModeKey = DEFAULT_SALES_MODE;
+    if (queryMode) {
+        currentModeKey = queryMode;
+        modeSource = 'query';
+    } else if (storedMode) {
+        currentModeKey = storedMode;
+        modeSource = 'localStorage';
+    } else if (process.env.SAMBAPOS_DEFAULT_MODE) {
+        currentModeKey = process.env.SAMBAPOS_DEFAULT_MODE;
+        modeSource = 'env';
+    }
+    const modePreset = resolveSalesMode(currentModeKey);
+
+    const DEPARTMENT = storedDept || modePreset.departmentName || process.env.SAMBAPOS_DEPARTMENT;
+    const TICKET_TYPE = storedTT || modePreset.ticketTypeName || process.env.SAMBAPOS_TICKET_TYPE;
+    const ENTITY_SCREEN = storedEntityScreen || modePreset.entityScreenName || process.env.SAMBAPOS_ENTITY_SCREEN;
+    const ENTITY_TYPE = storedEntityType || modePreset.entityTypeName || process.env.SAMBAPOS_ENTITY_TYPE;
+    const MENU_NAME = storedMenu || modePreset.menuName || process.env.SAMBAPOS_MENU;
+
+    const CLIENT_ID = (() => {
+        if (storedClient) { clientSource = 'localStorage'; return storedClient; }
+        if (process.env.SAMBAPOS_CLIENT_ID) { clientSource = 'env'; return process.env.SAMBAPOS_CLIENT_ID; }
+        return null;
+    })();
 
     return {
         // SambaPOS API Configuration
@@ -180,9 +249,19 @@ export const appconfig = () => {
         // Business Configuration
         departmentName: DEPARTMENT,
         ticketTypeName: TICKET_TYPE,
-        menuName: process.env.SAMBAPOS_MENU,
+        menuName: MENU_NAME || 'MENU',
         entityScreenName: ENTITY_SCREEN,
         entityTypeName: ENTITY_TYPE,
+        salesMode: {
+            key: currentModeKey,
+            label: modePreset.label,
+            description: modePreset.description,
+            departmentName: modePreset.departmentName,
+            ticketTypeName: modePreset.ticketTypeName,
+            entityTypeName: modePreset.entityTypeName,
+            entityScreenName: modePreset.entityScreenName,
+            menuName: modePreset.menuName
+        },
 
         // Application Settings (configurable)
         autoConnectPrinter: process.env.SAMBAPOS_AUTO_CONNECT_PRINTER !== 'false',
@@ -196,6 +275,13 @@ export const appconfig = () => {
         connectionTimeout: parseInt(process.env.SAMBAPOS_CONNECTION_TIMEOUT || '30000'),
         refreshInterval: parseInt(process.env.SAMBAPOS_REFRESH_INTERVAL || '5000'),
 
+        // Read Service Configuration
+        readService: {
+            url: process.env.READ_SERVICE_URL || hasWindow ? localStorage.getItem('READ_SERVICE_URL') || 'http://localhost:4005' : 'http://localhost:4005',
+            apiKey: process.env.READ_SERVICE_APIKEY || hasWindow ? localStorage.getItem('READ_SERVICE_APIKEY') || 'test-key-123' : 'test-key-123',
+            enabled: (process.env.REACT_APP_USE_SQL_READS || 'true').toLowerCase() === 'true'
+        },
+
         // Auth Configuration
         auth: {
             clientId: CLIENT_ID,
@@ -205,6 +291,15 @@ export const appconfig = () => {
             tokenValidity: parseInt(process.env.SAMBAPOS_TOKEN_VALIDITY || '31536000000'), // 365 days
             refreshThreshold: parseInt(process.env.SAMBAPOS_REFRESH_THRESHOLD || '604800000'), // 7 days
             baseUrl: API_URL
+        },
+
+        // Meta para depuración de origen de config
+        _source: {
+            user: userSource,
+            pass: passSource,
+            client: clientSource,
+            api: storedApi ? 'localStorage' : envApi ? 'env' : 'auto',
+            mode: modeSource
         }
     };
 };

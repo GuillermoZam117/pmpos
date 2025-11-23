@@ -50,6 +50,12 @@ import { formatMXN } from '../utils/currencyFormatter';
 import PropTypes from 'prop-types';
 import orderTagService from '../services/orderTagService';
 
+console.log('🔬 [MODAL DEBUG] ProductDetailsModal imported orderTagService:', {
+    orderTagService: orderTagService,
+    hasGetGroups: typeof orderTagService?.getGroups === 'function',
+    serviceKeys: Object.keys(orderTagService || {})
+});
+
 const ProductDetailsModal = ({
     open,
     onClose,
@@ -76,6 +82,16 @@ const ProductDetailsModal = ({
     // Reset state when product changes or modal opens
     useEffect(() => {
         if (open && product) {
+            console.log('🔄 [MODAL RESET] ProductDetailsModal resetting state for product:', {
+                productName: product.name,
+                productId: product.id || product.productId,
+                hasOrderTags: !!(product.orderTags && product.orderTags.length > 0),
+                hasDefaultOrderTags: !!(product.defaultOrderTags && product.defaultOrderTags.length > 0),
+                orderTags: product.orderTags,
+                defaultOrderTags: product.defaultOrderTags,
+                portions: product.portions || product.product?.portions
+            });
+
             setQuantity(1);
             setComments('');
             setSelectedOrderTags(existingTags || []);
@@ -144,8 +160,17 @@ const ProductDetailsModal = ({
                 const pid = product.productId || product.id || product.product?.id;
                 const portionName = selectedPortion?.name || (portions.length > 0 ? portions[0].name : 'Normal');
 
+                console.log('🏷️ [TAGS LOADING] Starting order tags loading:', {
+                    productId: pid,
+                    portionName: portionName,
+                    hasProductId: !!pid,
+                    hasSelectedPortion: !!selectedPortion,
+                    showOrderTags: showOrderTags
+                });
+
                 if (!pid) {
                     debug('ProductDetailsModal: No product ID available for order tags');
+                    console.log('❌ [TAGS LOADING] No product ID available');
                     return;
                 }
 
@@ -158,8 +183,25 @@ const ProductDetailsModal = ({
                     existingOrderTags: orderTags
                 });
 
+                console.log('🔄 [TAGS LOADING] Calling orderTagService.getGroups...', {
+                    productId: pid,
+                    portionName: portionName,
+                    serviceExists: !!orderTagService,
+                    getGroupsExists: typeof orderTagService?.getGroups === 'function'
+                });
+
+                console.log('🧪 [TAGS LOADING] About to call orderTagService.getGroups...');
+
                 // Usar orderTagService para obtener las etiquetas configuradas en SambaPOS
                 const sambaposTags = await orderTagService.getGroups(pid, portionName);
+
+                console.log('✅ [TAGS LOADING] orderTagService.getGroups call completed!');
+                console.log('📋 [TAGS LOADING] orderTagService.getGroups returned:', {
+                    sambaposTags,
+                    isArray: Array.isArray(sambaposTags),
+                    length: sambaposTags?.length,
+                    tags: sambaposTags
+                });
 
                 debug('ProductDetailsModal: orderTagService.getGroups returned:', {
                     sambaposTags,
@@ -169,6 +211,10 @@ const ProductDetailsModal = ({
 
                 if (!canceled && Array.isArray(sambaposTags) && sambaposTags.length > 0) {
                     debug('ProductDetailsModal: Loaded SambaPOS tags:', sambaposTags.length);
+                    console.log('✅ [TAGS LOADING] Found SambaPOS tags, setting availableOrderTags:', {
+                        tagsCount: sambaposTags.length,
+                        firstTag: sambaposTags[0]
+                    });
                     setAvailableOrderTags(sambaposTags.map(t => ({
                         id: t.id || `${t.group || 'default'}:${t.name}`,
                         name: t.name,
@@ -177,6 +223,10 @@ const ProductDetailsModal = ({
                     })));
                 } else {
                     debug('ProductDetailsModal: No SambaPOS tags found for this product/portion');
+                    console.log('⚠️ [TAGS LOADING] No SambaPOS tags found, using fallback tags:', {
+                        productDefaultOrderTags: product.defaultOrderTags,
+                        orderTags: orderTags
+                    });
                     // Use product default tags if available
                     if (!canceled) {
                         const fallbackTags = product.defaultOrderTags || orderTags || [];
@@ -264,6 +314,18 @@ const ProductDetailsModal = ({
     const mergedTags = availableOrderTags?.length > 0 ? availableOrderTags : (orderTags || []);
     const displayedTags = showAllTags ? mergedTags : mergedTags.slice(0, 8);
     const hasMoreTags = mergedTags.length > 8;
+
+    // DEBUG: Log tags for rendering
+    console.log('🏷️ [TAGS RENDER] Tags ready for rendering:', {
+        availableOrderTagsLength: availableOrderTags?.length || 0,
+        orderTagsLength: (orderTags || []).length,
+        mergedTagsLength: mergedTags.length,
+        displayedTagsLength: displayedTags.length,
+        showOrderTags: showOrderTags,
+        hasMoreTags: hasMoreTags,
+        mergedTags: mergedTags,
+        displayedTags: displayedTags
+    });
 
     return (
         <Dialog

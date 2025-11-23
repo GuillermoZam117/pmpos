@@ -65,15 +65,20 @@ export const ticketService = {
 
         try {
             const { LOAD_TERMINAL_TICKET } = await import('../graphql/queries');
-            const data = await graphqlRequest(LOAD_TERMINAL_TICKET, { terminalId, ticketId });
+            const safeTicketId = ticketId != null ? String(ticketId) : '';
+            const safeTerminalId = terminalId != null ? String(terminalId) : '';
+            const data = await graphqlRequest(LOAD_TERMINAL_TICKET, {
+                terminalId: safeTerminalId,
+                ticketId: safeTicketId
+            });
             const ticket = data?.loadTerminalTicket;
 
             if (ticket) {
                 debug('✅ Ticket loaded successfully:', `ID: ${ticket.id}`);
                 return ticket;
-            } else {
-                throw new Error('Empty response from loadTerminalTicket');
             }
+
+            throw new Error('Empty response from loadTerminalTicket');
         } catch (error) {
             debug('❌ Failed to load ticket:', error.message);
             throw new Error(`Error al cargar ticket: ${error.message}`);

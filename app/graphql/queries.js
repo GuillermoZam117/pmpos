@@ -10,8 +10,9 @@ export const GET_OPEN_TICKETS = `
   query {
     getTickets(isClosed: false, orderBy: date) {
       id number totalAmount remainingAmount
+      date
       entities { type name }
-      orders { id menuItemName quantity price }
+      orders { id uid menuItemName name quantity price portion date }
       states { stateName state }
     }
   }
@@ -68,6 +69,15 @@ export const GET_TERMINAL_TICKET = `
     getTerminalTicket(terminalId: $terminalId) {
       id number totalAmount remainingAmount
       orders { uid name quantity price portion orderTags }
+    }
+  }
+`;
+
+export const CREATE_TERMINAL_TICKET = `
+  mutation ($terminalId: String!) {
+    createTerminalTicket(terminalId: $terminalId) {
+      uid
+      totalAmount
     }
   }
 `;
@@ -159,6 +169,17 @@ export const CLOSE_TERMINAL_TICKET = `
   }
 `;
 
+export const SEARCH_ENTITIES = `
+  query ($type: String!, $search: String) {
+    getEntities(type: $type, search: $search) {
+      id
+      name
+      customData
+      phone
+    }
+  }
+`;
+
 export const TICKET_DETAILS = `
   query ($ticketId: String) {
     ticket(id: $ticketId) {
@@ -177,6 +198,12 @@ export const GET_TABLE_TICKETS = `
   }
 `;
 
+export const UPDATE_TICKET_STATE = `
+  mutation ($ticketId: Int!, $stateName: String!, $state: String!) {
+    updateTicketState(ticketId: $ticketId, stateName: $stateName, state: $state)
+  }
+`;
+
 export default {
   GET_PAYMENT_TYPES,
   GET_OPEN_TICKETS,
@@ -192,5 +219,7 @@ export default {
   TICKET_DETAILS,
   GET_TABLE_TICKETS,
   ADD_ORDER_TO_TERMINAL_TICKET,
-  ADD_ORDER_TO_TERMINAL_TICKET_BY_ID
+  ADD_ORDER_TO_TERMINAL_TICKET_BY_ID,
+  SEARCH_ENTITIES,
+  UPDATE_TICKET_STATE
 };

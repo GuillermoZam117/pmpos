@@ -2,7 +2,7 @@
  * Menu Service for PMPOS
  * Enhanced menu management with robust caching and no fallbacks
  */
-import { gql, graphqlRequest } from './graphqlService';
+import { gql, graphqlRequest, gqlEscape } from './graphqlService';
 import { GET_MENU, GET_PRODUCTS } from '../graphql/queries';
 import cacheService from './cacheService';
 import Debug from 'debug';
@@ -15,12 +15,25 @@ class MenuService {
         this.loading = false;
         this.error = null;
         this.productNameById = new Map();
+        this.salesMode = 'mesas';
+        this.menuName = 'MENU';
+    }
+
+    setSalesMode(modeKey = 'mesas') {
+        this.salesMode = modeKey || 'mesas';
+    }
+
+    setMenuName(name = 'MENU') {
+        this.menuName = name || 'MENU';
     }
 
     /**
      * Get menu with caching and retry logic
      */
     async getMenu(forceRefresh = false) {
+        if (this.salesMode === 'mostrador') {
+            return await this.getMenuFromProducts(forceRefresh);
+        }
         debug('📋 Getting menu...', { forceRefresh });
 
         // Check cache first unless forced refresh
@@ -68,9 +81,10 @@ class MenuService {
         this.error = null;
 
         try {
+            const menuName = this.menuName || 'MENU';
             // Canonical GET_MENU attempt (non-fatal):
             try {
-                const dataCanonical = await graphqlRequest(GET_MENU, { name: 'MENU' });
+                const dataCanonical = await graphqlRequest(GET_MENU, { name: menuName });
                 const menuCanonical = dataCanonical?.getMenu || null;
                 if (menuCanonical && menuCanonical.categories) {
                     cacheService.setMenu(menuCanonical);
@@ -82,7 +96,7 @@ class MenuService {
                 try { debug('dY"? Canonical GET_MENU failed, falling back:', e?.message || e); } catch {}
             }
             // Canonical query path using shared queries
-            const dataCanonical = await graphqlRequest(GET_MENU, { name: 'MENU' });
+            const dataCanonical = await graphqlRequest(GET_MENU, { name: menuName });
             const menuCanonical = dataCanonical?.getMenu || null;
             if (menuCanonical && menuCanonical.categories) {
                 cacheService.setMenu(menuCanonical);
@@ -91,8 +105,9 @@ class MenuService {
                 return menuCanonical;
             }
             // ÚNICO QUERY QUE FUNCIONA - SIN FALLBACKS
+            const escapedMenuName = gqlEscape(menuName);
             const query = `query { 
-                menu: getMenu(name: "MENU") { 
+                menu: getMenu(name: "${escapedMenuName}") { 
                     categories { 
                         id 
                         name 
@@ -179,6 +194,46 @@ class MenuService {
     async getProducts() {
         const data = await graphqlRequest(GET_PRODUCTS, {});
         return data?.getProducts || [];
+    }
+
+    async getMenuFromProducts(forceRefresh = false) {
+        debug('🧮 Building menu from products...', { forceRefresh });
+        if (!forceRefresh && this.currentMenu && this.currentMenu._source === 'products') {
+            debug('✅ Using cached product-based menu');
+            return this.currentMenu;
+        }
+
+        const products = await this.getProducts();
+        const groups = new Map();
+        products.forEach(product => {
+            const groupKey = (product.groupCode || 'GENERAL') || 'GENERAL';
+            if (!groups.has(groupKey)) groups.set(groupKey, []);
+            groups.get(groupKey).push(product);
+        });
+
+        const categories = Array.from(groups.entries()).map(([name, items], idx) => ({
+            id: idx + 1,
+            name,
+            menuItems: items.map(item => ({
+                id: item.id,
+                name: item.name,
+                caption: item.name,
+                quantity: 1,
+                product: {
+                    id: item.id,
+                    name: item.name,
+                    barcode: item.barcode,
+                    groupCode: item.groupCode,
+                    price: item.portions?.[0]?.price || item.price || 0,
+                    portions: item.portions || []
+                }
+            }))
+        }));
+
+        const syntheticMenu = { categories, _source: 'products' };
+        this.currentMenu = syntheticMenu;
+        this.buildIndex(syntheticMenu);
+        return syntheticMenu;
     }
 
     /**

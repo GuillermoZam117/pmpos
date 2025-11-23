@@ -1,6 +1,12 @@
 import Debug from 'debug';
 import { graphqlRequest, gqlEscape } from './graphqlService';
-import { ADD_ORDER_TO_TERMINAL_TICKET } from '../graphql/queries';
+import {
+    ADD_ORDER_TO_TERMINAL_TICKET,
+    CREATE_TERMINAL_TICKET,
+    GET_OPEN_TICKETS,
+    GET_TERMINAL_TICKET,
+    LOAD_TERMINAL_TICKET
+} from '../graphql/queries';
 
 const debug = Debug('pmpos:order');
 
@@ -12,10 +18,11 @@ export const orderService = {
     /**
      * Añade una nueva orden al ticket del terminal
      * Implementa el flujo correcto para mesa libre según documentación SambaPOS
+     * Ahora soporta orderTags para aplicación automática después de crear la orden
      */
-    async addOrder(terminalId, productName, quantity = 1, portion = null, tableId = null, skipTicketReload = false) {
-        console.log('➕ [orderService] Adding order (mesa libre flow):', { terminalId, productName, quantity, portion, tableId, skipTicketReload });
-        debug('➕ Adding order (mesa libre flow):', { terminalId, productName, quantity, portion, tableId, skipTicketReload });
+    async addOrder(terminalId, productName, quantity = 1, portion = null, tableId = null, skipTicketReload = false, orderTags = [], quickSale = false) {
+        console.log('➕ [orderService] Adding order (mesa libre flow):', { terminalId, productName, quantity, portion, tableId, skipTicketReload, orderTags: orderTags?.length || 0 });
+        debug('➕ Adding order (mesa libre flow):', { terminalId, productName, quantity, portion, tableId, skipTicketReload, orderTags });
 
         if (!terminalId) {
             throw new Error('Terminal ID is required');
@@ -24,144 +31,117 @@ export const orderService = {
             throw new Error('Product name is required');
         }
 
+        const useQuickSale = !!quickSale;
+        if (!useQuickSale && !tableId) {
+            throw new Error('tableId is required for mesa libre flow');
+        }
+
         try {
-            // 1. Verificar si existe un ticket ABIERTO (no cerrado/pagado) para la mesa específica
-            console.log('🔍 [orderService] Checking for OPEN tickets for table:', tableId);
-            debug('🔍 Checking for open tickets for table:', tableId);
+            if (!useQuickSale) {
+                console.log('🔍 [orderService] Checking for OPEN tickets for table:', tableId);
+                debug('🔍 Checking for open tickets for table:', tableId);
 
-            // Usar getTickets(isClosed: false) para obtener SOLO tickets abiertos, no pagados
-            const openTicketsQuery = `query { 
-                getTickets(isClosed: false, orderBy: date) { 
-                    id number totalAmount remainingAmount 
-                    entities { type name } 
-                } 
-            }`;
-            const openTicketsResult = await graphqlRequest(openTicketsQuery);
+                const openTicketsResult = await graphqlRequest(GET_OPEN_TICKETS);
+                console.log('📋 [orderService] All open tickets:', openTicketsResult?.getTickets?.length || 0);
+                debug('📋 All open tickets count:', openTicketsResult?.getTickets?.length || 0);
 
-            console.log('📋 [orderService] All open tickets:', openTicketsResult?.getTickets?.length || 0);
-            debug('📋 All open tickets count:', openTicketsResult?.getTickets?.length || 0);
+                const openTickets = openTicketsResult?.getTickets || [];
+                const tableTicket = openTickets.find(ticket =>
+                    ticket.entities?.some(entity =>
+                        entity.type === "Mesas" && entity.name === String(tableId)
+                    )
+                );
 
-            // Filtrar tickets de la mesa específica
-            const openTickets = openTicketsResult?.getTickets || [];
-            const tableTicket = openTickets.find(ticket =>
-                ticket.entities?.some(entity =>
-                    entity.type === "Mesas" && entity.name === String(tableId)
-                )
-            );
+                console.log('🎫 [orderService] Table ticket found:', tableTicket ? `ID: ${tableTicket.id}, remaining: ${tableTicket?.remainingAmount}` : 'none');
+                debug('🎫 Table ticket state:', tableTicket);
 
-            console.log('🎫 [orderService] Table ticket found:', tableTicket ? `ID: ${tableTicket.id}, remaining: ${tableTicket?.remainingAmount}` : 'none');
-            debug('🎫 Table ticket state:', tableTicket);
+                const hasActiveTableTicket = tableTicket !== null &&
+                    tableTicket?.remainingAmount !== undefined &&
+                    tableTicket?.remainingAmount > 0;
 
-            // 2. Determinar si necesitamos crear un nuevo ticket (mesa libre)
-            // Fix: Use existing OPEN ticket with remaining amount > 0 (not fully paid)
-            // Filter out paid tickets (remainingAmount = 0) to avoid loading them on free tables
-            const hasActiveTableTicket = tableTicket !== null &&
-                tableTicket?.remainingAmount !== undefined &&
-                tableTicket?.remainingAmount > 0;
+                console.log('💰 [orderService] Table ticket validation:', {
+                    hasTicket: tableTicket !== null,
+                    remainingAmount: tableTicket?.remainingAmount,
+                    hasActiveTableTicket
+                });
 
-            console.log('💰 [orderService] Table ticket validation:', {
-                hasTicket: tableTicket !== null,
-                remainingAmount: tableTicket?.remainingAmount,
-                hasActiveTableTicket
-            });
+                if (!hasActiveTableTicket) {
+                    if (tableTicket && tableTicket?.remainingAmount === 0) {
+                        console.log('💳 [orderService] Found paid ticket for table, ignoring for new order:', {
+                            id: tableTicket.id,
+                            totalAmount: tableTicket?.totalAmount,
+                            remainingAmount: tableTicket?.remainingAmount
+                        });
+                    }
 
-            if (!hasActiveTableTicket) {
-                // Log if we found a paid ticket that we're ignoring
-                if (tableTicket && tableTicket?.remainingAmount === 0) {
-                    console.log('💳 [orderService] Found paid ticket for table, ignoring for new order:', {
+                    console.log('🆕 [orderService] No open ticket found for table, creating new ticket for mesa libre...');
+                    debug('🆕 Creating new ticket for mesa libre flow...');
+
+                    const newTicket = await graphqlRequest(CREATE_TERMINAL_TICKET, { terminalId });
+                    console.log('✅ [orderService] New ticket created for mesa libre:', newTicket);
+                    debug('✅ New ticket created for mesa libre:', newTicket);
+
+                    if (tableId) {
+                        console.log('🏠 [orderService] Assigning table to new ticket:', { tableId, terminalId });
+                        debug('🏠 Assigning table to new ticket:', { tableId, terminalId });
+                        try {
+                            const { ticketService } = await import('./ticketService');
+                            await ticketService.changeEntityOfTerminalTicket(terminalId, String(tableId), "Mesas");
+                            debug('✅ Table assigned to ticket successfully');
+                        } catch (assignError) {
+                            debug('❌ Failed to assign table to ticket:', assignError.message);
+                            throw new Error(`Failed to assign table ${tableId} to ticket: ${assignError.message}`);
+                        }
+                    } else {
+                        console.log('⚠️ [orderService] No tableId provided, ticket created without table assignment');
+                        debug('⚠️ No tableId provided, ticket created without table assignment');
+                        throw new Error('tableId is required for mesa libre flow');
+                    }
+
+                    console.log('� [orderService] Verifying new ticket was created...');
+                    const verifyTicketQuery = `query { getTerminalTicket(terminalId: "${terminalId}") { id number totalAmount remainingAmount } }`;
+                    const verifiedTicketState = await graphqlRequest(verifyTicketQuery);
+                    console.log('✅ [orderService] Verified new ticket state:', verifiedTicketState);
+                    debug('✅ Verified new ticket state:', verifiedTicketState);
+
+                } else {
+                    if (!tableTicket || !tableTicket.id) {
+                        console.error('❌ [orderService] Critical error: tableTicket is invalid:', tableTicket);
+                        debug('❌ Critical error: invalid tableTicket in active flow:', tableTicket);
+                        throw new Error('Invalid table ticket state - cannot proceed with order');
+                    }
+
+                    console.log('📋 [orderService] Using existing ACTIVE table ticket:', {
                         id: tableTicket.id,
-                        totalAmount: tableTicket?.totalAmount,
+                        number: tableTicket.number,
+                        totalAmount: tableTicket.totalAmount,
                         remainingAmount: tableTicket?.remainingAmount
                     });
-                }
+                    debug('📋 Using existing active table ticket:', tableTicket);
 
-                // SOLO crear nuevo ticket si NO hay ticket activo (abierto y no pagado) para la mesa específica
-                // SOLO crear nuevo ticket si NO hay ticket abierto para la mesa específica
-                console.log('🆕 [orderService] No open ticket found for table, creating new ticket for mesa libre...');
-                debug('🆕 Creating new ticket for mesa libre flow...');
+                    if (!skipTicketReload) {
+                        console.log('📥 [orderService] Loading existing ticket into terminal (required step):', tableTicket.id);
+                        debug('📥 Loading existing ticket into terminal:', tableTicket.id);
 
-                const createTicketMutation = `mutation { createTerminalTicket(terminalId: "${terminalId}") { uid totalAmount } }`;
-                const newTicket = await graphqlRequest(createTicketMutation);
-                console.log('✅ [orderService] New ticket created for mesa libre:', newTicket);
-                debug('✅ New ticket created for mesa libre:', newTicket);
+                        const loadedTicket = await graphqlRequest(LOAD_TERMINAL_TICKET, {
+                            terminalId,
+                            ticketId: String(tableTicket.id)
+                        });
+                        console.log('✅ [orderService] Existing ticket loaded into terminal:', loadedTicket?.loadTerminalTicket);
+                        debug('✅ Existing ticket loaded into terminal:', loadedTicket?.loadTerminalTicket);
 
-                // 2b. Si tenemos tableId, asignar la mesa al ticket recién creado
-                if (tableId) {
-                    console.log('🏠 [orderService] Assigning table to new ticket:', { tableId, terminalId });
-                    debug('🏠 Assigning table to new ticket:', { tableId, terminalId });
-                    try {
-                        const { ticketService } = await import('./ticketService');
-                        await ticketService.changeEntityOfTerminalTicket(terminalId, String(tableId), "Mesas");
-                        debug('✅ Table assigned to ticket successfully');
-                    } catch (assignError) {
-                        debug('❌ Failed to assign table to ticket:', assignError.message);
-                        throw new Error(`Failed to assign table ${tableId} to ticket: ${assignError.message}`);
-                    }
-                } else {
-                    console.log('⚠️ [orderService] No tableId provided, ticket created without table assignment');
-                    debug('⚠️ No tableId provided, ticket created without table assignment');
-                    throw new Error('tableId is required for mesa libre flow');
-                }
-
-                // 2c. Verificar que el nuevo ticket fue creado correctamente
-                console.log('� [orderService] Verifying new ticket was created...');
-                const verifyTicketQuery = `query { getTerminalTicket(terminalId: "${terminalId}") { id number totalAmount remainingAmount } }`;
-                const verifiedTicketState = await graphqlRequest(verifyTicketQuery);
-                console.log('✅ [orderService] Verified new ticket state:', verifiedTicketState);
-                debug('✅ Verified new ticket state:', verifiedTicketState);
-
-            } else {
-                // FLUJO CORRECTO PARA MESA OCUPADA según documento AÑADIR PEDIDOS A ORDENES ABIERTAS.txt
-                // Validate tableTicket exists and has required properties
-                if (!tableTicket || !tableTicket.id) {
-                    console.error('❌ [orderService] Critical error: tableTicket is invalid:', tableTicket);
-                    debug('❌ Critical error: invalid tableTicket in active flow:', tableTicket);
-                    throw new Error('Invalid table ticket state - cannot proceed with order');
-                }
-
-                console.log('📋 [orderService] Using existing ACTIVE table ticket:', {
-                    id: tableTicket.id,
-                    number: tableTicket.number,
-                    totalAmount: tableTicket.totalAmount,
-                    remainingAmount: tableTicket?.remainingAmount
-                });
-                debug('📋 Using existing active table ticket:', tableTicket);
-
-                // OPTIMIZACIÓN CRÍTICA: Solo cargar el ticket si no se solicita saltarse
-                if (!skipTicketReload) {
-                    // 2.1. PASO OBLIGATORIO: Cargar el ticket existente en el terminal (según documento)
-                    console.log('📥 [orderService] Loading existing ticket into terminal (required step):', tableTicket.id);
-                    debug('📥 Loading existing ticket into terminal:', tableTicket.id);
-
-                    const loadTicketMutation = `mutation {
-                        loadTerminalTicket(
-                            terminalId: "${terminalId}"
-                            ticketId: "${String(tableTicket.id)}"
-                        ) {
-                            id
-                            number
-                            totalAmount
-                            orders {
-                                uid
-                                name
-                                quantity
-                                price
-                                portion
-                            }
+                        if (!loadedTicket?.loadTerminalTicket) {
+                            throw new Error(`Failed to load existing ticket ${tableTicket.id} into terminal ${terminalId}`);
                         }
-                    }`;
-
-                    const loadedTicket = await graphqlRequest(loadTicketMutation);
-                    console.log('✅ [orderService] Existing ticket loaded into terminal:', loadedTicket?.loadTerminalTicket);
-                    debug('✅ Existing ticket loaded into terminal:', loadedTicket?.loadTerminalTicket);
-
-                    if (!loadedTicket?.loadTerminalTicket) {
-                        throw new Error(`Failed to load existing ticket ${tableTicket.id} into terminal ${terminalId}`);
+                    } else {
+                        console.log('⚡ [orderService] OPTIMIZATION: Skipping ticket reload to preserve existing orders in terminal');
+                        debug('⚡ OPTIMIZATION: Skipping ticket reload for batch order processing');
                     }
-                } else {
-                    console.log('⚡ [orderService] OPTIMIZATION: Skipping ticket reload to preserve existing orders in terminal');
-                    debug('⚡ OPTIMIZATION: Skipping ticket reload for batch order processing');
                 }
+            } else {
+                console.log('⚡ [orderService] Quick sale flow detected - ensuring terminal ticket without table');
+                debug('⚡ Quick sale flow detected - ensuring terminal ticket without table');
+                await this.ensureQuickSaleTicket(terminalId);
             }
 
             // 3. Ahora proceder con agregar la orden al ticket activo (ya cargado en terminal)
@@ -181,31 +161,64 @@ export const orderService = {
             debug('🔍 Final variables for GraphQL (by name):', vars);
 
             // Usar mutación con formato EXACTO de la documentación SambaPOS
-            const mutation = `
-                mutation {
-                    addOrderToTerminalTicket(
-                        terminalId: "${vars.terminalId}"
-                        productName: "${vars.productName}"
-                        portion: "${vars.portion}"
-                        quantity: ${vars.quantity}
-                    ) { 
-                        totalAmount 
-                    }
-                }
-            `;
-
             console.log('📤 [orderService] Sending addOrderToTerminalTicket mutation...');
-            debug('🔍 Sending mutation:', mutation);
             debug('🔍 Mutation variables being sent:', vars);
-            debug('🔍 Raw mutation string being sent:', JSON.stringify(mutation));
-
-            const result = await graphqlRequest(mutation);
+            const result = await graphqlRequest(ADD_ORDER_TO_TERMINAL_TICKET, vars);
             console.log('📥 [orderService] GraphQL response received:', result);
             debug('🔍 GraphQL response received:', result);
 
             if (result?.addOrderToTerminalTicket) {
                 console.log('✅ [orderService] Order added successfully to kitchen!', result.addOrderToTerminalTicket);
                 debug('✅ Order added successfully:', result.addOrderToTerminalTicket);
+
+                // CRITICAL FIX: Apply order tags if provided
+                if (orderTags && Array.isArray(orderTags) && orderTags.length > 0) {
+                    console.log('🏷️ [orderService] Applying order tags after order creation:', orderTags.length);
+                    debug('🏷️ Applying order tags:', orderTags);
+
+                    try {
+                        // First, get the terminal ticket to find the UID of the just-created order
+                        const ticketResult = await graphqlRequest(GET_TERMINAL_TICKET, { terminalId });
+
+                        // Find the order we just created (match by name and portion)
+                        const orders = ticketResult?.getTerminalTicket?.orders || [];
+                        const targetOrder = orders.find(o =>
+                            (o?.name || '').toLowerCase() === productName.toLowerCase() &&
+                            (o?.portion || 'Normal') === (portion || 'Normal')
+                        );
+
+                        if (targetOrder?.uid) {
+                            console.log('🎯 [orderService] Found target order UID for tagging:', targetOrder.uid);
+
+                            // Import and use the applyOrderTagsToTerminalTicketAsync function
+                            const { applyOrderTagsToTerminalTicketAsync } = await import('../queries');
+
+                            // Convert orderTags to expected format
+                            const formattedTags = orderTags.map(tag => ({
+                                tagName: tag.name || tag.tagName || 'CUSTOM',
+                                tag: tag.value || tag.tag || tag.name || '',
+                                price: parseFloat(tag.price) || 0
+                            }));
+
+                            const tagResult = await applyOrderTagsToTerminalTicketAsync(
+                                terminalId,
+                                targetOrder.uid,
+                                formattedTags
+                            );
+
+                            console.log('✅ [orderService] Order tags applied successfully:', tagResult);
+                            debug('✅ Order tags applied:', tagResult);
+                        } else {
+                            console.warn('⚠️ [orderService] Could not find order UID for tag application');
+                            debug('⚠️ Could not find order UID for tags, orders found:', orders.map(o => ({ name: o.name, portion: o.portion })));
+                        }
+                    } catch (tagError) {
+                        console.error('❌ [orderService] Failed to apply order tags:', tagError.message);
+                        debug('❌ Tag application failed:', tagError);
+                        // Don't fail the entire order if tags fail - log and continue
+                    }
+                }
+
                 return { success: true, order: result.addOrderToTerminalTicket };
             } else {
                 console.error('❌ [orderService] Kitchen submission failed - no addOrderToTerminalTicket in response:', Object.keys(result || {}));
@@ -217,6 +230,23 @@ export const orderService = {
             debug('❌ Failed to add order:', error.message);
             // Enhanced error message with debugging info
             throw new Error(`Error al agregar orden: ${error.message} (Product: ${productName}, Portion: ${portion || 'Normal'})`);
+        }
+    },
+
+    async ensureQuickSaleTicket(terminalId) {
+        try {
+            const { ticketService } = await import('./ticketService');
+            const existingTicket = await ticketService.getTerminalTicket(terminalId).catch(() => null);
+            if (!existingTicket) {
+                await ticketService.createTerminalTicket(terminalId);
+                debug('✅ Quick sale ticket created for terminal:', terminalId);
+            } else {
+                debug('✅ Quick sale ticket already present for terminal:', terminalId);
+            }
+        } catch (error) {
+            debug('⚠️ ensureQuickSaleTicket fallback:', error?.message || error);
+            const { ticketService } = await import('./ticketService');
+            await ticketService.createTerminalTicket(terminalId);
         }
     },
 

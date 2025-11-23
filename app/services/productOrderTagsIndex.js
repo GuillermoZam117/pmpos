@@ -61,8 +61,10 @@ class ProductOrderTagsIndex {
                 const t = tasks[i++];
                 try {
                     // Prefer productId path (orderTagService uses productId)
+                    debug(`🏷️ Building index for: ${t.name}, portion: ${t.portion}, productId: ${t.productId}`);
                     const flat = await orderTagService.getGroups(t.productId, t.portion);
                     if (flat && flat.length) {
+                        debug(`✅ Found ${flat.length} order tags for ${t.name}`);
                         // group results back by group name
                         const grouped = new Map();
                         for (const f of flat) {
@@ -72,9 +74,12 @@ class ProductOrderTagsIndex {
                         }
                         const groups = Array.from(grouped.entries()).map(([group, tags]) => ({ group, tags }));
                         this.index.set(this._key(t.name, t.portion), groups);
+                        debug(`🎯 Stored ${groups.length} tag groups for ${t.name}`);
+                    } else {
+                        debug(`⚠️ No order tags found for ${t.name} portion ${t.portion}`);
                     }
                 } catch (e) {
-                    debug('fetch groups failed for', t, e?.message || e);
+                    debug('❌ fetch groups failed for', t, e?.message || e);
                 }
                 await runNext();
             };

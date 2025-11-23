@@ -1,0 +1,10 @@
+2025-11-20 10:40:57.617 [INFO] 🟦 [m15etm4h] GET /internal-api/sql-config {"requestId":"m15etm4h","method":"GET","url":"/internal-api/sql-config","ip":"127.0.0.1","hasAuth":true}
+2025-11-20 10:40:57.814 [INFO] 🟢 [m15etm4h] 200 GET /internal-api/sql-config - 218ms {"requestId":"m15etm4h","method":"GET","url":"/internal-api/sql-config","status":200,"duration":218,"slow":false}
+2025-11-20 10:40:57.853 [INFO] 🟦 [bq8acvak] GET /internal-api/sql-config {"requestId":"bq8acvak","method":"GET","url":"/internal-api/sql-config","ip":"127.0.0.1","hasAuth":true}
+2025-11-20 10:40:57.864 [INFO] 🟢 [bq8acvak] 200 GET /internal-api/sql-config - 12ms {"requestId":"bq8acvak","method":"GET","url":"/internal-api/sql-config","status":200,"duration":12,"slow":false}
+2025-11-20 10:41:00.260 [INFO] 🟦 [9svubv0v] POST /internal-api/validate-admin {"requestId":"9svubv0v","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-11-20 10:41:00.286 [INFO] 🟢 [9svubv0v] 200 POST /internal-api/validate-admin - 27ms {"requestId":"9svubv0v","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":27,"slow":false}
+2025-11-20 10:41:08.172 [INFO] 🟦 [dnxbr76p] GET /internal-api/sql-config {"requestId":"dnxbr76p","method":"GET","url":"/internal-api/sql-config","ip":"127.0.0.1","hasAuth":true}
+2025-11-20 10:41:08.183 [INFO] 🟢 [dnxbr76p] 200 GET /internal-api/sql-config - 11ms {"requestId":"dnxbr76p","method":"GET","url":"/internal-api/sql-config","status":200,"duration":11,"slow":false}
+2025-11-20 10:41:08.234 [INFO] 🟦 [gbi7u51g] GET /internal-api/sql-config {"requestId":"gbi7u51g","method":"GET","url":"/internal-api/sql-config","ip":"127.0.0.1","hasAuth":true}
+2025-11-20 10:41:08.241 [INFO] 🟢 [gbi7u51g] 200 GET /internal-api/sql-config - 7ms {"requestId":"gbi7u51g","method":"GET","url":"/internal-api/sql-config","status":200,"duration":7,"slow":false}

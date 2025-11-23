@@ -1,4 +1,5 @@
 const webpack = require('webpack');
+const os = require('os');
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
@@ -14,16 +15,35 @@ dotenv.config({ path: path.resolve(__dirname, envFile) });
 
 module.exports = (env, argv) => {
     const isProduction = argv.mode === 'production';
+    const localIPv4 = (() => {
+        try {
+            const ifaces = os.networkInterfaces();
+            for (const name of Object.keys(ifaces)) {
+                for (const iface of ifaces[name] || []) {
+                    if (iface.family === 'IPv4' && !iface.internal) {
+                        return iface.address;
+                    }
+                }
+            }
+        } catch (_) {}
+        return 'localhost';
+    })();
+    const autoApiBase = `http://${localIPv4}:9000`;
     
     // Define environment variables for DefinePlugin
+    // Dev: forzar IP local como base para evitar quedarnos con una IP vieja del .env
+    const effectiveApi = isProduction
+        ? (process.env.SAMBAPOS_API_URL || env.SAMBAPOS_API_URL || autoApiBase)
+        : autoApiBase;
+
     const envKeys = {
         'process.env': JSON.stringify({
             NODE_ENV: NODE_ENV,
-            API_URL: env.API_URL || 'http://localhost:9000',
+            API_URL: effectiveApi,
             // Core Samba endpoints
-            SAMBAPOS_API_URL: process.env.SAMBAPOS_API_URL || env.SAMBAPOS_API_URL,
-            SAMBAPOS_GRAPHQL_URL: process.env.SAMBAPOS_GRAPHQL_URL || `${env.API_URL || 'http://localhost:9000'}/api/graphql`,
-            SAMBAPOS_TOKEN_URL: process.env.SAMBAPOS_TOKEN_URL || `${env.API_URL || 'http://localhost:9000'}/Token`,
+            SAMBAPOS_API_URL: effectiveApi,
+            SAMBAPOS_GRAPHQL_URL: `${effectiveApi}/api/graphql`,
+            SAMBAPOS_TOKEN_URL: `${effectiveApi}/Token`,
             // Auth
             SAMBAPOS_USERNAME: process.env.SAMBAPOS_USERNAME || env.USER_NAME,
             SAMBAPOS_PASSWORD: process.env.SAMBAPOS_PASSWORD || env.PASSWORD,
@@ -98,7 +118,7 @@ module.exports = (env, argv) => {
             },
             proxy: {
                 '/api': {
-                    target: process.env.SAMBAPOS_API_URL || env.API_URL || 'http://localhost:9000',
+                    target: effectiveApi,
                     pathRewrite: { '^/api': '/api' },
                     changeOrigin: true,
                     secure: false,
@@ -119,7 +139,7 @@ module.exports = (env, argv) => {
                     }
                 },
                 '/Token': {
-                    target: process.env.SAMBAPOS_API_URL || env.API_URL || 'http://localhost:9000',
+                    target: effectiveApi,
                     changeOrigin: true,
                     secure: false,
                     onProxyReq: (proxyReq) => {
@@ -127,7 +147,7 @@ module.exports = (env, argv) => {
                     }
                 },
                 '/signalr': {
-                    target: process.env.SAMBAPOS_API_URL || env.API_URL || 'http://localhost:9000',
+                    target: effectiveApi,
                     changeOrigin: true,
                     secure: false
                 },

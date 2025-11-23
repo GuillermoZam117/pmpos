@@ -6,44 +6,29 @@
     "auditLog": "C:\\PMPOS\\pmpos\\server\\logs\\.fba800739ca238461433f647d21d2579a2994540-audit.json",
     "files": [
         {
-            "date": 1756923473167,
-            "name": "C:\\PMPOS\\pmpos\\server\\logs\\api-2025-09-03.log",
-            "hash": "a1232f3c77bb23938348502cc79af1df8d0b2f14611dba935249cd815b56d574"
+            "date": 1763436341376,
+            "name": "C:\\PMPOS\\pmpos\\server\\logs\\api-2025-11-17.log",
+            "hash": "ab3d18f3b279d125a77c917d4eee34668d9e5df318f24a9609b3e3819a591114"
         },
         {
-            "date": 1757001038183,
-            "name": "C:\\PMPOS\\pmpos\\server\\logs\\api-2025-09-04.log",
-            "hash": "6aff62eeb5c34d02b437ad7cd800010ee065590b87a9959c889b2fc39f91bd26"
+            "date": 1763474983722,
+            "name": "C:\\PMPOS\\pmpos\\server\\logs\\api-2025-11-18.log",
+            "hash": "c815bed47910dbe4bfde07d30200607308ac4a193031c7d29a7e4082e333297f"
         },
         {
-            "date": 1757090856505,
-            "name": "C:\\PMPOS\\pmpos\\server\\logs\\api-2025-09-05.log",
-            "hash": "873a0aa1a5d8b7b23ccf4cea34fe40a972ac6374e316fd4a0093fc85cfd78b79"
+            "date": 1763564955482,
+            "name": "C:\\PMPOS\\pmpos\\server\\logs\\api-2025-11-19.log",
+            "hash": "b8afcf2221ebb9857fcdd775fd46587bc15c5699cd900ae32d49ab795ead720e"
         },
         {
-            "date": 1757301934062,
-            "name": "C:\\PMPOS\\pmpos\\server\\logs\\api-2025-09-07.log",
-            "hash": "44588966d250d3916b577606c3f3e7af6146827f899d34a72886391f9898fbad"
+            "date": 1763656857666,
+            "name": "C:\\PMPOS\\pmpos\\server\\logs\\api-2025-11-20.log",
+            "hash": "65c66d37c7c3d9a160208b5816c0a4d41833d8d5983247ba87461df3912986ec"
         },
         {
-            "date": 1757347588450,
-            "name": "C:\\PMPOS\\pmpos\\server\\logs\\api-2025-09-08.log",
-            "hash": "8c466bddb57f85019eefbfa7b814138b9b979a8aad9789411c2dba27614b67d4"
-        },
-        {
-            "date": 1757429344510,
-            "name": "C:\\PMPOS\\pmpos\\server\\logs\\api-2025-09-09.log",
-            "hash": "f7d7878333b1fa61bf6b78c11281175bdf42ec26dca3050255be24bd925895fb"
-        },
-        {
-            "date": 1757522142271,
-            "name": "C:\\PMPOS\\pmpos\\server\\logs\\api-2025-09-10.log",
-            "hash": "a7a4e803c2141084429f0bd3a5c7f5bd3b25e0f847e63d73ad56494a0b335880"
-        },
-        {
-            "date": 1757599973046,
-            "name": "C:\\PMPOS\\pmpos\\server\\logs\\api-2025-09-11.log",
-            "hash": "af724894ca005db9112aee4b23eeb27e854c36608af8a01bbb2b554e77be90f8"
+            "date": 1763838657451,
+            "name": "C:\\PMPOS\\pmpos\\server\\logs\\api-2025-11-22.log",
+            "hash": "9735c1bcf5189940478a11c73f63e3a055f8b432241425407926da7296f9e2e5"
         }
     ],
     "hashType": "sha256"
