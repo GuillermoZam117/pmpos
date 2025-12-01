@@ -44,7 +44,8 @@ import {
     MenuBook as FullMenuIcon,
     Phone as PhoneIcon,
     Navigation as NavigationIcon,
-    Home as AddressIcon
+    Home as AddressIcon,
+    Assessment as AssessmentIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
@@ -57,7 +58,9 @@ import { useTheme as useCustomTheme } from '../contexts/ThemeContext';
 import { logout } from '../actions/auth';
 import QuickSaleGrid from './QuickSale/QuickSaleGrid';
 import QuickSaleCart from './QuickSale/QuickSaleCart';
+import QuickSaleConfigDialog from './QuickSale/QuickSaleConfigDialog';
 import SalesSummaryCard from './SalesSummaryCard';
+import SalesReportsDialog from './Reports/SalesReportsDialog';
 import { getQuickSaleConfig, getQuickProductPrice } from '../config/quickSale';
 import menuService from '../services/menuService';
 import PaymentProcessor from './PaymentProcessor';
@@ -100,6 +103,8 @@ const SalesModeDashboard = ({ modeKey, config, tickets = [], loading, error, onR
     const [quickSaleProducts, setQuickSaleProducts] = useState([]);
     const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
     const [currentTicketForPayment, setCurrentTicketForPayment] = useState(null);
+    const [configDialogOpen, setConfigDialogOpen] = useState(false);
+    const [reportsDialogOpen, setReportsDialogOpen] = useState(false);
     const { menu: menuData } = useDataManager();
 
     useEffect(() => {
@@ -344,6 +349,32 @@ const SalesModeDashboard = ({ modeKey, config, tickets = [], loading, error, onR
         }
     }, [saleMode]);
 
+    // Quick Sale handlers (must be defined before handleBarcodeScan)
+    const handleQuickAddToCart = useCallback((product) => {
+        setQuickCart(prev => {
+            const existingIndex = prev.findIndex(item =>
+                (item.id === product.id || item.productId === product.productId)
+            );
+
+            if (existingIndex >= 0) {
+                // Increment quantity
+                const updated = [...prev];
+                updated[existingIndex] = {
+                    ...updated[existingIndex],
+                    quantity: (updated[existingIndex].quantity || 1) + 1
+                };
+                return updated;
+            } else {
+                // Add new item
+                return [...prev, {
+                    ...product,
+                    quantity: 1,
+                    price: getQuickProductPrice(product)
+                }];
+            }
+        });
+    }, []);
+
     // Barcode scanner handler
     const handleBarcodeScan = useCallback((barcode) => {
         console.log('🔍 Barcode scanned:', barcode);
@@ -418,32 +449,6 @@ const SalesModeDashboard = ({ modeKey, config, tickets = [], loading, error, onR
             }
         }
     }, [wizardData, wizardOpen]);
-
-    // Quick Sale handlers
-    const handleQuickAddToCart = useCallback((product) => {
-        setQuickCart(prev => {
-            const existingIndex = prev.findIndex(item =>
-                (item.id === product.id || item.productId === product.productId)
-            );
-
-            if (existingIndex >= 0) {
-                // Increment quantity
-                const updated = [...prev];
-                updated[existingIndex] = {
-                    ...updated[existingIndex],
-                    quantity: (updated[existingIndex].quantity || 1) + 1
-                };
-                return updated;
-            } else {
-                // Add new item
-                return [...prev, {
-                    ...product,
-                    quantity: 1,
-                    price: getQuickProductPrice(product)
-                }];
-            }
-        });
-    }, []);
 
     const handleQuickRemoveFromCart = useCallback((product) => {
         setQuickCart(prev => {
@@ -545,6 +550,18 @@ const SalesModeDashboard = ({ modeKey, config, tickets = [], loading, error, onR
         // Refresh tickets
         await refreshData?.(true);
     }, [refreshData, isMountedRef]);
+
+    const handleQuickSaleConfigSave = useCallback((newConfig) => {
+        setQuickSaleProducts(newConfig.products || []);
+
+        if (isMountedRef.current) {
+            setSnackbar({
+                open: true,
+                message: `Configuración guardada: ${newConfig.products.length} productos`,
+                severity: 'success'
+            });
+        }
+    }, [isMountedRef]);
 
     const handleRefreshClick = (force = true) => {
         if (typeof onRefresh === 'function') return onRefresh(force);
@@ -841,8 +858,20 @@ const SalesModeDashboard = ({ modeKey, config, tickets = [], loading, error, onR
 
     const renderMostrador = () => (
         <Stack spacing={2}>
-            {/* Sales Summary */}
-            <SalesSummaryCard departmentName={config?.departmentName} />
+            {/* Sales Summary with Reports Button */}
+            <Stack direction="row" spacing={2} alignItems="stretch">
+                <Box sx={{ flexGrow: 1 }}>
+                    <SalesSummaryCard departmentName={config?.departmentName} />
+                </Box>
+                <Button
+                    variant="outlined"
+                    startIcon={<AssessmentIcon />}
+                    onClick={() => setReportsDialogOpen(true)}
+                    sx={{ minWidth: 120 }}
+                >
+                    Reportes
+                </Button>
+            </Stack>
 
             <Paper sx={{ p: 3 }}>
                 <Typography variant="h6" gutterBottom>Venta de Mostrador</Typography>
@@ -881,6 +910,7 @@ const SalesModeDashboard = ({ modeKey, config, tickets = [], loading, error, onR
                             onAddToCart={handleQuickAddToCart}
                             onRemoveFromCart={handleQuickRemoveFromCart}
                             onOpenFullMenu={() => startSale()}
+                            onProductConfig={() => setConfigDialogOpen(true)}
                         />
                         <QuickSaleCart
                             cart={quickCart}
@@ -923,6 +953,21 @@ const SalesModeDashboard = ({ modeKey, config, tickets = [], loading, error, onR
                     onPaymentCompleted={handlePaymentCompleted}
                 />
             )}
+
+            {/* Quick Sale Configuration Dialog */}
+            <QuickSaleConfigDialog
+                open={configDialogOpen}
+                onClose={() => setConfigDialogOpen(false)}
+                menuData={menuData}
+                onSave={handleQuickSaleConfigSave}
+            />
+
+            {/* Sales Reports Dialog */}
+            <SalesReportsDialog
+                open={reportsDialogOpen}
+                onClose={() => setReportsDialogOpen(false)}
+                departmentName={config?.departmentName}
+            />
         </Stack>
     );
 

@@ -29,6 +29,11 @@
             "date": 1763838657451,
             "name": "C:\\PMPOS\\pmpos\\server\\logs\\api-2025-11-22.log",
             "hash": "9735c1bcf5189940478a11c73f63e3a055f8b432241425407926da7296f9e2e5"
+        },
+        {
+            "date": 1763919046178,
+            "name": "C:\\PMPOS\\pmpos\\server\\logs\\api-2025-11-23.log",
+            "hash": "4a2ef9e29801b3e0e7b234c096391d572171dd29f463e4ec0ec88d4c8b584a83"
         }
     ],
     "hashType": "sha256"

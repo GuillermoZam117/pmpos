@@ -24,6 +24,11 @@
             "date": 1763838657503,
             "name": "C:\\PMPOS\\pmpos\\server\\logs\\graphql-2025-11-22.log",
             "hash": "c672c4d7b9d4e7dff0ec9c580838829fc28940d2f17c8876d8661da8d297d61e"
+        },
+        {
+            "date": 1763919046183,
+            "name": "C:\\PMPOS\\pmpos\\server\\logs\\graphql-2025-11-23.log",
+            "hash": "9ab868421bcf666befb4e909d643129599d9899b1b6f83ec7e3f111636736f39"
         }
     ],
     "hashType": "sha256"

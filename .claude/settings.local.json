@@ -48,7 +48,8 @@
       "Read(/C:\\PMPOS\\pmpos\\app\\services/**)",
       "Bash(tasklist:*)",
       "Bash(findstr:*)",
-      "Bash(wmic process where ProcessId=31912 delete:*)"
+      "Bash(wmic process where ProcessId=31912 delete:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

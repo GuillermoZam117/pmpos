@@ -133,6 +133,68 @@ app.get('/internal-api/health', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /internal-api/health/postgres:
+ *   get:
+ *     summary: PostgreSQL health check
+ *     description: Checks PostgreSQL connectivity and pool status
+ *     tags: [Health]
+ *     security:
+ *       - ApiKeyAuth: []
+ *     responses:
+ *       200:
+ *         description: PostgreSQL is healthy
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: ok
+ *                 database:
+ *                   type: string
+ *                   example: pmpos_db
+ *                 pool:
+ *                   type: object
+ *                   properties:
+ *                     totalCount:
+ *                       type: integer
+ *                     idleCount:
+ *                       type: integer
+ *                     waitingCount:
+ *                       type: integer
+ *       500:
+ *         description: PostgreSQL unavailable
+ */
+app.get('/internal-api/health/postgres', async (req, res) => {
+    try {
+        const { testConnection, getPoolInfo } = require('./config/database');
+        const isConnected = await testConnection();
+        
+        if (isConnected) {
+            const poolInfo = getPoolInfo();
+            res.json({
+                status: 'ok',
+                database: process.env.PG_DATABASE || 'pmpos_db',
+                pool: poolInfo
+            });
+        } else {
+            res.status(500).json({
+                status: 'error',
+                message: 'PostgreSQL connection failed'
+            });
+        }
+    } catch (err) {
+        debug('PostgreSQL health check failed', err && err.message);
+        res.status(500).json({
+            status: 'error',
+            message: err && err.message
+        });
+    }
+});
+
 app.get('/internal-api/sql-config', async (req, res) => {
     try {
         const sqlConfig = require('./lib/sqlConfig');

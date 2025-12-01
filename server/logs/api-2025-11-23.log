@@ -1,0 +1,34 @@
+2025-11-23 11:30:46.205 [INFO] ================================================== START SESSION ==================================================
+2025-11-23 11:30:46.210 [INFO] Server started at 2025-11-23T17:30:46.208Z
+2025-11-23 11:30:46.211 [INFO] Log directory: C:\PMPOS\pmpos\server\logs
+2025-11-23 11:32:51.373 [INFO] 🟦 [6djytg49] GET /internal-api/sql-config {"requestId":"6djytg49","method":"GET","url":"/internal-api/sql-config","ip":"127.0.0.1","hasAuth":true}
+2025-11-23 11:33:05.480 [INFO] 🟢 [6djytg49] 200 GET /internal-api/sql-config - 14109ms {"requestId":"6djytg49","method":"GET","url":"/internal-api/sql-config","status":200,"duration":14109,"slow":true}
+2025-11-23 11:33:05.483 [WARN] ⚠️  [6djytg49] SLOW API REQUEST: 14109ms for GET /internal-api/sql-config {"requestId":"6djytg49","method":"GET","url":"/internal-api/sql-config","duration":14109,"slow":true}
+2025-11-23 11:33:05.612 [INFO] 🟦 [22qszwnt] GET /internal-api/sql-config {"requestId":"22qszwnt","method":"GET","url":"/internal-api/sql-config","ip":"127.0.0.1","hasAuth":true}
+2025-11-23 11:33:05.627 [INFO] 🟢 [22qszwnt] 200 GET /internal-api/sql-config - 16ms {"requestId":"22qszwnt","method":"GET","url":"/internal-api/sql-config","status":200,"duration":16,"slow":false}
+2025-11-23 11:33:35.574 [INFO] 🟦 [4ihiihzv] POST /internal-api/validate-admin {"requestId":"4ihiihzv","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-11-23 11:33:35.611 [INFO] 🟢 [4ihiihzv] 200 POST /internal-api/validate-admin - 37ms {"requestId":"4ihiihzv","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":37,"slow":false}
+2025-11-23 11:33:49.686 [INFO] 🟦 [rv08az0m] GET /internal-api/sql-config {"requestId":"rv08az0m","method":"GET","url":"/internal-api/sql-config","ip":"127.0.0.1","hasAuth":true}
+2025-11-23 11:33:49.695 [INFO] 🟢 [rv08az0m] 200 GET /internal-api/sql-config - 10ms {"requestId":"rv08az0m","method":"GET","url":"/internal-api/sql-config","status":200,"duration":10,"slow":false}
+2025-11-23 11:33:49.728 [INFO] 🟦 [8rphujwp] GET /internal-api/sql-config {"requestId":"8rphujwp","method":"GET","url":"/internal-api/sql-config","ip":"127.0.0.1","hasAuth":true}
+2025-11-23 11:33:49.735 [INFO] 🟢 [8rphujwp] 200 GET /internal-api/sql-config - 8ms {"requestId":"8rphujwp","method":"GET","url":"/internal-api/sql-config","status":200,"duration":8,"slow":false}
+2025-11-23 11:33:55.359 [INFO] 🟦 [9p726dtj] POST /internal-api/validate-admin {"requestId":"9p726dtj","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-11-23 11:33:55.371 [INFO] 🟢 [9p726dtj] 200 POST /internal-api/validate-admin - 13ms {"requestId":"9p726dtj","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":13,"slow":false}
+2025-11-23 11:34:00.427 [INFO] 🟦 [6oyu3g9f] GET /internal-api/sql-config {"requestId":"6oyu3g9f","method":"GET","url":"/internal-api/sql-config","ip":"127.0.0.1","hasAuth":true}
+2025-11-23 11:34:00.432 [INFO] 🟢 [6oyu3g9f] 200 GET /internal-api/sql-config - 5ms {"requestId":"6oyu3g9f","method":"GET","url":"/internal-api/sql-config","status":200,"duration":5,"slow":false}
+2025-11-23 11:34:00.464 [INFO] 🟦 [to4lggzy] GET /internal-api/sql-config {"requestId":"to4lggzy","method":"GET","url":"/internal-api/sql-config","ip":"127.0.0.1","hasAuth":true}
+2025-11-23 11:34:00.469 [INFO] 🟢 [to4lggzy] 200 GET /internal-api/sql-config - 5ms {"requestId":"to4lggzy","method":"GET","url":"/internal-api/sql-config","status":200,"duration":5,"slow":false}
+2025-11-23 11:34:04.188 [INFO] 🟦 [8gmh88z5] POST /internal-api/validate-admin {"requestId":"8gmh88z5","method":"POST","url":"/internal-api/validate-admin","ip":"127.0.0.1","hasAuth":true}
+2025-11-23 11:34:04.203 [INFO] 🟢 [8gmh88z5] 200 POST /internal-api/validate-admin - 14ms {"requestId":"8gmh88z5","method":"POST","url":"/internal-api/validate-admin","status":200,"duration":14,"slow":false}
+2025-11-23 11:34:06.177 [INFO] 🟦 [dng49wyt] GET /internal-api/sql-config {"requestId":"dng49wyt","method":"GET","url":"/internal-api/sql-config","ip":"127.0.0.1","hasAuth":true}
+2025-11-23 11:34:06.182 [INFO] 🟢 [dng49wyt] 200 GET /internal-api/sql-config - 5ms {"requestId":"dng49wyt","method":"GET","url":"/internal-api/sql-config","status":200,"duration":5,"slow":false}
+2025-11-23 11:34:06.210 [INFO] 🟦 [ldco542k] GET /internal-api/sql-config {"requestId":"ldco542k","method":"GET","url":"/internal-api/sql-config","ip":"127.0.0.1","hasAuth":true}
+2025-11-23 11:34:06.215 [INFO] 🟢 [ldco542k] 200 GET /internal-api/sql-config - 5ms {"requestId":"ldco542k","method":"GET","url":"/internal-api/sql-config","status":200,"duration":5,"slow":false}
+2025-11-23 11:34:15.098 [INFO] 🟦 [wj195cqx] GET /internal-api/sql-config {"requestId":"wj195cqx","method":"GET","url":"/internal-api/sql-config","ip":"127.0.0.1","hasAuth":true}
+2025-11-23 11:34:15.104 [INFO] 🟢 [wj195cqx] 200 GET /internal-api/sql-config - 7ms {"requestId":"wj195cqx","method":"GET","url":"/internal-api/sql-config","status":200,"duration":7,"slow":false}
+2025-11-23 11:34:15.143 [INFO] 🟦 [nenvpnt6] GET /internal-api/sql-config {"requestId":"nenvpnt6","method":"GET","url":"/internal-api/sql-config","ip":"127.0.0.1","hasAuth":true}
+2025-11-23 11:34:15.147 [INFO] 🟢 [nenvpnt6] 200 GET /internal-api/sql-config - 5ms {"requestId":"nenvpnt6","method":"GET","url":"/internal-api/sql-config","status":200,"duration":5,"slow":false}
+2025-11-23 11:36:38.459 [INFO] 🟦 [q4xosc2k] GET /internal-api/sql-config {"requestId":"q4xosc2k","method":"GET","url":"/internal-api/sql-config","ip":"127.0.0.1","hasAuth":true}
+2025-11-23 11:36:38.573 [INFO] 🟢 [q4xosc2k] 200 GET /internal-api/sql-config - 120ms {"requestId":"q4xosc2k","method":"GET","url":"/internal-api/sql-config","status":200,"duration":120,"slow":false}
+2025-11-23 11:36:38.658 [INFO] 🟦 [e4togjb7] GET /internal-api/sql-config {"requestId":"e4togjb7","method":"GET","url":"/internal-api/sql-config","ip":"127.0.0.1","hasAuth":true}
+2025-11-23 11:36:38.661 [INFO] 🟢 [e4togjb7] 200 GET /internal-api/sql-config - 3ms {"requestId":"e4togjb7","method":"GET","url":"/internal-api/sql-config","status":200,"duration":3,"slow":false}

@@ -4,7 +4,7 @@
  */
 
 import { graphqlRequest } from './graphqlService';
-import { GET_TICKETS } from '../graphql/queries';
+import { GET_OPEN_TICKETS } from '../graphql/queries';
 import Debug from 'debug';
 
 const debug = Debug('pmpos:sales-summary');
@@ -40,8 +40,8 @@ class SalesSummaryService {
         try {
             debug('📊 Fetching sales summary...');
 
-            // Get all tickets
-            const response = await graphqlRequest(GET_TICKETS, {});
+            // Get all tickets (open only - will need filtering for closed)
+            const response = await graphqlRequest(GET_OPEN_TICKETS, {});
             const allTickets = response?.getTickets || [];
 
             // Filter tickets
